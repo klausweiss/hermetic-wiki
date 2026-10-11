@@ -1,0 +1,27 @@
+# Proposal
+
+## Why
+
+The core workflow is writing in today's journal and referencing pages that get created on demand. Doing that from the browser, in the same UI used for reading, removes the need for a separate editor and makes hermetic a complete Logseq replacement for project notes.
+
+## What Changes
+
+- In `hermetic serve`, allow editing journal days and pages from the browser; changes are written back to the markdown files.
+- "Today" journal entry point; creating a page by following a link to an implicit page.
+- Copying a block reference assigns a short generated `id::` to the block if it has none.
+- An edit API on the server, with strict path safety: page names go through the `source-layout` encoding, invalid names are rejected, and every resolved path is canonicalized and checked to remain inside the source directory before writing.
+- Conflict detection when a file was changed on disk (e.g. by `$EDITOR`) since it was loaded in the browser.
+- Editor implemented in vanilla JS with no external dependencies; preview rendering is done by the server (single markdown renderer).
+
+## Capabilities
+
+### New Capabilities
+- `browser-editing`: the edit UI, page/journal creation, block id generation, edit API, path safety, and conflict handling.
+
+### Modified Capabilities
+- `serve-mode`: adds write endpoints and their security constraints.
+
+## Impact
+
+- Depends on `serve-mode` and `core-graph-model` (lossless markdown round-tripping of blocks).
+- Editor style (plain text vs. block outliner) to be decided in design.

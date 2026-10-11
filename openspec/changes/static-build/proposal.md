@@ -9,7 +9,8 @@ The notes must stay readable years from now without any tooling beyond a browser
 - Add a `hermetic build <dir> [<out>]` command; no configuration files, no flags required.
 - hermetic is a single executable that embeds everything needed to produce the output (CSS, JS, fonts, search tooling). Building makes **no network requests**.
 - Output is a directory of HTML files, one per page and one per journal day; HTML is the only content format and there is a single markdown renderer (Rust).
-- The whole wiki works without JavaScript: every page includes its own content, its linked references (each referencing block with its subtree and an ancestor breadcrumb), and its open tasks.
+- The whole wiki works without JavaScript: every page includes its own content, its linked references (each referencing block with its subtree and an ancestor breadcrumb), its open tasks, and a "Related" section listing co-mentioned pages with their weight, each expandable (e.g. `<details>`) to the shared blocks.
+- Markdown links between notes are rewritten to the corresponding generated pages; unresolved ones are rendered visibly broken.
 - No output file grows with the size of the whole wiki, except the search index (see `search`). Global views are split so each file stays bounded (e.g. journal index split by period; heavily referenced pages may paginate their references).
 - Generated pages:
   - page and implicit-page HTML,

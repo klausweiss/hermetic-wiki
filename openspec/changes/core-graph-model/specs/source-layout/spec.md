@@ -1,0 +1,111 @@
+# Spec Delta
+
+## Purpose
+
+Defines how a notes directory is laid out with zero configuration, how page names map to files and back in a reversible, Windows-portable way, and how page names are matched.
+
+## ADDED Requirements
+
+### Requirement: Source directory conventions
+The system SHALL treat a given directory as the notes root with no configuration file. Markdown files (`.md`) under `journals/` SHALL be journal pages and markdown files under `pages/` (at any depth) SHALL be regular pages. Files outside these two directories, non-markdown files, and any file or directory whose name begins with `.` SHALL be ignored.
+
+#### Scenario: Journals and pages are discovered
+- **WHEN** the root contains `journals/2026-10-12.md` and `pages/auth.md`
+- **THEN** the graph contains a journal page for 2026-10-12 and a regular page named `auth`
+
+#### Scenario: Unrelated files are ignored
+- **WHEN** the root contains `README.md`, `pages/diagram.png`, and `pages/.drafts/x.md`
+- **THEN** none of them become pages and no diagnostic is reported for them
+
+#### Scenario: Empty or missing directories
+- **WHEN** the root has no `journals/` or no `pages/` directory
+- **THEN** the graph is built from whatever exists without error
+
+### Requirement: Journal page naming
+A journal file SHALL be named `YYYY-MM-DD.md` with a valid calendar date, and its page name SHALL be that date string. A file in `journals/` whose name is not a valid date SHALL be reported as a diagnostic and treated as a regular page named after its file stem.
+
+#### Scenario: Valid journal file
+- **WHEN** the root contains `journals/2024-02-29.md`
+- **THEN** it becomes the journal page `2024-02-29` dated 29 February 2024
+
+#### Scenario: Invalid journal file name
+- **WHEN** the root contains `journals/2026-13-40.md` or `journals/notes.md`
+- **THEN** a diagnostic names the file and it is treated as a regular page named by its file stem
+
+### Requirement: Namespaces as directories
+A page name containing `/` SHALL denote a namespace path, and each `/`-separated segment SHALL map to one directory level under `pages/`, with the last segment as the file stem. Every namespace prefix of an existing or referenced page SHALL itself be a page in the graph (implicit if it has no file), and the graph SHALL record the parent/child relation between them.
+
+#### Scenario: Namespaced page file
+- **WHEN** the root contains `pages/Project X/Auth Flow.md`
+- **THEN** the graph contains the page `Project X/Auth Flow` whose namespace parent is the page `Project X`
+
+#### Scenario: Page and namespace directory side by side
+- **WHEN** the root contains both `pages/Project X.md` and `pages/Project X/Auth Flow.md`
+- **THEN** `Project X` is a page with content from `pages/Project X.md` and is the namespace parent of `Project X/Auth Flow`
+
+### Requirement: Reversible portable file-name encoding
+Mapping a page name to a file path SHALL escape, within each segment, every character that is unsafe on Linux, macOS, or Windows as `%` followed by two uppercase hexadecimal digits of each UTF-8 byte. The escaped set SHALL be: control characters (U+0000–U+001F, U+007F), `<`, `>`, `:`, `"`, `\`, `|`, `?`, `*`, `%`, a trailing `.` or space of a segment, and the first character of a segment whose name, or whose part before its first `.`, is (case-insensitively) a Windows reserved device name (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`). Mapping a file path back to a page name SHALL decode `%XX` sequences (hex digits in either case); a `%` not followed by two hex digits SHALL be kept literally. For every valid page name, encoding then decoding SHALL yield the original name.
+
+#### Scenario: Unsafe characters are escaped
+- **WHEN** the page `C#: a|b?` is mapped to a file path
+- **THEN** the path is `pages/C#%3A a%7Cb%3F.md`
+
+#### Scenario: Percent sign round-trips
+- **WHEN** the page `50% done` is mapped to a file path and back
+- **THEN** the file is `pages/50%25 done.md` and decodes to `50% done`
+
+#### Scenario: Windows reserved name
+- **WHEN** the page `con` is mapped to a file path
+- **THEN** the path is `pages/%63on.md`
+
+#### Scenario: Trailing dot
+- **WHEN** the page `etc.` is mapped to a file path
+- **THEN** the path is `pages/etc%2E.md`
+
+#### Scenario: Hand-created file with unescaped name
+- **WHEN** a file `pages/a:b.md` exists (created outside hermetic on Linux)
+- **THEN** it is read as the page `a:b`
+
+### Requirement: Invalid page names
+A page name SHALL be invalid if it is empty after trimming whitespace, contains NUL, has an empty segment (leading, trailing, or doubled `/`), has a segment equal to `.` or `..`, or has a segment beginning with `.`. Invalid names SHALL never be mapped to a file path; references using them SHALL be reported as diagnostics and not treated as references.
+
+#### Scenario: Path traversal attempt
+- **WHEN** a block contains `[[../../etc/passwd]]`
+- **THEN** a diagnostic is reported, no page is created, and no file path is produced for that name
+
+#### Scenario: Empty segment
+- **WHEN** a block contains `[[a//b]]` or `[[/a]]`
+- **THEN** a diagnostic is reported and no reference is recorded
+
+### Requirement: Name normalization and case-insensitive matching
+Page names SHALL be normalized to Unicode NFC and have surrounding whitespace trimmed. Two names SHALL refer to the same page when their NFC forms are equal after Unicode lowercasing. A page's display name SHALL be the decoded name of its file when one exists; for an implicit page it SHALL be the spelling of its first mention in scan order (journals by ascending date, then pages by ascending path).
+
+#### Scenario: Different casing resolves to one page
+- **WHEN** `pages/Auth.md` exists and blocks mention `[[auth]]` and `[[AUTH]]`
+- **THEN** both resolve to the page displayed as `Auth`
+
+#### Scenario: NFD file name matches NFC link
+- **WHEN** the file name is stored in NFD form (as macOS may do) and a block links to the same name in NFC form
+- **THEN** the link resolves to that page
+
+#### Scenario: Implicit page display name
+- **WHEN** no file exists for `redis`, journal 2026-01-01 mentions `[[Redis]]`, and journal 2026-02-01 mentions `[[redis]]`
+- **THEN** the implicit page is displayed as `Redis`
+
+### Requirement: Colliding page files
+When two or more files map to the same page (e.g. names differing only in case or Unicode normalization), the system SHALL use the file whose path sorts first by byte order, report a diagnostic naming all colliding files, and ignore the others.
+
+#### Scenario: Case collision on a case-sensitive file system
+- **WHEN** both `pages/Auth.md` and `pages/auth.md` exist
+- **THEN** `pages/Auth.md` is used and a diagnostic names both files
+
+### Requirement: Robust file reading
+Files SHALL be read as UTF-8 with LF or CRLF line endings. A file that cannot be read or is not valid UTF-8 SHALL be reported as a diagnostic and skipped. Diagnostics SHALL never prevent the rest of the graph from being built, and building the graph from the same directory contents SHALL always produce the same result.
+
+#### Scenario: Invalid UTF-8
+- **WHEN** `pages/broken.md` contains invalid UTF-8 bytes
+- **THEN** a diagnostic names the file and all other pages are still built
+
+#### Scenario: CRLF line endings
+- **WHEN** a file uses CRLF line endings
+- **THEN** it is parsed identically to the same file with LF line endings

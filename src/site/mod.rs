@@ -144,8 +144,17 @@ pub fn render(
         site_files.push(pages::default_home(&site));
     }
     site_files.extend(pages::task_files(&site));
+    site_files.push(pages::search_page(&site));
     for file in site_files {
         files.insert(file.path, Content::Bytes(file.html.into_bytes()));
+    }
+    let info = crate::search::index::SiteInfo {
+        path: &|p| site.out_path(p).to_path_buf(),
+        title: &|p| graph.page(p).name.clone(),
+        anchor: &|b| site.anchor(b),
+    };
+    for (path, bytes) in crate::search::index::build(graph, &info) {
+        files.insert(path, Content::Bytes(bytes));
     }
     let generated: HashSet<PathBuf> = files.keys().cloned().collect();
     for (path, bytes) in assets::EMBEDDED {

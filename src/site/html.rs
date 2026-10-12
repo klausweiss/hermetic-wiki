@@ -69,7 +69,7 @@ pub fn document(site_title: &str, path: &Path, title: &str, main: &str) -> Strin
          <body>\n\
          <header class=\"site-header\">\n\
          <a class=\"site-title\" href=\"{index}\">{site}</a>\n\
-         <nav class=\"site-nav\"><a href=\"{journals}\">Journals</a><a href=\"{pages}\">All pages</a><a href=\"{tasks}\">Open tasks</a><hermetic-theme-toggle></hermetic-theme-toggle></nav>\n\
+         <nav class=\"site-nav\"><a href=\"{journals}\">Journals</a><a href=\"{pages}\">All pages</a><a href=\"{tasks}\">Open tasks</a><hermetic-search></hermetic-search><hermetic-theme-toggle></hermetic-theme-toggle></nav>\n\
          </header>\n\
          <main>\n{main}</main>\n\
          <hermetic-sidebar></hermetic-sidebar>\n\

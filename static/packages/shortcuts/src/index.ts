@@ -1,7 +1,15 @@
 // <hermetic-shortcuts>: keyboard shortcuts and a help dialog listing them. It talks to
 // the sidebar only through events and the URL, so it works with or without one.
 
-import { SIDEBAR_CLOSE_TOP, SIDEBAR_TOGGLE, readEnv, readPanes, whenParsed, withPanes } from "@hermetic/core";
+import {
+  SEARCH_FOCUS,
+  SIDEBAR_CLOSE_TOP,
+  SIDEBAR_TOGGLE,
+  readEnv,
+  readPanes,
+  whenParsed,
+  withPanes,
+} from "@hermetic/core";
 
 const GO_TARGETS: Readonly<Record<string, string>> = {
   h: "index.html",
@@ -14,13 +22,19 @@ interface Shortcut {
   keys: string;
   what: string;
   sidebar?: true;
+  search?: true;
 }
+
+/** Ctrl+K, or Cmd+K on Apple platforms, as the help dialog names it. */
+const MOD_K = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘ K" : "Ctrl + K";
 
 const HELP: readonly Shortcut[] = [
   { keys: "g h", what: "Home" },
   { keys: "g j", what: "Journals" },
   { keys: "g p", what: "All pages" },
   { keys: "g t", what: "Open tasks" },
+  { keys: "/", what: "Search", search: true },
+  { keys: MOD_K, what: "Search, even while typing", search: true },
   { keys: "Shift + click", what: "Open a page in the sidebar", sidebar: true },
   { keys: "Esc", what: "Close the top sidebar pane", sidebar: true },
   { keys: "\\", what: "Show or hide the sidebar", sidebar: true },
@@ -48,6 +62,20 @@ export class HermeticShortcuts extends HTMLElement {
   }
 
   private onKey(e: KeyboardEvent): void {
+    // Ctrl+K / Cmd+K works even in a text field, and replaces the browser's own binding
+    // (Firefox's web search) only when there is a search box to focus.
+    if (
+      !e.defaultPrevented &&
+      (e.ctrlKey || e.metaKey) &&
+      !e.altKey &&
+      !e.shiftKey &&
+      e.key.toLowerCase() === "k" &&
+      hasSearch()
+    ) {
+      e.preventDefault();
+      document.dispatchEvent(new Event(SEARCH_FOCUS));
+      return;
+    }
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) {
       return;
     }
@@ -70,6 +98,13 @@ export class HermeticShortcuts extends HTMLElement {
           document.dispatchEvent(new Event(SIDEBAR_CLOSE_TOP));
         }
         break;
+      case "/":
+        // Only when a search box is shown; otherwise the key keeps its default.
+        if (hasSearch()) {
+          e.preventDefault();
+          document.dispatchEvent(new Event(SEARCH_FOCUS));
+        }
+        break;
       case "\\":
         e.preventDefault();
         document.dispatchEvent(new Event(SIDEBAR_TOGGLE));
@@ -90,7 +125,7 @@ export class HermeticShortcuts extends HTMLElement {
     title.textContent = "Keyboard shortcuts";
     const list = document.createElement("dl");
     for (const s of HELP) {
-      if (s.sidebar && !withSidebar) {
+      if ((s.sidebar && !withSidebar) || (s.search && !hasSearch())) {
         continue;
       }
       const dt = document.createElement("dt");
@@ -107,6 +142,11 @@ export class HermeticShortcuts extends HTMLElement {
     this.append(dialog);
     return dialog;
   }
+}
+
+/** The search box renders only where it can work (over http). */
+function hasSearch(): boolean {
+  return document.querySelector("hermetic-search input") !== null;
 }
 
 function isTyping(target: EventTarget | null): boolean {

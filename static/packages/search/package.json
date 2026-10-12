@@ -1,0 +1,8 @@
+{
+  "name": "@hermetic/search",
+  "private": true,
+  "type": "module",
+  "description": "<hermetic-search> and <hermetic-search-results>: full-text search over the index hermetic writes to search/.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@hermetic/core": "workspace:*" }
+}

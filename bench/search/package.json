@@ -1,0 +1,10 @@
+{
+  "name": "hermetic-search-bench",
+  "private": true,
+  "type": "module",
+  "description": "Development-only relevance and performance benchmark of hermetic's search against Pagefind. Nothing here ships.",
+  "packageManager": "bun@1.4.2",
+  "devDependencies": {
+    "playwright-core": "1.64.0"
+  }
+}

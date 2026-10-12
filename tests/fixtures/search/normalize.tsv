@@ -1,0 +1,51 @@
+## input<TAB>expected words, space separated. Shared by the Rust and TypeScript tests.
+Zażółć gęślą jaźń	zazolc gesla jazn
+ZAŻÓŁĆ GĘŚLĄ JAŹŃ	zazolc gesla jazn
+Łódź	lodz
+łąka	laka
+Kraków, Wrocław; Gdańsk.	krakow wroclaw gdansk
+Straße	strasse
+STRASSE	strasse
+Müller über Ärger	muller uber arger
+Œuvre	oeuvre
+cœur	coeur
+Æsir encyclopædia	aesir encyclopaedia
+Øresund smørrebrød	oresund smorrebrod
+Đorđe	dorde
+þing	thing
+İstanbul	istanbul
+ıspanak	ispanak
+café crème brûlée	cafe creme brulee
+naïve façade	naive facade
+niño señor	nino senor
+São Paulo	sao paulo
+Ångström	angstrom
+fiancé déjà vu	fiance deja vu
+ﬁnance	finance
+Ｆｕｌｌｗｉｄｔｈ	fullwidth
+x² + y³	x2 y3
+token refresh shipped for [[auth]]	token refresh shipped for auth
+#backend #[[Project X]]	backend project x
+((auth-ttl-bug))	auth ttl bug
+snake_case and kebab-case	snake case and kebab case
+don't won't	don t won t
+e-mail e.mail	e mail e mail
+v1.2.3 2026-10-12	v1 2 3 2026 10 12
+100% done!	100 done
+C# and C++	c and c
+UPPER lower MiXeD	upper lower mixed
+   leading and trailing   	leading and trailing
+tabs\tand\nnewlines	tabs and newlines
+	
+!!! ... ???	
+émoji 🎉 party	emoji party
+Москва и Санкт-Петербург	москва и санкт петербург
+Ёлка	елка
+Ελληνικά ΟΔΟΣ	ελληνικα οδοσ
+ﾃｽﾄ	テスト
+日本語テキスト	日本語テキスト
+123abc456	123abc456
+a1b2	a1b2
+über-cool	uber cool
+résumé	resume
+Ǆ ǅ ǆ	dz dz dz

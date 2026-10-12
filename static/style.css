@@ -301,3 +301,38 @@ dialog.shortcuts h2 { margin-top: 0; }
 dialog.shortcuts dl { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 1rem; }
 dialog.shortcuts dt { font-family: "JetBrains Mono", monospace; font-size: 0.85rem; }
 dialog.shortcuts dd { margin: 0; }
+
+/* Search (shown only when the script runs over http) */
+
+hermetic-search { position: relative; }
+hermetic-search input {
+  font: inherit; font-size: 0.85rem; width: 12rem; max-width: 40vw;
+  padding: 0.15rem 0.55rem; color: var(--text); background: var(--bg);
+  border: 1px solid var(--border); border-radius: 6px;
+}
+hermetic-search input:focus { outline: 2px solid var(--link); outline-offset: -1px; }
+.search-dropdown {
+  position: absolute; top: calc(100% + 0.35rem); left: 0; z-index: 20;
+  width: min(34rem, calc(100vw - 32px)); max-height: 70vh; overflow-y: auto;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12); padding: 0.3rem;
+}
+.search-result {
+  display: block; padding: 0.45rem 0.6rem; border-radius: 6px; color: var(--text);
+}
+.search-result:hover, .search-result[aria-selected="true"] { background: var(--surface); text-decoration: none; }
+.search-result-head { display: flex; flex-wrap: wrap; gap: 0 0.5rem; align-items: baseline; }
+.search-result-title { font-weight: 600; font-size: 0.9rem; }
+.search-result-crumbs { font-size: 0.78rem; color: var(--muted); }
+.search-result-preview { display: block; font-size: 0.85rem; color: var(--muted); overflow-wrap: anywhere; }
+.search-result mark { background: none; color: var(--text); font-weight: 650; text-decoration: underline; text-decoration-color: var(--link); text-underline-offset: 2px; }
+.search-note, .search-summary { color: var(--muted); font-size: 0.85rem; margin: 0.3rem 0.6rem; }
+.search-all { display: block; padding: 0.35rem 0.6rem; font-size: 0.85rem; }
+.search-list .search-result { padding: 0.6rem 0.75rem; margin: 0.2rem 0; }
+.search-unavailable[hidden] { display: none; }
+
+@media (max-width: 600px) {
+  hermetic-search { flex-basis: 100%; }
+  hermetic-search input { width: 100%; max-width: none; }
+  .search-dropdown { width: calc(100vw - 32px); }
+}

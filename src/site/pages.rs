@@ -371,6 +371,22 @@ fn journal_list(site: &Site, path: PathBuf, view: &str, footer: &str) -> OutFile
     }
 }
 
+/// `search.html`: results for `?q=`, filled in by `<hermetic-search-results>`. Without
+/// the script (or over `file://`) it explains what search needs.
+pub fn search_page(site: &Site) -> OutFile {
+    let path = PathBuf::from("search.html");
+    let main = "<article class=\"page index\" data-view=\"search\">\n\
+        <header class=\"page-header\"><h1>Search</h1></header>\n\
+        <hermetic-search-results></hermetic-search-results>\n\
+        <p class=\"search-unavailable\">Search needs JavaScript and the site served over <code>http://</code>. \
+        Run <code>hermetic serve</code> in the notes folder, or host the site on a web server.</p>\n\
+        </article>\n";
+    OutFile {
+        html: document(&site.title, &path, "Search", main),
+        path,
+    }
+}
+
 /// `pages.html`: every non-journal page, case-insensitively by name.
 pub fn all_pages(site: &Site) -> OutFile {
     let path = PathBuf::from("pages.html");

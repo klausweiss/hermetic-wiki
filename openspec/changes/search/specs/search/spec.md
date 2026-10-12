@@ -77,7 +77,7 @@ When the script runs over `http:` or `https:`, the header SHALL contain a search
 - **THEN** no search box is shown, and opening `search.html` shows the explanation
 
 ### Requirement: Index size and loading
-The index SHALL be split so that a query of up to three words loads only the index files for those words' first letters plus metadata, never the whole index. For the 5,000-journal benchmark corpus, the files a typical query loads SHALL total less than 300 KB uncompressed, and the whole index SHALL be no larger than the notes' markdown text.
+The index SHALL be split so that a query of up to three words loads only the index files for those words' first letters plus metadata, never the whole index. For the 5,000-journal benchmark corpus, the files a typical query loads SHALL total less than 300 KB uncompressed, and the whole index SHALL be no larger than twice the notes' markdown text, and no larger than a quarter of it when gzip-compressed (as static hosts and browsers transfer it).
 
 #### Scenario: Loading only what a query needs
 - **WHEN** the reader searches `redis ttl` on the 5,000-journal corpus

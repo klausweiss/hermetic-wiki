@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -93,4 +94,27 @@ pub fn contents(g: &Graph, blocks: impl IntoIterator<Item = BlockId>) -> Vec<Str
 
 pub fn kinds(diags: &[Diagnostic]) -> Vec<DiagnosticKind> {
     diags.iter().map(|d| d.kind).collect()
+}
+
+/// Every file under `dir` with its bytes, keyed by path relative to `dir`.
+pub fn tree(dir: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
+    fn walk(root: &Path, dir: &Path, out: &mut BTreeMap<PathBuf, Vec<u8>>) {
+        let Ok(entries) = fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                walk(root, &path, out);
+            } else {
+                out.insert(
+                    path.strip_prefix(root).unwrap().to_path_buf(),
+                    fs::read(&path).unwrap(),
+                );
+            }
+        }
+    }
+    let mut out = BTreeMap::new();
+    walk(dir, dir, &mut out);
+    out
 }

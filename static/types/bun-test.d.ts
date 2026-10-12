@@ -9,7 +9,14 @@ declare module "bun:test" {
     toBeNull(): void;
     toBeTrue(): void;
     toBeFalse(): void;
+    toHaveLength(length: number): void;
     not: Matchers;
   }
   export function expect(actual: unknown): Matchers;
+}
+
+// Reading fixture files in tests (Bun implements node:fs).
+declare module "node:fs" {
+  export function readFileSync(path: string | URL, encoding: "utf8"): string;
+  export function readdirSync(path: string | URL): string[];
 }

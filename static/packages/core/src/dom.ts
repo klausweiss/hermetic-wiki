@@ -24,3 +24,6 @@ export const SIDEBAR_TOGGLE = "hermetic-sidebar-toggle";
  * one changed; `detail` is `{ changed: string[], removed: string[] }` (site paths).
  */
 export const PAGES_CHANGED = "hermetic-pages-changed";
+
+/** Dispatched on `document` (by the `/` shortcut) to focus the search box. */
+export const SEARCH_FOCUS = "hermetic-search-focus";

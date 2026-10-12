@@ -1,0 +1,3 @@
+- authentication with tokens
+  - the redis ttl was wrong
+- redis cache only

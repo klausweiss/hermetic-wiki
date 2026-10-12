@@ -59,10 +59,19 @@ fn fixture_file_list() {
         "pages/Zu\u{308}rich.html",
         "pages/ops.html",
         "pages/redis.html",
+        "search.html",
+        "search/meta.json",
         "tasks.html",
     ];
     expected.sort();
+    // Index shards and document chunks depend on the words in the notes; they are
+    // covered by tests/search_index.rs.
+    let (index, files): (Vec<String>, Vec<String>) = files
+        .into_iter()
+        .partition(|f| f.starts_with("search/t/") || f.starts_with("search/d/"));
     assert_eq!(files, expected);
+    assert!(index.iter().any(|f| f == "search/d/0.json"));
+    assert!(index.iter().filter(|f| f.starts_with("search/t/")).count() > 10);
 }
 
 #[test]

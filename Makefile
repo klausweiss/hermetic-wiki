@@ -1,4 +1,4 @@
-.PHONY: build test test-perf run site serve lint fmt frontend clean
+.PHONY: build test test-perf run site serve lint fmt frontend bench-search clean
 
 # Arguments passed to the binary, e.g. `make run ARGS="build notes/"`.
 ARGS ?=
@@ -32,6 +32,11 @@ lint:
 
 fmt:
 	cargo fmt
+
+# Relevance and performance benchmark of search against Pagefind (development only;
+# downloads Pagefind and a headless browser).
+bench-search:
+	$(MAKE) -C bench/search bench
 
 # Rebuilds the browser script (static/dist/app.js) from static/ts/.
 frontend:

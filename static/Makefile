@@ -6,7 +6,7 @@
 
 BUN ?= bun
 # core first: the others depend on it. app last: it bundles the others.
-PACKAGES := core theme-toggle sidebar timeline shortcuts live-reload app
+PACKAGES := core theme-toggle sidebar timeline shortcuts live-reload search app
 
 node_modules: package.json bun.lock $(wildcard packages/*/package.json)
 	$(BUN) install --frozen-lockfile

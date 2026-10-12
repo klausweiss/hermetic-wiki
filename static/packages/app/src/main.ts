@@ -4,6 +4,7 @@
 // this script they are inert and every page still works.
 
 import { define as defineLiveReload } from "@hermetic/live-reload";
+import { define as defineSearch } from "@hermetic/search";
 import { define as defineShortcuts } from "@hermetic/shortcuts";
 import { applyInitialLayout, define as defineSidebar } from "@hermetic/sidebar";
 import { applyStoredTheme, define as defineThemeToggle } from "@hermetic/theme-toggle";
@@ -17,3 +18,4 @@ defineSidebar();
 defineTimeline();
 defineShortcuts();
 defineLiveReload();
+defineSearch();

@@ -1,0 +1,306 @@
+[
+ {
+  "q": "live reload",
+  "category": "phrase",
+  "relevant": [
+   "pages/spec/serve-mode.html",
+   "pages/design/serve-mode.html",
+   "pages/proposal/serve-mode.html"
+  ]
+ },
+ {
+  "q": "dns rebinding",
+  "category": "phrase",
+  "relevant": [
+   "pages/spec/serve-mode.html"
+  ]
+ },
+ {
+  "q": "porter2 stemmer",
+  "category": "phrase",
+  "relevant": [
+   "pages/design/search.html",
+   "pages/proposal/search.html"
+  ]
+ },
+ {
+  "q": "pagefind",
+  "category": "phrase",
+  "relevant": [
+   "pages/proposal/search.html",
+   "pages/design/search.html"
+  ]
+ },
+ {
+  "q": "colliding page files",
+  "category": "phrase",
+  "relevant": [
+   "pages/spec/source-layout.html"
+  ]
+ },
+ {
+  "q": "windows reserved device names",
+  "category": "phrase",
+  "relevant": [
+   "pages/spec/source-layout.html"
+  ]
+ },
+ {
+  "q": "theme toggle",
+  "category": "phrase",
+  "relevant": [
+   "pages/spec/reader-ui.html",
+   "pages/design/reader-ux.html",
+   "pages/proposal/reader-ux.html"
+  ]
+ },
+ {
+  "q": "keyboard shortcuts",
+  "category": "phrase",
+  "relevant": [
+   "pages/spec/reader-ui.html",
+   "pages/proposal/reader-ux.html"
+  ]
+ },
+ {
+  "q": "co-mentions",
+  "category": "phrase",
+  "relevant": [
+   "pages/spec/reference-graph.html",
+   "pages/design/core-graph-model.html",
+   "pages/proposal/core-graph-model.html"
+  ]
+ },
+ {
+  "q": "task markers",
+  "category": "phrase",
+  "relevant": [
+   "pages/spec/block-model.html",
+   "pages/proposal/core-graph-model.html"
+  ]
+ },
+ {
+  "q": "code fences",
+  "category": "phrase",
+  "relevant": [
+   "pages/spec/block-model.html",
+   "pages/design/core-graph-model.html"
+  ]
+ },
+ {
+  "q": "server-sent events",
+  "category": "phrase",
+  "relevant": [
+   "pages/design/serve-mode.html"
+  ]
+ },
+ {
+  "q": "bm25 ranking",
+  "category": "phrase",
+  "relevant": [
+   "pages/design/search.html",
+   "pages/proposal/search.html"
+  ]
+ },
+ {
+  "q": "bun workspace web components",
+  "category": "multi",
+  "relevant": [
+   "pages/design/reader-ux.html"
+  ]
+ },
+ {
+  "q": "output directory marker file",
+  "category": "multi",
+  "relevant": [
+   "pages/spec/cli.html",
+   "pages/design/static-build.html"
+  ]
+ },
+ {
+  "q": "journal timeline",
+  "category": "phrase",
+  "relevant": [
+   "pages/spec/journal-timeline.html",
+   "pages/design/reader-ux.html"
+  ]
+ },
+ {
+  "q": "linked references pagination",
+  "category": "multi",
+  "relevant": [
+   "pages/spec/static-site-output.html"
+  ]
+ },
+ {
+  "q": "no network requests",
+  "category": "multi",
+  "relevant": [
+   "pages/spec/cli.html",
+   "pages/proposal/static-build.html"
+  ]
+ },
+ {
+  "q": "namespaces as directories",
+  "category": "multi",
+  "relevant": [
+   "pages/spec/source-layout.html"
+  ]
+ },
+ {
+  "q": "block references",
+  "category": "phrase",
+  "relevant": [
+   "pages/spec/reference-graph.html"
+  ]
+ },
+ {
+  "q": "change detection polling",
+  "category": "multi",
+  "relevant": [
+   "pages/design/serve-mode.html"
+  ]
+ },
+ {
+  "q": "font license",
+  "category": "multi",
+  "relevant": [
+   "pages/spec/static-site-output.html",
+   "pages/proposal/static-build.html",
+   "pages/design/static-build.html"
+  ]
+ },
+ {
+  "q": "sidebar panes in the url",
+  "category": "multi",
+  "relevant": [
+   "pages/spec/multi-pane.html"
+  ]
+ },
+ {
+  "q": "rebuilding",
+  "category": "inflection",
+  "relevant": [
+   "pages/spec/serve-mode.html",
+   "pages/design/serve-mode.html"
+  ]
+ },
+ {
+  "q": "collisions",
+  "category": "inflection",
+  "relevant": [
+   "pages/spec/source-layout.html"
+  ]
+ },
+ {
+  "q": "stemming",
+  "category": "inflection",
+  "relevant": [
+   "pages/design/search.html",
+   "pages/proposal/search.html"
+  ]
+ },
+ {
+  "q": "highlighted previews",
+  "category": "inflection",
+  "relevant": [
+   "pages/design/search.html",
+   "pages/proposal/search.html"
+  ]
+ },
+ {
+  "q": "namesp",
+  "category": "prefix",
+  "relevant": [
+   "pages/spec/source-layout.html"
+  ]
+ },
+ {
+  "q": "diacr",
+  "category": "prefix",
+  "relevant": [
+   "pages/design/search.html",
+   "pages/proposal/search.html"
+  ]
+ },
+ {
+  "q": "rebind",
+  "category": "prefix",
+  "relevant": [
+   "pages/spec/serve-mode.html"
+  ]
+ },
+ {
+  "q": "rebuidl",
+  "category": "typo",
+  "relevant": [
+   "pages/spec/serve-mode.html",
+   "pages/design/serve-mode.html"
+  ]
+ },
+ {
+  "q": "sidebr",
+  "category": "typo",
+  "relevant": [
+   "pages/spec/multi-pane.html",
+   "pages/design/reader-ux.html"
+  ]
+ },
+ {
+  "q": "pagefnid",
+  "category": "typo",
+  "relevant": [
+   "pages/proposal/search.html",
+   "pages/design/search.html"
+  ]
+ },
+ {
+  "q": "multi-pane",
+  "category": "name",
+  "relevant": [
+   "pages/spec/multi-pane.html"
+  ]
+ },
+ {
+  "q": "serve mode design",
+  "category": "name",
+  "relevant": [
+   "pages/design/serve-mode.html"
+  ]
+ },
+ {
+  "q": "zazolc gesla jazn",
+  "category": "polish",
+  "relevant": [
+   "journals/2026-07-20.html"
+  ]
+ },
+ {
+  "q": "wlasna wyszukiwarka",
+  "category": "polish",
+  "relevant": [
+   "journals/2026-08-15.html"
+  ]
+ },
+ {
+  "q": "przebudowa serwera",
+  "category": "polish",
+  "relevant": [
+   "journals/2026-09-03.html"
+  ]
+ },
+ {
+  "q": "mniej zaleznosci",
+  "category": "polish",
+  "relevant": [
+   "journals/2026-08-15.html"
+  ]
+ },
+ {
+  "q": "polskie znaki",
+  "category": "polish",
+  "relevant": [
+   "journals/2026-07-20.html"
+  ]
+ }
+]

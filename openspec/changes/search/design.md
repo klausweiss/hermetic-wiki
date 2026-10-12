@@ -34,7 +34,7 @@ Only a page's own blocks are documents, so linked references and related section
 4. Lowercase.
 5. Split into maximal runs of letters and digits.
 
-A shared vector file (`tests/fixtures/search/normalize.tsv`, about 200 lines covering Polish, German, French, Nordic, Turkish, digits, and mixed scripts) is asserted by both `cargo test` and `bun test`.
+A shared vector file (`tests/fixtures/search/normalize.tsv`, about 50 hand-checked lines covering Polish, German, French, Nordic, Turkish, digits, and mixed scripts) is asserted by both `cargo test` and `bun test`.
 
 ### Porter2 stemmer in both languages
 A direct port of the Snowball English (Porter2) algorithm in Rust (`search::stem`) and TypeScript (`stem.ts`), each about 300 lines. Both are tested against the same vector file: a subset of Snowball's published `voc.txt`/`output.txt` (BSD-3, attributed) of about 5,000 words, at `tests/fixtures/search/porter2.tsv`. Stems are computed on folded words.
@@ -44,13 +44,14 @@ A direct port of the Snowball English (Porter2) algorithm in Rust (`search::stem
  search/meta.json         { version, n_docs, avg_len: {name, text}, k1, b,
                             journal_docs: [first, last], shards: [keys], doc_chunk }
  search/t/<hex key>.json  terms sharing a 2-character prefix, sorted:
-                            [[term, stem, [doc_delta, field, tf, len, doc_delta, ...]], ...]
- search/d/<n>.json        documents n*256 .. n*256+255:
-                            { pages: [[path, title], ...],
-                              docs: [[page_idx, anchor | "", breadcrumb, preview], ...] }
+                            [[term, stem | "", "<packed postings>"], ...]
+ search/d/<n>.json         documents n*256 .. n*256+255:
+                            { pages: [[path, name], ...],
+                              docs: [[page_idx, anchor | "", parent_delta, preview], ...] }
 ```
 - **Shard key:** the first two characters of the folded term, or the whole term if shorter. It is hex-encoded in the file name, so any script yields a safe path. A query word reads the shard of its first two characters.
-- **Postings:** each posting carries the document's field length, so BM25 needs no global length table.
+- **Postings:** packed into a string of variable-length numbers, five bits per character from a 64-character alphabet. Each posting is `doc_delta, tf·2+field, field_length`. Carrying the field length means BM25 needs no global length table, and folding the field into `tf` saves a number. This halves the size compared with JSON number arrays.
+- **Breadcrumbs:** a block document stores `parent_delta`, the distance back to its parent block's document, instead of the breadcrumb text. The client builds breadcrumbs from the parents' previews, which usually sit in the same chunk. Titles are page names; the client adds weekdays for journal dates.
 - **Recency:** comes from the document id's position within `journal_docs`. That is monotonic in date and needs no per-document date table.
 - **Previews:** at most 240 characters of plain text. Breadcrumbs are ancestor texts truncated to 40 characters each, joined with ` › `.
 - **Encoding:** JSON throughout, which is readable, compressed by every static host and by browsers, and parsed natively.
@@ -69,7 +70,7 @@ A direct port of the Snowball English (Porter2) algorithm in Rust (`search::stem
 7. **Fetch details:** only the document chunks for the top results shown (8 in the box, 200 on the page). Matched words are highlighted by normalizing each preview word and comparing it against the matched terms.
 
 ### Components (`@hermetic/search`)
-- **`<hermetic-search>`** sits in the header nav. It renders only over `http:`/`https:`, debounces typing at 80 ms, and keeps results in a listbox with arrow-key and Enter handling. Enter without a selection goes to `search.html?q=`. Pressing `/` (handled by `<hermetic-shortcuts>`) dispatches a `hermetic-search-focus` event.
+- **`<hermetic-search>`** sits in the header nav. It renders only over `http:`/`https:`, debounces typing at 80 ms, and keeps results in a listbox with arrow-key and Enter handling. Enter without a selection goes to `search.html?q=`. Pressing `/`, or `Ctrl+K`/`Cmd+K` even in a text field (handled by `<hermetic-shortcuts>`), dispatches a `hermetic-search-focus` event.
 - **`<hermetic-search-results>`** sits in `search.html` and renders up to 200 results for `?q=`.
 - **Shared index loader:** it drops cached shards and metadata when a `hermetic-pages-changed` event lists anything under `search/`.
 
@@ -100,4 +101,5 @@ Downloads happen only when a developer runs `make bench-search`, never in `make 
 - [Typo tolerance cannot fix the first two letters] → stated in the spec; those typos usually come from the first keystrokes and are noticed immediately.
 - [Recency by document position is approximate] → it is monotonic in date, which is all a tie-breaker needs.
 - [Indexing adds build time] → measured; `serve` must still show a change within 2 seconds on 5,000 journals.
+- [Previews make the index larger than the notes] → measured at about 1.8× the markdown uncompressed and 0.14× gzipped on the 5,000-journal corpus. The spec allows up to 2× (¼ gzipped), relying on transfer compression rather than our own compressor.
 - [The benchmark corpus is our own text, so relevance judgments are ours] → queries and judgments are reviewable files; you can add your own notes and queries.

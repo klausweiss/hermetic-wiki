@@ -340,7 +340,7 @@ fn events_list_exactly_the_affected_pages() {
     }
     assert_eq!(
         json.matches(".html\"").count(),
-        expected.len(),
+        expected.iter().filter(|p| p.ends_with(".html")).count(),
         "{json} vs {expected:?}"
     );
     assert!(json.contains("\"pages/kafka.html\"") && json.contains("\"pages/redis.html\""));

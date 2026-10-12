@@ -552,6 +552,7 @@ fn web_component_tags() {
         // Empty, so pages look the same without the script that defines them.
         for tag in [
             "hermetic-theme-toggle",
+            "hermetic-search",
             "hermetic-sidebar",
             "hermetic-shortcuts",
         ] {

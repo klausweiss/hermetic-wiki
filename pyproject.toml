@@ -1,0 +1,15 @@
+# Packages the `hermetic` binary as a Python wheel, so it installs with
+# `uv tool install git+ssh://gitea@gitea.lan/mbiel/hermetic.git`.
+# Building needs a Rust toolchain; the browser script is committed (static/dist/app.js),
+# so Bun is not needed.
+[build-system]
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
+
+[project]
+name = "hermetic"
+requires-python = ">=3.8"
+dynamic = ["version"]
+
+[tool.maturin]
+bindings = "bin"

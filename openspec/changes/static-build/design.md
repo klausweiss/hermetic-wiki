@@ -1,0 +1,99 @@
+# Design
+
+## Context
+
+`core-graph-model` is implemented: `Graph::load` returns pages, blocks (with exact source, display content, properties, task state, and resolved `Ref`s carrying byte ranges into the block content), linked references, tasks, namespaces, and co-mentions. `src/main.rs` is a placeholder. There is no rendering code, no CLI, and no bundled assets yet. Behavior is defined in `specs/cli` and `specs/static-site-output`; this document covers how to build it.
+
+Constraints: stable Rust, minimal dependencies, a single binary with everything embedded, no network access, deterministic output.
+
+## Goals / Non-Goals
+
+**Goals:**
+- A library entry point `site::build(notes_dir, out_dir) -> Result<BuildReport, BuildError>` that `main.rs` wraps, and that `serve-mode` can reuse later.
+- Hand-written HTML generation that is easy to read, with no template engine.
+- A clean, readable baseline stylesheet; visual polish is left to `reader-ux`.
+
+**Non-Goals:**
+- JavaScript of any kind (multi-pane, journal merging, search UI belong to `reader-ux` / `search`).
+- Incremental rebuilds (belongs to `serve-mode`).
+- Sanitizing raw HTML in notes (see Risks).
+- Generating heading anchors inside block content.
+
+## Decisions
+
+### Markdown renderer: pulldown-cmark
+`pulldown-cmark` 0.13 with `default-features = false, features = ["html"]` and options tables, strikethrough, task lists, footnotes. It is small, pure Rust, dependency-light, and fast.
+
+*Alternative:* comrak — more complete GFM, but larger and its AST is not needed since block structure comes from our own parser.
+
+### References are substituted through placeholders
+Each block's content is rendered separately. Before rendering, every reference range is replaced (from the end, so earlier ranges stay valid):
+
+- `[[x]]`, `#x`, `((id))`, and broken markdown links → a placeholder token `\u{E000}<n>\u{E001}` (Unicode private-use characters, which markdown treats as plain text);
+- resolved markdown links → only their destination is replaced with the rewritten relative URL, so the author's link text and title stay real markdown.
+
+After `pulldown-cmark` renders the block, placeholders in the HTML are replaced with generated HTML (`<a class="page-ref">`, `<a class="tag">`, `<span class="block-ref">…<a class="block-ref-link">↗</a></span>`, `<span class="broken">`). This avoids escaping markdown inside generated links and works anywhere in the content, including tables.
+
+This needs the destination's byte range for markdown links, which the graph does not expose yet: `parse::RawRef` and `graph::Ref` gain `dest: Option<Range<usize>>`, filled by the inline scanner. Implementation detail only; no spec change.
+
+*Alternative:* splicing raw HTML anchors into the markdown source. Rejected: generated HTML containing newlines or block elements breaks paragraph parsing, and page names containing `*`/`_` would need markdown escaping.
+
+### Block refs expand one level
+A block ref renders the target's content using the same pipeline with a flag that renders nested `((id))` as a short link instead of expanding, so cycles terminate. A single-paragraph result has its `<p>` wrapper stripped so it flows inline.
+
+### Paths and hrefs
+`site::paths`:
+- `output_path(page)`: file-backed → source rel path with the trailing `.md` replaced by `.html` (string replacement, since names may contain dots); implicit regular → `layout::page_file_path(name)` likewise; implicit journal → `journals/<date>.html`.
+- `href(from, to, fragment)`: relative path from `from`'s directory to `to`, each segment percent-encoded except RFC 3986 unreserved characters. Every generated link uses this, which makes `file://` and `http://` behave the same.
+- Continuation files: `refs/<output path without .html>/<n>.html`, `tasks/<n>.html`.
+
+### Block anchors
+Blocks of one page are contiguous in the graph in document order, so a block's position is `block.0 - first_block.0 + 1`; the anchor is `id-<id>` or `b<n>`. A helper on the renderer computes this once per page.
+
+### HTML generation
+A small `Html` string builder with `escape_text`/`escape_attr` and functions per section (`page_header`, `blocks_tree`, `linked_refs`, `open_tasks`, `related`, `ns_nav`). A single `layout(title, path, main)` function emits the document shell (`<!doctype html>`, `<meta charset>`, viewport, stylesheet link, header nav, one `<main>`). No `<script>` tags. Iteration order always comes from the graph's ordered APIs or page/block ids, never from hash maps, which keeps output deterministic.
+
+Pagination splits a page's linked references into chunks of 100 `LinkedRef`s; a group split across chunks repeats its group header.
+
+### Journal dates
+Weekday from the date via the days-from-civil algorithm (no date crate). Previous/next day: a sorted list of file-backed journal dates, binary-searched per page. The journal index groups that list by month, newest first.
+
+### Assets
+Committed under `static/` in the repository and embedded with `include_bytes!`/`include_str!`:
+
+```
+ static/style.css
+ static/fonts/InterVariable.woff2, InterVariable-Italic.woff2      (Inter v4.1, web/)
+ static/fonts/JetBrainsMono-{Regular,Italic,Bold}.woff2            (v2.304, fonts/webfonts/)
+ static/fonts/LICENSE-Inter.txt, LICENSE-JetBrainsMono.txt          (OFL 1.1)
+```
+
+Font files are used exactly as released (no subsetting or conversion), so the Reserved Font Name clause is never triggered. They are written to `_hermetic/` in every build.
+
+### Attachments
+Walk `journals/`, `pages/`, `assets/` under the notes root; copy regular, non-`.md`, non-dot files to the same relative path. Symlinked files are skipped with a diagnostic, so a link pointing outside the notes cannot leak into a published site. A conflict with a generated page path reports a diagnostic and skips the attachment. This complements `source-layout`, which only governs which files become pages.
+
+### Output directory handling
+1. Resolve `notes` (must be an existing directory) and `out` to absolute, lexically normalized paths (canonicalize the existing prefix).
+2. Refuse when `out` == notes, `out` is an ancestor of notes, or `out` is inside `notes/{journals,pages,assets}`; refuse when `out` exists, is non-empty, and lacks `.hermetic-site`.
+3. Render everything into a sibling temp directory `<out>.hermetic-tmp-<pid>`, write the marker, then remove the old `out` and rename the temp directory into place. On any error the temp directory is removed and the old output is untouched.
+
+### CLI
+`main.rs` parses arguments by hand (`build`, `--help`, `--version`), so no argument-parsing dependency. Diagnostics go to stderr as `warning: <file>:<line>: <message>`, then `built <n> pages into <out> (<m> warnings)`. Exit codes: 0 success, 1 failure, 2 usage.
+
+### New diagnostics
+`DiagnosticKind` gains `AttachmentConflict` and `SkippedSymlink`.
+
+## Risks / Trade-offs
+
+- [Raw HTML in notes passes through unsanitized] → acceptable for one's own notes; documented. Publishing someone else's notes is out of scope.
+- [Placeholder characters typed by the author would be misinterpreted] → private-use code points are practically never typed; an unknown placeholder index is left as text.
+- [Names-only indexes (`index.html`, `pages.html`) grow with page count] → accepted explicitly; tens of thousands of names stay in the hundreds of KB.
+- [Related-page `<details>` repeat block content already shown in linked references] → bounded by the page's own references; the duplication is what makes the section useful without JS.
+- [Fonts add roughly 1 MB to the binary and to every output] → accepted for a consistent look; subsetting could come later.
+- [Very long encoded paths may exceed Windows' 260-character limit] → not handled; deep namespaces with many escaped characters are unlikely.
+- [Replacing the output directory is not atomic on all platforms] → remove-then-rename leaves a short window without output; the previous content is never partially overwritten.
+
+## Open Questions
+
+- Exact visual design of the baseline stylesheet; `reader-ux` will revisit it.

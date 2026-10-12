@@ -7,7 +7,7 @@ Defines how a notes directory is laid out with zero configuration, how page name
 ## Requirements
 
 ### Requirement: Source directory conventions
-The system SHALL treat a given directory as the notes root with no configuration file. Markdown files (`.md`) under `journals/` SHALL be journal pages and markdown files under `pages/` (at any depth) SHALL be regular pages. A file named `index.md` directly in the notes root SHALL be the regular page `index`, the site's home page. All other files outside these two directories, non-markdown files, and any file or directory whose name begins with `.` SHALL be ignored.
+The system SHALL treat a given directory as the notes root with no configuration file. Markdown files (`.md`) under `journals/` SHALL be journal pages and markdown files under `pages/` (at any depth) SHALL be regular pages. A file named `index.md` directly in the notes root SHALL be the regular page `index`, the site's home page. The name `index` SHALL be reserved for it: a file under `pages/` whose name would be `index` (such as `pages/index.md`) SHALL instead be the page `index (in pages)`, and a diagnostic SHALL report the conflict. All other files outside these two directories, non-markdown files, and any file or directory whose name begins with `.` SHALL be ignored.
 
 #### Scenario: Journals and pages are discovered
 - **WHEN** the root contains `journals/2026-10-12.md` and `pages/auth.md`
@@ -27,7 +27,11 @@ The system SHALL treat a given directory as the notes root with no configuration
 
 #### Scenario: Root index and pages index
 - **WHEN** the root contains both `index.md` and `pages/index.md`
-- **THEN** they collide as the same page; `index.md` is used because its path sorts first, and a diagnostic names both files
+- **THEN** `index.md` is the page `index`, `pages/index.md` is the page `index (in pages)`, and a diagnostic names `pages/index.md`
+
+#### Scenario: Pages index alone
+- **WHEN** the root contains `pages/index.md` and no `index.md`
+- **THEN** `pages/index.md` is the page `index (in pages)`, not the home page, and a diagnostic names it
 
 ### Requirement: Journal page naming
 A journal file SHALL be named `YYYY-MM-DD.md` with a valid calendar date, and its page name SHALL be that date string. A file in `journals/` whose name is not a valid date SHALL be reported as a diagnostic and treated as a regular page named after its file stem.

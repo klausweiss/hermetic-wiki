@@ -7,7 +7,7 @@ Lets the author write the notes in the browser, in a Logseq-style block outliner
 ## Requirements
 
 ### Requirement: Where editing is available
-Editing SHALL be available only on pages served by `hermetic serve` to a browser on the same machine: the request comes from a loopback address and its `Host` header names `localhost`, `127.0.0.1`, or `[::1]`. Only then SHALL the served HTML contain the editor element. Editable pages SHALL be journal days (with or without a file), regular pages (with or without a file), and the home page when the notes root contains `index.md`. The journal list, all-pages list, open-tasks page, search page, and continuation files SHALL NOT be editable. Within an editable page, only the page's own blocks SHALL be editable; linked references, related pages, tasks, sidebar panes, and the timeline SHALL stay read-only. Without JavaScript, and in built sites, pages SHALL be exactly as before.
+Editing SHALL be available only on pages served by `hermetic serve` to a browser on the same machine: the request comes from a loopback address and its `Host` header names `localhost`, `127.0.0.1`, or `[::1]`. Only then SHALL the served HTML contain the editor element. Editable pages SHALL be journal days (with or without a file), regular pages (with or without a file), and the home page when the notes root contains `index.md`. The journal list, all-pages list, open-tasks page, search page, and continuation files SHALL NOT be editable. Within an editable page, only the page's own blocks SHALL be editable; linked references, related pages, sidebar panes, and the timeline SHALL stay read-only. The one exception is task labels in the task lists (the open-tasks page and each page's "Open tasks" section), which change the task's state as "Task labels" requires, also on the open-tasks page, which is otherwise not editable. Without JavaScript, and in built sites, pages SHALL be exactly as before.
 
 #### Scenario: Same machine
 - **WHEN** the author opens `http://127.0.0.1:8000/pages/auth.html` from `hermetic serve` on the same machine
@@ -22,7 +22,7 @@ Editing SHALL be available only on pages served by `hermetic serve` to a browser
 - **THEN** it contains no editor element and no editing controls
 
 ### Requirement: Editing a block
-Clicking a block's content (outside its links) SHALL replace the block's rendered content with a text field holding the block's markdown as written: its first line without the bullet marker, its further lines without the block's indentation, and its property lines. Clicking a link in a block that is not being edited SHALL follow the link. Exactly one block SHALL be edited at a time. Pressing Escape or clicking outside the block SHALL end editing and show the block rendered again, as the next build renders it. An editable page with no blocks SHALL offer one empty block to start writing in.
+Clicking anywhere in a block's row (outside its links and controls), also for an empty block, SHALL replace the block's rendered content with a text field holding the block's markdown as written: its first line without the bullet marker, its further lines without the block's indentation, and its property lines. Clicking a link in a block that is not being edited SHALL follow the link. Exactly one block SHALL be edited at a time. Pressing Escape or clicking outside the block SHALL end editing and show the block rendered again, as the next build renders it. An editable page with no blocks SHALL offer one empty block to start writing in. Opening a page SHALL NOT start editing (except as "Creating journal days and pages" says for "Today"); pressing Return while no block is edited and no other control has the focus SHALL start editing the page's last block in document order, with the cursor at its end, or the starter block of an empty page.
 
 #### Scenario: Raw text
 - **WHEN** the author clicks the block `- decided to use [[JWT]]` followed by `  status:: accepted`
@@ -35,6 +35,18 @@ Clicking a block's content (outside its links) SHALL replace the block's rendere
 #### Scenario: Empty page
 - **WHEN** the author opens the page of a name that is only referenced (it has no file)
 - **THEN** the page offers an empty block, and typing in it starts the page
+
+#### Scenario: No edit mode on arrival
+- **WHEN** the author opens a page that has blocks
+- **THEN** no block is being edited until a block is clicked or Return is pressed
+
+#### Scenario: Return starts editing at the end
+- **WHEN** the author opens `journals/2026-10-12.html`, whose last block is `- standup notes`, and presses Return
+- **THEN** that block is being edited with the cursor after `notes`
+
+#### Scenario: Empty block
+- **WHEN** a page's only block is `- ` and the author leaves editing, then clicks the block's row
+- **THEN** the empty block is being edited again
 
 ### Requirement: Outliner keys
 While a block is being edited:
@@ -132,15 +144,23 @@ A save SHALL change only the lines of blocks that were edited, added, moved, or 
 - **THEN** the page has blocks `a` and `b`
 
 ### Requirement: Creating journal days and pages
-When editing is available, every page SHALL show a "Today" control in the header. It SHALL open the journal day of the browser's current date, first creating `journals/YYYY-MM-DD.md` with one empty block if the day has no file, and start editing its first block. Saving a page that has no file, such as one that is only referenced, SHALL create its file at the path given by the `source-layout` name encoding (journal days at `journals/YYYY-MM-DD.md`), creating namespace directories as needed. Existing files SHALL never be replaced by a create.
+When editing is available, every page SHALL show a "Today" control in the header. It, and the keys `g` then `d`, SHALL open the journal day of the browser's current date, first creating `journals/YYYY-MM-DD.md` with one empty block if the day has no file. Editing SHALL start in its first block only when the day has no content (no block with text); otherwise the day opens without editing. Saving a page that has no file, such as one that is only referenced, SHALL create its file at the path given by the `source-layout` name encoding (journal days at `journals/YYYY-MM-DD.md`), creating namespace directories as needed. Existing files SHALL never be replaced by a create. The page `index` is the home page: its file is the root `index.md`, never `pages/index.md`. When the notes root has no `index.md`, the home page SHALL offer "Write a home page" instead of its hint about `index.md`; choosing it SHALL create the root `index.md` with one empty block and start editing it there.
 
 #### Scenario: Today without a file
 - **WHEN** the author clicks "Today" on 2026-10-13 and `journals/2026-10-13.md` does not exist
 - **THEN** the file is created, the journal day opens, and its first block is being edited
 
+#### Scenario: Today with content
+- **WHEN** `journals/2026-10-13.md` contains `- standup notes` and the author presses `g` then `d`
+- **THEN** the journal day opens and no block is being edited
+
 #### Scenario: New page from a link
 - **WHEN** the author writes `[[Project X/Auth]]` in a journal, follows the link, and types `- first note` on the new page
 - **THEN** `pages/Project X/Auth.md` exists and contains `- first note`
+
+#### Scenario: Write a home page
+- **WHEN** the notes root has no `index.md` and the author chooses "Write a home page" on `index.html` and types `welcome`
+- **THEN** the root `index.md` contains `- welcome`, `index.html` shows it, and no `pages/index.md` exists
 
 ### Requirement: Page and block autocomplete
 Typing `[[` in a block being edited SHALL show a list of pages matching the text typed after it, ranked by the search engine's page-name matching. The list SHALL also offer a new page with exactly the typed name when no page has that name. Choosing an entry SHALL complete the link as `[[name]]`. Typing `((` SHALL show a list of blocks matching the typed text, ranked by the search engine. Choosing one SHALL insert `((id))` with the block's id, first giving the chosen block a generated id if it has none. Arrow keys SHALL move through the list, Enter or Tab SHALL choose, and Escape SHALL close it and keep the typed text.
@@ -236,3 +256,26 @@ The file written for a page SHALL be the page's existing source file or, for a p
 #### Scenario: Crash during write
 - **WHEN** the server is killed while writing `pages/auth.md`
 - **THEN** `pages/auth.md` holds either its old or its new content
+
+### Requirement: Task labels
+Where editing is available, clicking a task's label (`TODO`, `DOING`, or `DONE`) SHALL move the task to its next state, TODO → DOING → DONE → TODO, and save the change to the task block's own note file, changing nothing else in it. This SHALL work on the page's own blocks (also while another block is being edited) and on the task lists: the open-tasks page with its continuation pages, and each page's "Open tasks" section. The label SHALL show the new state at once. Labels that work SHALL be focusable and react to Enter and Space like a click; labels elsewhere (linked references, related pages, sidebar panes, the timeline, built sites, other devices) SHALL stay plain text. When the task's file changed since the list was built so that the task cannot be found, nothing SHALL be written and the label SHALL keep its state.
+
+#### Scenario: Cycle on the page
+- **WHEN** the page `auth` has the block `- TODO rotate signing keys` and the author clicks its `TODO` label twice
+- **THEN** `pages/auth.md` contains `- DONE rotate signing keys` and the label shows `DONE`
+
+#### Scenario: Done wraps around
+- **WHEN** the author clicks the `DONE` label of a block
+- **THEN** the block is `TODO` again
+
+#### Scenario: Tick off from the open-tasks page
+- **WHEN** `tasks.html` lists `TODO rotate signing keys` from page `auth` and the author clicks its label
+- **THEN** `pages/auth.md` contains `- DOING rotate signing keys`, and nothing else in it changed
+
+#### Scenario: Read-only elsewhere
+- **WHEN** a task appears in another page's linked references
+- **THEN** its label there is not a control and clicking it changes nothing
+
+#### Scenario: Keyboard
+- **WHEN** the author moves focus to a task label on `tasks.html` with Tab and presses Enter
+- **THEN** the task moves to its next state

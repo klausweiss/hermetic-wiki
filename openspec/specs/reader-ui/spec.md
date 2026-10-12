@@ -14,7 +14,7 @@ Pages SHALL use the embedded Inter for text and JetBrains Mono for code, with bo
 - **THEN** body text lines do not exceed about 75 characters and use Inter
 
 ### Requirement: Themes
-Pages SHALL follow the system's light or dark preference by default. When the script runs, it SHALL offer a toggle cycling between system, light, and dark, and SHALL remember the choice in the browser so it applies to every page of the site. Without the script, pages SHALL still follow the system preference.
+Pages SHALL follow the system's light or dark preference by default. When the script runs, it SHALL offer a toggle cycling between system, light, and dark: an icon button showing the current theme, with an accessible name stating the current and the next theme, fixed in the top-right corner next to the sidebar's show/hide control (or in the corner itself where there is none), never overlapping the header's links, search box, or the sidebar's controls, and SHALL remember the choice in the browser so it applies to every page of the site. Without the script, pages SHALL still follow the system preference.
 
 #### Scenario: Dark system preference
 - **WHEN** the operating system prefers a dark appearance and the user has not chosen a theme
@@ -23,6 +23,10 @@ Pages SHALL follow the system's light or dark preference by default. When the sc
 #### Scenario: Manual choice persists
 - **WHEN** the user switches to light theme on one page and opens another page of the site
 - **THEN** the other page renders in the light theme
+
+#### Scenario: Corner controls
+- **WHEN** a page is shown at any width from 320px up, with the sidebar shown or hidden
+- **THEN** the theme button sits directly left of the sidebar's control in the top-right corner, neither moves when the sidebar is toggled, and neither covers a header link or the search box
 
 ### Requirement: Responsive layout
 Pages SHALL be usable from 320px wide upward without horizontal page scrolling; wide content such as tables and code blocks SHALL scroll within themselves.
@@ -43,7 +47,7 @@ The bundled script SHALL only add behavior to pages that are already complete wi
 - **THEN** it shows no theme toggle, timeline toggle, or sidebar, and all links work as plain links
 
 ### Requirement: Keyboard shortcuts
-When the script runs, it SHALL provide these shortcuts, ignored while typing in a text field: `g` then `h` opens the home page, `g` then `j` the journal list, `g` then `p` all pages, `g` then `t` open tasks; `/` focuses the search box when it is shown; `Escape` closes the topmost sidebar pane; `\` shows or hides the sidebar; `?` shows a list of the shortcuts. In addition, `Ctrl+K` (`Cmd+K` on macOS) SHALL focus the search box when it is shown, also while typing in a text field.
+When the script runs, it SHALL provide these shortcuts, ignored while typing in a text field: `g` then `h` opens the home page, `g` then `j` the journal list, `g` then `p` all pages, `g` then `t` open tasks; `g` then `d` today's journal, where editing is available (see `browser-editing`); `/` focuses the search box when it is shown; `Escape` closes the topmost sidebar pane; `\` shows or hides the sidebar; `?` shows a list of the shortcuts. In addition, `Ctrl+K` (`Cmd+K` on macOS) SHALL focus the search box when it is shown, also while typing in a text field.
 
 #### Scenario: Go to journals
 - **WHEN** the user presses `g` then `j` on any page
@@ -60,3 +64,7 @@ When the script runs, it SHALL provide these shortcuts, ignored while typing in 
 #### Scenario: Focus search while typing
 - **WHEN** the page is served over `http://`, focus is in a text field, and the user presses `Ctrl+K` (`Cmd+K` on macOS)
 - **THEN** the search box receives focus and the browser's own binding for the key does not run
+
+#### Scenario: Go to today
+- **WHEN** editing is available and the user presses `g` then `d`
+- **THEN** today's journal day opens

@@ -142,11 +142,11 @@ Non-markdown files under `journals/`, `pages/`, and a root-level `assets/` direc
 - **THEN** `pages/auth-flow.png` exists in the output and the image displays on `pages/auth.html`
 
 ### Requirement: Embedded stylesheet and fonts
-The output SHALL include hermetic's stylesheet and the Inter and JetBrains Mono fonts under `_hermetic/`, together with the fonts' license texts, and pages SHALL use only these fonts (Inter for text, JetBrains Mono for code), never fonts installed on the viewer's system except as a last-resort generic fallback.
+The output SHALL include hermetic's stylesheet and the Inter and JetBrains Mono fonts under `_hermetic/`, together with the fonts' license texts and the license text of the icons the script uses (`_hermetic/LICENSE-Lucide.txt`), and pages SHALL use only these fonts (Inter for text, JetBrains Mono for code), never fonts installed on the viewer's system except as a last-resort generic fallback.
 
 #### Scenario: Fonts and licenses shipped
 - **WHEN** the site is built
-- **THEN** `_hermetic/` contains the stylesheet, the Inter and JetBrains Mono font files, and their OFL license texts
+- **THEN** `_hermetic/` contains the stylesheet, the Inter and JetBrains Mono font files, their OFL license texts, and the Lucide ISC license text
 
 ### Requirement: Deterministic output
 Building the same notes directory twice SHALL produce byte-identical output.
@@ -156,7 +156,7 @@ Building the same notes directory twice SHALL produce byte-identical output.
 - **THEN** both directories contain the same files with identical bytes
 
 ### Requirement: Home page
-When the notes root contains `index.md`, `index.html` SHALL be the HTML of the page `index` (its blocks, linked references, related pages, and open tasks, like any page). When there is no `index.md`, `index.html` SHALL show the journal list, followed by an unobtrusive note that adding `index.md` to the notes root replaces this page.
+When the notes root contains `index.md`, `index.html` SHALL be the HTML of the page `index` (its blocks, linked references, related pages, and open tasks, like any page). When there is no `index.md`, `index.html` SHALL show the journal list, followed by an unobtrusive note that adding `index.md` to the notes root replaces this page. References to the page `index` SHALL always link to `index.html`, also without `index.md`; the page `index` SHALL then have no page of its own. When the page `index (in pages)` exists (see `source-layout`), `index.html` SHALL start with a warning that `pages/index.md` conflicts with the home page, linking to that page.
 
 #### Scenario: Custom home page
 - **WHEN** the notes root contains `index.md` with `- Start at [[auth]]` and `pages/auth.md` exists
@@ -169,3 +169,11 @@ When the notes root contains `index.md`, `index.html` SHALL be the HTML of the p
 #### Scenario: Linking to the home page
 - **WHEN** `index.md` exists and a journal contains `[[index]]`
 - **THEN** the journal's link points to `index.html`
+
+#### Scenario: Linking to the home page without index.md
+- **WHEN** the notes root has no `index.md` and a journal contains `[[index]]`
+- **THEN** the journal's link points to `index.html`, and no `pages/index.html` is written for it
+
+#### Scenario: Conflicting pages/index.md
+- **WHEN** the notes contain `pages/index.md`
+- **THEN** `index.html` starts with a warning naming `pages/index.md` and linking to `pages/index.html`, which shows that file's content under the title `index (in pages)`

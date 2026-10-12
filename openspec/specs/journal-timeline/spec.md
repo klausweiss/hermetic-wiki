@@ -7,15 +7,19 @@ Lets a reader scroll through journal days as one continuous timeline, assembled 
 ## Requirements
 
 ### Requirement: Timeline view
-When the script is active on the journal list page, it SHALL offer a toggle between the list (default) and a timeline view. The timeline SHALL show the full content of journal days that have a source file, newest first, each headed by a link to its day page, with the day's own blocks and without its linked references, related pages, or open tasks sections. The selected view SHALL be reflected in the URL so that reloading or sharing the URL keeps it.
+When the script is active on the journal list page, it SHALL offer a toggle between the timeline view (default) and the list. The timeline SHALL show the full content of journal days that have a source file, newest first, each headed by a link to its day page, with the day's own blocks and without its linked references, related pages, or open tasks sections. Choosing the list SHALL be reflected in the URL so that reloading or sharing the URL keeps it.
 
 #### Scenario: Switch to timeline
-- **WHEN** the user opens `journals.html` and selects the timeline view
+- **WHEN** the list is shown on `journals.html` and the user selects the timeline view
+- **THEN** the newest journal days are shown with their full content, newest first
+
+#### Scenario: Timeline first
+- **WHEN** the user opens `journals.html`
 - **THEN** the newest journal days are shown with their full content, newest first
 
 #### Scenario: Reload keeps the view
-- **WHEN** the timeline view is selected and the page is reloaded
-- **THEN** the timeline view is shown
+- **WHEN** the list is selected and the page is reloaded
+- **THEN** the list is shown
 
 ### Requirement: Loading as you scroll
 The timeline SHALL initially load a small batch of days and load the next older batch when the reader scrolls near its end, until all days are shown. Each day SHALL be fetched from its own page; no other file listing all journal content SHALL be needed.

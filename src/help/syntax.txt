@@ -1,0 +1,79 @@
+SYNTAX
+
+  Notes are markdown (CommonMark with tables, strikethrough, task lists, and
+  footnotes), organized as an outline of blocks.
+
+  Blocks
+      Every line starting with "- " starts a block. A block continues over
+      the following lines up to the next bullet, so it can hold several
+      paragraphs, lists, or code. Indenting a bullet further than the one
+      above makes it a child; a tab counts as 4 columns, and any consistent
+      indentation works:
+
+        - standup
+          - shipped token refresh
+            more detail about the refresh
+          - reviewed the PR
+
+      Text outside bullets is never lost: a paragraph of prose becomes a
+      block of its own, so pages without bullets work too.
+
+  Properties
+      key:: value lines at the start of a block are properties. Keys are
+      letters, digits, - and _, matched ignoring case. They are shown as
+      key/value pairs, and links in values count as links of the block:
+
+        - decided to use JWT
+          status:: accepted
+
+  Block ids
+      The id property lets other blocks reference this one. An id is any
+      text without spaces or parentheses, and must be unique across the
+      notes:
+
+        - TTL defaults were wrong
+          id:: ttl-bug
+
+  Tasks
+      A block starting with TODO, DOING, or DONE (in capitals, followed by a
+      space) is a task. TODO and DOING are open; DONE is closed.
+
+        - TODO rotate signing keys
+        - DOING write the migration
+        - DONE drop the legacy endpoint
+
+  References
+      These link a block to a page. Each one also makes the block show up on
+      the target page (see `hermetic help pages`). A page link or tag to a
+      name that has no file still gives that name a page.
+
+        - met with Ana about [[auth]]
+        - see [[Project X/Auth Flow]] for the namespaced page
+        - follow up on [[2026-10-01]], the journal of that day
+        - fixed the bug #backend
+        - kicked off #[[Project X]]
+        - details in [the auth notes](../pages/auth.md)
+        - root cause: ((ttl-bug))
+
+      [[name]]          A page link. Does not span lines or nest.
+      #name             A tag; the same as [[name]]. It starts after a space
+                        or at the start of a line and ends at the next space;
+                        a trailing . , ; : ! ? or ) is not part of it. A
+                        heading (# Title) and a URL fragment (a.html#x) are
+                        not tags.
+      #[[multi word]]   A tag whose name has spaces.
+      [text](file.md)   A markdown link to a note file, relative to the
+                        linking file (or to the notes root if it starts with
+                        /), optionally with #fragment. Links to a missing
+                        file or outside journals/, pages/, and index.md are
+                        reported. Links with a scheme (https:) are ordinary
+                        links.
+      ((id))            A block reference: shows the block with that id
+                        inline and also links its page. An unknown id is
+                        reported and shown as broken.
+
+  Where references are not recognized
+      Inside `inline code`, inside fenced code blocks, and after a backslash:
+
+        - write `[[auth]]` to link a page
+        - \[[auth]] is shown literally

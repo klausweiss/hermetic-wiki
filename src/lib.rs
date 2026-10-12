@@ -2,6 +2,7 @@
 
 pub mod diag;
 pub mod graph;
+pub mod help;
 pub mod layout;
 pub mod parse;
 pub mod search;

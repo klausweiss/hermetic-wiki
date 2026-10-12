@@ -1,0 +1,49 @@
+NOTES LAYOUT
+
+  A notes directory needs no configuration. hermetic reads:
+
+  journals/YYYY-MM-DD.md
+      One journal page per day, named by its date (journals/2026-10-12.md is
+      the page 2026-10-12). Days are listed newest first in the journal list
+      and can be read as one continuous timeline. A file in journals/ whose
+      name is not a valid date (journals/notes.md, journals/2026-13-40.md)
+      is reported as a warning and becomes a regular page named after the
+      file (notes).
+
+  pages/**/*.md
+      Regular pages, at any depth. The page name is the file path under
+      pages/ without .md. Subdirectories are namespaces:
+      pages/Project X/Auth Flow.md is the page Project X/Auth Flow, a child
+      of the page Project X. Project X exists even without a file; add
+      pages/Project X.md next to the directory to give it content.
+
+  index.md
+      In the notes root: the page index, shown as the site's home page.
+      Link to it as [[index]]. Without it, the home page shows the journal
+      list. If pages/index.md also exists, the root index.md wins and a
+      warning names both.
+
+  assets/, and non-markdown files in journals/ and pages/
+      Attachments, such as images. They are copied unchanged to the same
+      path in the site, so ![flow](auth-flow.png) in pages/auth.md shows
+      pages/auth-flow.png. Symbolic links to attachments are not copied.
+
+  Everything else is ignored: other files in the notes root (README.md,
+  ...), and every file or directory whose name begins with a dot. Missing
+  journals/ or pages/ directories are fine.
+
+  Page names and file names
+      Characters that some systems do not allow in file names are written
+      as % and two hex digits per byte, so any page name round-trips to a
+      file on Linux, macOS, and Windows: the page C#: a|b? is stored as
+      pages/C#%3A a%7Cb%3F.md, and 50% done as pages/50%25 done.md. Files
+      named by hand without escaping (pages/a:b.md) are read as is.
+
+      Names are matched ignoring case and Unicode normalization: [[auth]],
+      [[Auth]], and [[AUTH]] are one page. A page is shown with the spelling
+      of its file name, or, if it has no file, of its first mention.
+      If two files are the same page (pages/Auth.md and pages/auth.md), the
+      one whose path sorts first is used and a warning names both.
+
+  Files are read as UTF-8 with LF or CRLF line endings. A file that cannot
+  be read is reported and skipped; the rest is built anyway.

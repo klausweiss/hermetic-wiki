@@ -2,7 +2,7 @@
 
 ## Context
 
-`src/main.rs` matches arguments by hand (no argument-parsing crate) and holds a short `USAGE` constant; `help` is currently matched together with `--help`/`-h`. The rules the reference must explain live in the `source-layout`, `block-model`, `reference-graph`, `static-site-output`, `serve-mode`, and `cli` specs. The `search` change is in flight and not implemented; per the spec the reference describes only implemented behavior.
+`src/main.rs` matches arguments by hand (no argument-parsing crate) and holds a short `USAGE` constant; `help` is currently matched together with `--help`/`-h`. The rules the reference must explain live in the `source-layout`, `block-model`, `reference-graph`, `static-site-output`, `serve-mode`, and `cli` specs. The `search` change was implemented while this change was in progress, so the reference describes it like any other implemented feature.
 
 ## Goals / Non-Goals
 
@@ -29,6 +29,6 @@
 
 ## Risks / Trade-offs
 
-- [Reference drifts as features change (e.g. when `search` lands)] → The examples are tested; for the rest, add a checklist item to future changes' tasks when they change user-visible syntax or layout. The `search` change's tasks should gain "update `hermetic help`" when it is applied.
+- [Reference drifts as features change] → The examples are tested; for the rest, add a checklist item to future changes' tasks when they change user-visible syntax or layout.
 - [`hermetic help` stops showing the short usage] → Low impact: the full reference begins with the `commands` section, so the usage information is still the first thing printed.
 - [Long output scrolls off the terminal] → Topics give short entry points; users can pipe to a pager.

@@ -1,0 +1,2 @@
+- How login works.
+- DONE move sessions to [[redis]]

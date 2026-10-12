@@ -1,0 +1,74 @@
+PAGES AND REFERENCES
+
+  Every page shows its own blocks, then everything the rest of the notes
+  say about it. Nothing has to be filed in one place: write in today's
+  journal, link the topics, and each topic's page collects it.
+
+  Pages without a file
+      Every name that is linked but has no file still gets a page, showing
+      only what links to it. So does every namespace above a page
+      (Project X for Project X/Auth Flow), and a linked date gets a journal
+      page. Markdown links to missing files do not create pages.
+
+  Linked references
+      A page lists every block on other pages that links to it, or to one
+      of its blocks with ((id)). Each is shown with its breadcrumb (the
+      blocks above it) and all its children. If a block and one of its
+      children both link the page, only the outer block is listed. Groups
+      come from journals first, newest day first, then from pages in
+      alphabetical order. Links from the page to itself are not listed.
+
+  Inherited references and tasks
+      A block's children belong to everything the block links: a TODO under
+      "meeting about [[auth]]" is a task of auth. A page shows its open
+      tasks (TODO and DOING): those written on it and those under blocks
+      that link to it. The open tasks page lists all open tasks.
+
+  Related pages
+      Pages linked together in the same block are related. A page lists
+      its related pages, the most often linked together first, then the
+      most recently; each expands to the blocks they share. Only links in
+      the block itself count, not those of its parents or the page it is
+      on.
+
+  Namespaces
+      A namespaced page links to the pages above it and lists the pages
+      directly below it.
+
+  Site-wide pages
+      Home page (index.md, or the journal list), journal list (newest
+      first, grouped by month, also readable as one timeline), all pages
+      (implicit ones marked), open tasks, and search. Long lists of linked
+      references or tasks continue on further pages, 100 per page.
+
+  Search
+      Over http:// (hermetic serve, or any static host), the header has a
+      search box: press / or Ctrl+K (Cmd+K on macOS). It searches page
+      names, block text, and property values; ignores case and accents;
+      matches word forms (testing finds tested) and the start of words
+      (auth finds authentication); and tolerates one typo when nothing
+      else matches. Results are blocks and pages; Enter opens the full
+      list on search.html.
+
+  Reading
+      Shift+click a link to open the page in the sidebar next to the
+      current one (over http://). Press ? for keyboard shortcuts.
+
+  Example
+      Notes:
+
+@example
+
+      Result:
+      - auth lists the block "[[auth]] token refresh shipped, ..." from
+        2026-10-12 with the breadcrumb "standup" and its child TODO, then
+        the block from index. Its open tasks are "rotate signing keys"
+        (inherited); "move sessions to [[redis]]" is done, so it is not
+        listed.
+      - redis, Project X, and backend have no file; their pages show what
+        links to them. redis lists the journal block first, then the
+        block from auth.
+      - "rotate signing keys" is also an open task of redis.
+      - auth and redis are related (linked together in one block), and so
+        are auth and Project X.
+      - The home page is index.md.

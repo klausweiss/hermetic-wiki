@@ -64,10 +64,12 @@ fn unknown_command_and_wrong_arguments() {
 #[test]
 fn help_and_version() {
     let work = Notes::empty();
-    for args in [&[][..], &["--help"]] {
+    for args in [&[][..], &["--help"], &["-h"]] {
         let o = hermetic(work.path(), args);
         assert_eq!(o.status.code(), Some(0));
-        assert!(String::from_utf8_lossy(&o.stdout).contains("Usage:"));
+        let out = String::from_utf8_lossy(&o.stdout);
+        assert!(out.contains("Usage:"));
+        assert!(out.contains("hermetic help [<topic>]"));
     }
     let o = hermetic(work.path(), &["--version"]);
     assert_eq!(o.status.code(), Some(0));
@@ -114,4 +116,75 @@ fn building_the_current_directory_twice() {
         assert!(stderr(&o).contains("(0 warnings)"));
     }
     assert!(work.path().join("site/pages/a.html").is_file());
+}
+
+fn stdout(o: &Output) -> String {
+    String::from_utf8_lossy(&o.stdout).into_owned()
+}
+
+#[test]
+fn full_reference() {
+    let work = Notes::empty();
+    let o = hermetic(work.path(), &["help"]);
+    assert_eq!(o.status.code(), Some(0), "{}", stderr(&o));
+    let out = stdout(&o);
+    assert_eq!(out, hermetic::help::reference());
+    let headings = ["COMMANDS", "NOTES LAYOUT", "SYNTAX", "PAGES AND REFERENCES"];
+    let at: Vec<usize> = headings
+        .iter()
+        .map(|h| {
+            out.find(&format!("\n{h}\n"))
+                .unwrap_or_else(|| panic!("{h}"))
+        })
+        .collect();
+    assert!(at.is_sorted(), "{at:?}");
+
+    let usage = stdout(&hermetic(work.path(), &["--help"]));
+    assert!(usage.len() < out.len());
+}
+
+#[test]
+fn single_topics() {
+    let work = Notes::empty();
+    for name in hermetic::help::TOPICS {
+        let o = hermetic(work.path(), &["help", name]);
+        assert_eq!(o.status.code(), Some(0), "{name}");
+        assert_eq!(stdout(&o), hermetic::help::topic(name).unwrap());
+    }
+    let layout = stdout(&hermetic(work.path(), &["help", "layout"]));
+    assert!(layout.starts_with("NOTES LAYOUT\n"));
+    assert!(layout.contains("journals/YYYY-MM-DD.md"));
+    assert!(layout.contains("index.md"));
+    assert!(!layout.contains("\nSYNTAX\n"));
+    let syntax = stdout(&hermetic(work.path(), &["help", "syntax"]));
+    for example in [
+        "[[name]]",
+        "#name",
+        "#[[multi word]]",
+        "((id))",
+        "key:: value",
+        "id::",
+        "TODO",
+    ] {
+        assert!(syntax.contains(example), "{example}");
+    }
+    assert!(!syntax.contains("\nCOMMANDS\n"));
+}
+
+#[test]
+fn unknown_help_topic() {
+    let work = Notes::empty();
+    let o = hermetic(work.path(), &["help", "frobnicate"]);
+    assert_eq!(o.status.code(), Some(2));
+    assert!(o.stdout.is_empty());
+    let err = stderr(&o);
+    assert!(err.contains("unknown help topic `frobnicate`"), "{err}");
+    for name in hermetic::help::TOPICS {
+        assert!(err.contains(name), "{name}");
+    }
+
+    let o = hermetic(work.path(), &["help", "syntax", "layout"]);
+    assert_eq!(o.status.code(), Some(2));
+    assert!(o.stdout.is_empty());
+    assert!(stderr(&o).contains("Usage:"));
 }

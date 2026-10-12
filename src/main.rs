@@ -2,6 +2,7 @@ use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use hermetic::help;
 use hermetic::serve::{self, Bind};
 
 const USAGE: &str = "\
@@ -10,6 +11,8 @@ hermetic - turn a directory of markdown notes into a static wiki
 Usage:
   hermetic build <notes-dir> [<output-dir>]   Build the site (output defaults to ./site)
   hermetic serve [<notes-dir>] [options]      Serve the notes as a live site
+  hermetic help [<topic>]                     Show the full reference: commands,
+                                              notes layout, syntax, and pages
   hermetic --help                             Show this help
   hermetic --version                          Show the version
 
@@ -24,10 +27,27 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
     match args.as_slice() {
-        [] | ["--help" | "-h" | "help"] => {
+        [] | ["--help" | "-h"] => {
             print!("{USAGE}");
             ExitCode::SUCCESS
         }
+        ["help"] => {
+            print!("{}", help::reference());
+            ExitCode::SUCCESS
+        }
+        ["help", name] => match help::topic(name) {
+            Some(text) => {
+                print!("{text}");
+                ExitCode::SUCCESS
+            }
+            None => {
+                eprintln!(
+                    "error: unknown help topic `{name}` (topics: {})",
+                    help::TOPICS.join(", ")
+                );
+                ExitCode::from(2)
+            }
+        },
         ["--version" | "-V"] => {
             println!("hermetic {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS

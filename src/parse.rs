@@ -98,6 +98,12 @@ pub struct ParsedBlock {
     pub task: Option<TaskState>,
     /// References inside `content`; ranges are relative to `content`.
     pub refs: Vec<RawRef>,
+    /// The block as an editor shows it: its content lines de-indented to `column`,
+    /// without the bullet marker, including property lines and the task marker, and
+    /// without trailing blank lines.
+    pub body: String,
+    /// Column where the block's content starts (after `- ` for bullets).
+    pub column: u32,
 }
 
 impl ParsedBlock {
@@ -317,13 +323,19 @@ fn finish(b: Builder, end: usize, source: String) -> ParsedBlock {
     while lines.last().is_some_and(|(l, _)| l.trim().is_empty()) {
         lines.pop();
     }
+    let body = lines
+        .iter()
+        .map(|(l, _)| l.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
 
     // Properties either form the block's first lines or directly follow its first line.
     let is_prop = |(l, fenced): &(String, bool)| !fenced && property_line(l).is_some();
+    // An empty block has no first line to follow.
     let prop_start = if lines.first().is_some_and(is_prop) {
         0
     } else {
-        1
+        1.min(lines.len())
     };
     let prop_end = prop_start
         + lines
@@ -331,7 +343,7 @@ fn finish(b: Builder, end: usize, source: String) -> ParsedBlock {
             .skip(prop_start)
             .take_while(|l| is_prop(l))
             .count();
-    let props = lines[prop_start.min(lines.len())..prop_end]
+    let props = lines[prop_start..prop_end]
         .iter()
         .map(|(l, _)| {
             let (key, value) = property_line(l).expect("checked above");
@@ -360,6 +372,8 @@ fn finish(b: Builder, end: usize, source: String) -> ParsedBlock {
         props,
         task,
         refs,
+        body,
+        column: b.content_col as u32,
     }
 }
 
@@ -702,6 +716,34 @@ mod tests {
     }
 
     #[test]
+    fn empty_blocks() {
+        for text in ["-\n", "- \n", "- a\n-\n  - b\n", "-"] {
+            let blocks = parse_blocks(text);
+            assert_eq!(reassembled(&blocks), text);
+            assert!(
+                blocks
+                    .iter()
+                    .any(|b| b.content.is_empty() && b.body.is_empty())
+            );
+        }
+        assert_eq!(
+            parents(&parse_blocks("- a\n-\n  - b\n")),
+            [None, None, Some(1)]
+        );
+    }
+
+    #[test]
+    fn bodies_and_columns() {
+        let blocks = parse_blocks("- TODO a\n  id:: x\n\n  more\n\n\t- b\n\t  c\nprose\n");
+        assert_eq!(blocks[0].body, "TODO a\nid:: x\n\nmore");
+        assert_eq!(blocks[0].column, 2);
+        assert_eq!(blocks[1].body, "b\nc");
+        assert_eq!(blocks[1].column, 6);
+        assert_eq!(blocks[2].body, "prose");
+        assert_eq!(blocks[2].column, 0);
+    }
+
+    #[test]
     fn multi_line_block() {
         let blocks = parse_blocks("- first line\n  more text\n");
         assert_eq!(contents(&blocks), ["first line\nmore text"]);
@@ -990,5 +1032,27 @@ mod tests {
             }
         }
         assert_eq!(scan_refs(text).len(), 5);
+    }
+
+    proptest::proptest! {
+        /// Parsing never panics, and the blocks' sources reassemble the text exactly
+        /// (a text of only blank lines has no blocks).
+        #[test]
+        fn no_text_is_lost(lines in proptest::collection::vec(proptest::sample::select(vec![
+            "", " ", "-", "- ", "- a", "  - b", "\t- c", "    -", "text", "  more", "```",
+            "  ```", "~~~", "key:: v", "  id:: x", "TODO", "- DONE x", "\t", "#tag [[p]]",
+        ]), 0..24), crlf in proptest::bool::ANY, newline in proptest::bool::ANY) {
+            let mut text = lines.join(if crlf { "\r\n" } else { "\n" });
+            if newline {
+                text.push('\n');
+            }
+            let text = text.replace("\r\n", "\n");
+            let blocks = parse_blocks(&text);
+            if text.trim().is_empty() {
+                proptest::prop_assert!(blocks.is_empty());
+            } else {
+                proptest::prop_assert_eq!(reassembled(&blocks), text);
+            }
+        }
     }
 }

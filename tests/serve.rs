@@ -151,11 +151,13 @@ fn same_output_as_build() {
         let r = get(server.addr, &url(&path));
         assert_eq!(r.status, 200, "{}", path.display());
         if path.extension().is_some_and(|e| e == "html") {
-            let expected = hermetic::serve::http::inject_live_reload(&bytes);
+            let expected = hermetic::serve::http::inject_elements(&bytes, true);
             assert_eq!(r.body, expected, "{}", path.display());
             assert_eq!(
                 r.body.len(),
-                bytes.len() + "<hermetic-live-reload></hermetic-live-reload>\n".len()
+                bytes.len()
+                    + "<hermetic-live-reload></hermetic-live-reload><hermetic-editor></hermetic-editor>\n"
+                        .len()
             );
             html += 1;
         } else {
@@ -177,11 +179,9 @@ fn http_behavior() {
     assert_eq!(r.status, 200);
     assert!(r.headers.contains("Content-Type: text/html; charset=utf-8"));
     assert!(r.headers.contains("Cache-Control: no-store"));
-    assert!(
-        String::from_utf8(r.body)
-            .unwrap()
-            .contains("<hermetic-live-reload></hermetic-live-reload>\n</body>")
-    );
+    assert!(String::from_utf8(r.body).unwrap().contains(
+        "<hermetic-live-reload></hermetic-live-reload><hermetic-editor></hermetic-editor>\n</body>"
+    ));
     let r = get(server.addr, "/pages/pic.png");
     assert!(r.headers.contains("Content-Type: image/png") && r.body == b"\x89PNG");
     assert!(

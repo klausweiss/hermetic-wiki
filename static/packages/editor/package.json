@@ -1,0 +1,8 @@
+{
+  "name": "@hermetic/editor",
+  "private": true,
+  "type": "module",
+  "description": "<hermetic-editor>: the block outliner hermetic serve offers to a browser on the same machine.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@hermetic/core": "workspace:*", "@hermetic/search": "workspace:*" }
+}

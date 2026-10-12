@@ -13,6 +13,10 @@ const MAX_HEAD: usize = 8 * 1024;
 pub const LIVE_RELOAD_TAG: &str = "<hermetic-live-reload></hermetic-live-reload>";
 /// The server-sent events endpoint the live-reload element connects to.
 pub const EVENTS_PATH: &str = "/_hermetic/events";
+/// The element the server adds to pages it serves to a browser on the same machine.
+pub const EDITOR_TAG: &str = "<hermetic-editor></hermetic-editor>";
+/// The edit API: one page's source, by site path.
+pub const SOURCE_PATH: &str = "/_hermetic/source";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Request {
@@ -93,6 +97,41 @@ pub fn decoded_path(target: &str) -> Option<String> {
     String::from_utf8(out).ok()
 }
 
+/// The value of a query parameter, percent-decoded (`+` is a space).
+pub fn query_param(target: &str, name: &str) -> Option<String> {
+    let query = target.split_once('?')?.1.split('#').next()?;
+    query.split('&').find_map(|pair| {
+        let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+        if key != name {
+            return None;
+        }
+        let value = value.replace('+', " ");
+        decoded_path(&format!("/{value}"))
+    })
+}
+
+/// Reads a request body of `Content-Length` bytes, at most `max`. Errors are the
+/// response status: 411 without a length (or with a transfer encoding), 413 when too
+/// large, 400 when the connection ends early.
+pub fn read_body(reader: &mut impl Read, request: &Request, max: usize) -> Result<Vec<u8>, u16> {
+    if request.header("transfer-encoding").is_some() {
+        return Err(411);
+    }
+    let len: usize = request
+        .header("content-length")
+        .ok_or(411u16)?
+        .parse()
+        .map_err(|_| 400u16)?;
+    if len > max {
+        // Read (and drop) what was sent, so the client sees the response, not a reset.
+        let _ = io::copy(&mut reader.take(len.min(4 * max) as u64), &mut io::sink());
+        return Err(413);
+    }
+    let mut body = vec![0; len];
+    reader.read_exact(&mut body).map_err(|_| 400u16)?;
+    Ok(body)
+}
+
 /// Finds the build file for a decoded path: `""` and paths ending in `/` map to the
 /// directory's `index.html`. Paths with `.`/`..` segments never match.
 pub fn lookup<'f>(files: &'f SiteFiles, path: &str) -> Option<(PathBuf, &'f Content)> {
@@ -139,11 +178,16 @@ pub fn content_type(path: &Path) -> &'static str {
     }
 }
 
-/// Adds the live-reload element before `</body>` of a generated page.
-pub fn inject_live_reload(html: &[u8]) -> Vec<u8> {
+/// Adds the live-reload element, and the editor element when `editor` is set, before
+/// `</body>` of a generated page.
+pub fn inject_elements(html: &[u8], editor: bool) -> Vec<u8> {
     const END: &[u8] = b"</body>";
+    let mut tags = String::from(LIVE_RELOAD_TAG);
+    if editor {
+        tags.push_str(EDITOR_TAG);
+    }
     match html.windows(END.len()).rposition(|w| w == END) {
-        Some(i) => [&html[..i], LIVE_RELOAD_TAG.as_bytes(), b"\n", &html[i..]].concat(),
+        Some(i) => [&html[..i], tags.as_bytes(), b"\n", &html[i..]].concat(),
         None => html.to_vec(),
     }
 }
@@ -173,6 +217,9 @@ pub fn status_text(status: u16) -> &'static str {
         403 => "Forbidden",
         404 => "Not Found",
         405 => "Method Not Allowed",
+        409 => "Conflict",
+        411 => "Length Required",
+        413 => "Content Too Large",
         _ => "Internal Server Error",
     }
 }
@@ -344,11 +391,52 @@ mod tests {
     #[test]
     fn injection() {
         let page = b"<html><body><main>x</main>\n</body>\n</html>\n";
-        let out = String::from_utf8(inject_live_reload(page)).unwrap();
+        let out = String::from_utf8(inject_elements(page, false)).unwrap();
         assert_eq!(
             out,
             format!("<html><body><main>x</main>\n{LIVE_RELOAD_TAG}\n</body>\n</html>\n")
         );
-        assert_eq!(inject_live_reload(b"no body"), b"no body");
+        let out = String::from_utf8(inject_elements(page, true)).unwrap();
+        assert!(out.contains(&format!("{LIVE_RELOAD_TAG}{EDITOR_TAG}\n</body>")));
+        assert_eq!(inject_elements(b"no body", true), b"no body");
+    }
+
+    #[test]
+    fn query_params() {
+        let t = "/_hermetic/source?x=1&path=pages/Project%20X/A+b.html#frag";
+        assert_eq!(
+            query_param(t, "path").as_deref(),
+            Some("pages/Project X/A b.html")
+        );
+        assert_eq!(query_param(t, "x").as_deref(), Some("1"));
+        assert_eq!(query_param(t, "y"), None);
+        assert_eq!(query_param("/_hermetic/source", "path"), None);
+        assert_eq!(query_param("/s?path=%2B%25", "path").as_deref(), Some("+%"));
+        assert_eq!(query_param("/s?path=%ff", "path"), None);
+    }
+
+    #[test]
+    fn bodies() {
+        let body = |head: &str, rest: &str, max: usize| {
+            let r = parse(head).unwrap();
+            read_body(&mut rest.as_bytes(), &r, max)
+        };
+        let head = "PUT / HTTP/1.1\r\nContent-Length: 3\r\n\r\n";
+        assert_eq!(body(head, "abcdef", 10), Ok(b"abc".to_vec()));
+        assert_eq!(body(head, "ab", 10), Err(400));
+        assert_eq!(body(head, "abc", 2), Err(413));
+        assert_eq!(body("PUT / HTTP/1.1\r\n\r\n", "abc", 10), Err(411));
+        assert_eq!(
+            body(
+                "PUT / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n",
+                "",
+                10
+            ),
+            Err(411)
+        );
+        assert_eq!(
+            body("PUT / HTTP/1.1\r\nContent-Length: x\r\n\r\n", "", 10),
+            Err(400)
+        );
     }
 }

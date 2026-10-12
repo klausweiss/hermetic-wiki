@@ -23,10 +23,14 @@ interface Shortcut {
   what: string;
   sidebar?: true;
   search?: true;
+  /** Listed only where editing is available (hermetic serve, same machine). */
+  editing?: true;
 }
 
+const APPLE = /Mac|iPhone|iPad/.test(navigator.platform);
 /** Ctrl+K, or Cmd+K on Apple platforms, as the help dialog names it. */
-const MOD_K = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘ K" : "Ctrl + K";
+const MOD_K = APPLE ? "⌘ K" : "Ctrl + K";
+const MOD_ENTER = APPLE ? "⌘ Enter" : "Ctrl + Enter";
 
 const HELP: readonly Shortcut[] = [
   { keys: "g h", what: "Home" },
@@ -39,6 +43,14 @@ const HELP: readonly Shortcut[] = [
   { keys: "Esc", what: "Close the top sidebar pane", sidebar: true },
   { keys: "\\", what: "Show or hide the sidebar", sidebar: true },
   { keys: "?", what: "Show these shortcuts" },
+  { keys: "Click a block", what: "Edit it", editing: true },
+  { keys: "Enter", what: "New block below (Shift + Enter: line break)", editing: true },
+  { keys: "Tab / Shift + Tab", what: "Indent / outdent the block", editing: true },
+  { keys: "Alt + Shift + ↑ / ↓", what: "Move the block up / down", editing: true },
+  { keys: "Backspace at the start", what: "Join with the block above (or delete an empty one)", editing: true },
+  { keys: MOD_ENTER, what: "Cycle TODO / DOING / DONE", editing: true },
+  { keys: "[[ and ((", what: "Link a page / reference a block", editing: true },
+  { keys: "Esc", what: "Stop editing", editing: true },
 ];
 
 /** How long after `g` the second key is accepted. */
@@ -119,13 +131,14 @@ export class HermeticShortcuts extends HTMLElement {
 
   private helpDialog(): HTMLDialogElement {
     const withSidebar = readEnv().interactive && document.querySelector("hermetic-sidebar") !== null;
+    const withEditing = readEnv().interactive && document.querySelector("hermetic-editor") !== null;
     const dialog = document.createElement("dialog");
     dialog.className = "shortcuts";
     const title = document.createElement("h2");
     title.textContent = "Keyboard shortcuts";
     const list = document.createElement("dl");
     for (const s of HELP) {
-      if ((s.sidebar && !withSidebar) || (s.search && !hasSearch())) {
+      if ((s.sidebar && !withSidebar) || (s.search && !hasSearch()) || (s.editing && !withEditing)) {
         continue;
       }
       const dt = document.createElement("dt");

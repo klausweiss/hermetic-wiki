@@ -27,3 +27,10 @@ export const PAGES_CHANGED = "hermetic-pages-changed";
 
 /** Dispatched on `document` (by the `/` shortcut) to focus the search box. */
 export const SEARCH_FOCUS = "hermetic-search-focus";
+
+/**
+ * Set on `<html>` by <hermetic-editor> while the page is open for editing. Then
+ * <hermetic-live-reload> does not reload when the page itself changes, and includes it
+ * in `PAGES_CHANGED` instead, so the editor can update the page in place.
+ */
+export const EDITING_ATTR = "data-hermetic-editing";

@@ -1,9 +1,10 @@
 // <hermetic-live-reload>: inserted by `hermetic serve` into the pages it serves (built
 // sites never contain it). After each rebuild the server lists the pages that changed:
 // this page reloads only if it is one of them, keeping its scroll position; otherwise
-// other components (the sidebar) are told, so they can refresh what they show.
+// other components (the sidebar) are told, so they can refresh what they show. A page
+// open in the editor never reloads: the editor is told and updates it in place.
 
-import { PAGES_CHANGED, readEnv, whenParsed } from "@hermetic/core";
+import { EDITING_ATTR, PAGES_CHANGED, readEnv, whenParsed } from "@hermetic/core";
 
 import { affects, parseChanges, sitePath } from "./changes";
 
@@ -37,7 +38,8 @@ export class HermeticLiveReload extends HTMLElement {
       if (!changes) {
         return;
       }
-      if (path && affects(changes, path)) {
+      const editing = document.documentElement.hasAttribute(EDITING_ATTR);
+      if (path && affects(changes, path) && !editing) {
         saveScroll(path);
         location.reload();
       } else {

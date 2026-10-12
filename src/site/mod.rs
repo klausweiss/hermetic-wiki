@@ -8,6 +8,8 @@ mod render;
 
 /// Percent-encodes one path segment the way generated links do.
 pub use paths::encode as encode_url_segment;
+/// Output path of a page's HTML file, relative to the site root.
+pub use paths::output_path as page_output_path;
 
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;

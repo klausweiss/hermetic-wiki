@@ -1,0 +1,2 @@
+- no final newline
+  - child

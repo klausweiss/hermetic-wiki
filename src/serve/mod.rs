@@ -1,6 +1,7 @@
 //! `hermetic serve`: builds the site in memory, serves it over HTTP, rebuilds when the
 //! notes change, and tells open pages which files changed.
 
+pub mod edit;
 pub mod http;
 pub mod watch;
 
@@ -10,6 +11,7 @@ use std::fs;
 use std::io::{self, BufReader, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, UdpSocket};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
@@ -68,6 +70,8 @@ struct Build {
     files: SiteFiles,
     /// Size and modification time of each attachment, to detect attachment changes.
     attachments: BTreeMap<PathBuf, (u64, Option<SystemTime>)>,
+    /// Pages the editor may change, by site path.
+    editable: edit::EditMap,
 }
 
 struct State {
@@ -77,6 +81,15 @@ struct State {
     port: u16,
     build: RwLock<Arc<Build>>,
     clients: Mutex<Vec<Sender<String>>>,
+    /// Held while rebuilding or saving, so saves and rebuilds never interleave.
+    rebuilding: Mutex<()>,
+    /// The inputs as of the last rebuild; saves update it so the watcher does not
+    /// rebuild a second time for them.
+    snapshot: Mutex<watch::Snapshot>,
+    /// Diagnostics printed after the last rebuild, to print only when they change.
+    diagnostics: Mutex<Vec<String>>,
+    /// Number of rebuilds since the start.
+    rebuilds: AtomicUsize,
 }
 
 /// A running server.
@@ -88,9 +101,15 @@ pub struct Running {
     pub diagnostics: Vec<Diagnostic>,
     pub pages: usize,
     accept: thread::JoinHandle<()>,
+    state: Arc<State>,
 }
 
 impl Running {
+    /// Number of rebuilds since the server started.
+    pub fn rebuilds(&self) -> usize {
+        self.state.rebuilds.load(Ordering::SeqCst)
+    }
+
     /// Blocks while the server runs (until the process is interrupted).
     pub fn wait(self) {
         let _ = self.accept.join();
@@ -121,15 +140,24 @@ pub fn start(options: Options) -> Result<Running, ServeError> {
         port: addr.port(),
         build: RwLock::new(Arc::new(build)),
         clients: Mutex::new(Vec::new()),
+        rebuilding: Mutex::new(()),
+        snapshot: Mutex::new(initial_snapshot),
+        diagnostics: Mutex::new(diagnostics.iter().map(ToString::to_string).collect()),
+        rebuilds: AtomicUsize::new(0),
     });
 
     let watcher = Arc::clone(&state);
-    let mut last_diagnostics: Vec<String> = diagnostics.iter().map(ToString::to_string).collect();
     thread::spawn(move || {
-        let mut current = initial_snapshot;
         loop {
-            current = watch::wait_for_change(&watcher.notes, &current, options.timing);
-            rebuild(&watcher, &mut last_diagnostics);
+            watch::wait_for_change(&watcher.notes, &watcher.snapshot, options.timing);
+            let _rebuilding = watcher.rebuilding.lock().expect("rebuild lock");
+            // A save may have rebuilt for this change already.
+            let now = watch::snapshot(&watcher.notes);
+            if now == *watcher.snapshot.lock().expect("snapshot lock") {
+                continue;
+            }
+            *watcher.snapshot.lock().expect("snapshot lock") = now;
+            rebuild(&watcher);
         }
     });
 
@@ -149,6 +177,7 @@ pub fn start(options: Options) -> Result<Running, ServeError> {
         diagnostics,
         pages,
         accept,
+        state,
     })
 }
 
@@ -166,6 +195,7 @@ fn build_site(notes: &Path, title: &str) -> io::Result<(Build, usize, Vec<Diagno
     let build = Build {
         files: rendered.files,
         attachments,
+        editable: edit::editable_pages(&graph),
     };
     Ok((build, rendered.pages, diagnostics))
 }
@@ -174,8 +204,9 @@ fn fingerprint(path: &Path) -> (u64, Option<SystemTime>) {
     fs::metadata(path).map_or((0, None), |m| (m.len(), m.modified().ok()))
 }
 
-/// Rebuilds after a change, swaps the served build, and notifies open pages.
-fn rebuild(state: &State, last_diagnostics: &mut Vec<String>) {
+/// Rebuilds after a change, swaps the served build, and notifies open pages. Callers
+/// hold `state.rebuilding`.
+fn rebuild(state: &State) {
     let started = Instant::now();
     let (build, pages, diagnostics) = match build_site(&state.notes, &state.title) {
         Ok(b) => b,
@@ -184,17 +215,20 @@ fn rebuild(state: &State, last_diagnostics: &mut Vec<String>) {
             return;
         }
     };
+    state.rebuilds.fetch_add(1, Ordering::SeqCst);
     let old = Arc::clone(&state.build.read().expect("build lock"));
     let (changed, removed) = diff(&old, &build);
     *state.build.write().expect("build lock") = Arc::new(build);
 
     let messages: Vec<String> = diagnostics.iter().map(ToString::to_string).collect();
-    if &messages != last_diagnostics {
+    let mut last_diagnostics = state.diagnostics.lock().expect("diagnostics lock");
+    if messages != *last_diagnostics {
         for m in &messages {
             eprintln!("warning: {m}");
         }
         *last_diagnostics = messages;
     }
+    drop(last_diagnostics);
     eprintln!(
         "rebuilt {pages} pages in {} ms: {} changed, {} removed ({} warnings)",
         started.elapsed().as_millis(),
@@ -272,7 +306,9 @@ fn broadcast(state: &State, json: &str) {
 
 fn handle(state: &State, mut stream: TcpStream) -> io::Result<()> {
     stream.set_read_timeout(Some(Duration::from_secs(10)))?;
-    let request = match http::read_request(&mut BufReader::new(&stream)) {
+    let peer = stream.peer_addr()?.ip();
+    let mut reader = BufReader::new(stream.try_clone()?);
+    let request = match http::read_request(&mut reader) {
         Ok(r) => r,
         Err(_) => {
             return stream.write_all(&http::response(400, "text/plain", b"Bad Request\n", false));
@@ -284,6 +320,16 @@ fn handle(state: &State, mut stream: TcpStream) -> io::Result<()> {
             .is_some_and(|h| http::is_loopback_host(h, state.port))
     {
         return stream.write_all(&http::response(403, "text/plain", b"Forbidden\n", false));
+    }
+    let same_machine = edit::same_machine(peer, &request, state.port);
+    if request.target.split(['?', '#']).next() == Some(http::SOURCE_PATH) {
+        let (status, body) = source(state, &request, &mut reader, same_machine);
+        let content_type = if status == 200 || status == 409 {
+            "application/json"
+        } else {
+            "text/plain"
+        };
+        return stream.write_all(&http::response(status, content_type, &body, false));
     }
     let head = request.method == "HEAD";
     if request.method != "GET" && !head {
@@ -320,11 +366,82 @@ fn handle(state: &State, mut stream: TcpStream) -> io::Result<()> {
     };
     let content_type = http::content_type(&rel);
     let body = if content_type.starts_with("text/html") {
-        http::inject_live_reload(&body)
+        http::inject_elements(&body, same_machine)
     } else {
         body
     };
     stream.write_all(&http::response(200, content_type, &body, head))
+}
+
+/// The edit API: `GET` returns a page's source payload, `PUT` saves it (see
+/// `browser-editing`). Returns the status and body.
+fn source(
+    state: &State,
+    request: &http::Request,
+    reader: &mut impl io::Read,
+    same_machine: bool,
+) -> (u16, Vec<u8>) {
+    let put = request.method == "PUT";
+    if !put && request.method != "GET" {
+        return (405, Vec::new());
+    }
+    if !same_machine || (put && !edit::from_editor(request)) {
+        return (403, Vec::new());
+    }
+    let body = if put {
+        match http::read_body(reader, request, edit::MAX_BODY) {
+            Ok(body) => Some(body),
+            Err(status) => return (status, Vec::new()),
+        }
+    } else {
+        None
+    };
+    let build = Arc::clone(&state.build.read().expect("build lock"));
+    let Some(page) = http::query_param(&request.target, "path")
+        .and_then(|path| edit::resolve(&build.editable, &path))
+    else {
+        return (404, b"not an editable page\n".to_vec());
+    };
+    drop(build);
+
+    let _rebuilding = state.rebuilding.lock().expect("rebuild lock");
+    let target = match edit::checked_target(&state.notes, &edit::source_path(&page)) {
+        Ok(target) => target,
+        Err(edit::Unsafe::Outside) => return (403, b"outside the notes\n".to_vec()),
+        Err(edit::Unsafe::Io(e)) => return (500, format!("{e}\n").into_bytes()),
+    };
+    let current = match fs::read(&target) {
+        Ok(bytes) => Some(bytes),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => None,
+        Err(e) => return (500, format!("{e}\n").into_bytes()),
+    };
+    let payload = |bytes: Option<&[u8]>| match edit::source_json(bytes) {
+        Some(json) => (200, json.into_bytes()),
+        None => (500, b"the file is not UTF-8\n".to_vec()),
+    };
+    let Some(body) = body else {
+        return payload(current.as_deref());
+    };
+
+    let Ok(text) = String::from_utf8(body) else {
+        return (400, b"the text is not UTF-8\n".to_vec());
+    };
+    let Some(base) = request.header(edit::VERSION_HEADER) else {
+        return (400, b"missing version\n".to_vec());
+    };
+    if base != edit::version(current.as_deref()) {
+        let (status, json) = payload(current.as_deref());
+        return (if status == 200 { 409 } else { status }, json);
+    }
+    let bytes = edit::file_bytes(&text, current.as_deref());
+    match edit::write_atomic(&state.notes, &target, &bytes) {
+        Ok(()) => {}
+        Err(edit::Unsafe::Outside) => return (403, b"outside the notes\n".to_vec()),
+        Err(edit::Unsafe::Io(e)) => return (500, format!("{e}\n").into_bytes()),
+    }
+    *state.snapshot.lock().expect("snapshot lock") = watch::snapshot(&state.notes);
+    rebuild(state);
+    payload(Some(&bytes))
 }
 
 /// A server-sent event stream: one `data:` line per rebuild that changed something.
@@ -407,6 +524,7 @@ mod tests {
                 .map(|(p, b)| (PathBuf::from(p), Content::Bytes(b.to_vec())))
                 .collect(),
             attachments: BTreeMap::new(),
+            editable: edit::EditMap::new(),
         }
     }
 

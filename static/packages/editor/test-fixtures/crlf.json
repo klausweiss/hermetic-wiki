@@ -1,0 +1,1 @@
+{"exists":true,"version":"d54c63d97c5a572f","text":"- a\u000a  - b\u000a- c\u000a","indent":"  ","blocks":[{"lines":[0,1],"first":0,"depth":0,"bullet":true,"anchor":"b1","body":"a","column":2},{"lines":[1,2],"first":1,"depth":1,"bullet":true,"anchor":"b2","body":"b","column":4},{"lines":[2,4],"first":2,"depth":0,"bullet":true,"anchor":"b3","body":"c","column":2}]}

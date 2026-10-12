@@ -20,9 +20,17 @@ COMMANDS
   hermetic serve [<notes-dir>] [--port <n>] [--host <address>] [--public]
       Serve the notes as a live site at http://127.0.0.1:8000/ (or the next
       free port up to 8099). The notes directory defaults to the current
-      one. Nothing is written to disk. When a note changes, the site is
-      rebuilt and open tabs update: a tab reloads only if its own page
-      changed, keeping its scroll position and sidebar.
+      one. The site itself is never written to disk. When a note changes,
+      the site is rebuilt and open tabs update: a tab reloads only if its
+      own page changed, keeping its scroll position and sidebar.
+
+      In a browser on the same machine, pages can be edited in place: click
+      a block to edit its markdown; Enter starts a new block, Tab and
+      Shift+Tab indent and outdent, [[ and (( complete page and block
+      references. Edits are saved to the note files automatically; a save
+      is refused if the file changed on disk since the page loaded it.
+      "Today" opens (and creates) today's journal. Other devices and other
+      websites can never edit, also with --host or --public.
 
       --port <n>        Use exactly this port; fail if it is taken.
       --host <address>  Listen on this address instead of 127.0.0.1.

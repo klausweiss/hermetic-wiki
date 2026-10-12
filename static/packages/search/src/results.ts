@@ -10,6 +10,8 @@ export interface Result {
   path: string;
   /** Block anchor, "" for page results. */
   anchor: string;
+  /** The page's name. */
+  name: string;
   title: string;
   breadcrumb: string[];
   preview: string;
@@ -70,6 +72,7 @@ export async function resolve(source: IndexSource, meta: Meta, hits: Hit[]): Pro
         kind: e.anchor === "" ? ("page" as const) : ("block" as const),
         path: e.path,
         anchor: e.anchor,
+        name: e.name,
         title: title(e.name),
         breadcrumb,
         preview: e.preview,

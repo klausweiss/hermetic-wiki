@@ -3,6 +3,7 @@
 // defines every element. The generated HTML already contains the elements; without
 // this script they are inert and every page still works.
 
+import { define as defineEditor } from "@hermetic/editor";
 import { define as defineLiveReload } from "@hermetic/live-reload";
 import { define as defineSearch } from "@hermetic/search";
 import { define as defineShortcuts } from "@hermetic/shortcuts";
@@ -19,3 +20,4 @@ defineTimeline();
 defineShortcuts();
 defineLiveReload();
 defineSearch();
+defineEditor();

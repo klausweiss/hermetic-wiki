@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, SystemTime};
 
@@ -68,13 +69,14 @@ impl Default for Timing {
     }
 }
 
-/// Blocks until the inputs differ from `current`, then until they have stayed the same
-/// for the quiet period. Returns the settled snapshot.
-pub fn wait_for_change(notes: &Path, current: &Snapshot, timing: Timing) -> Snapshot {
+/// Blocks until the inputs differ from `current` (which saves from the editor update
+/// while this waits), then until they have stayed the same for the quiet period.
+/// Returns the settled snapshot.
+pub fn wait_for_change(notes: &Path, current: &Mutex<Snapshot>, timing: Timing) -> Snapshot {
     let mut latest = loop {
         thread::sleep(timing.poll);
         let now = snapshot(notes);
-        if &now != current {
+        if now != *current.lock().expect("snapshot lock") {
             break now;
         }
     };

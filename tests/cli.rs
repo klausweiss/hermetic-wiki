@@ -169,6 +169,11 @@ fn single_topics() {
         assert!(syntax.contains(example), "{example}");
     }
     assert!(!syntax.contains("\nCOMMANDS\n"));
+    // Editing is described: same machine only, saved to the note files.
+    let commands = stdout(&hermetic(work.path(), &["help", "commands"]));
+    for phrase in ["same machine", "saved to the note files", "can never edit"] {
+        assert!(commands.contains(phrase), "{phrase}");
+    }
 }
 
 #[test]

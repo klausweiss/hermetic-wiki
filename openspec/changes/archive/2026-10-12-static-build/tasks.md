@@ -49,5 +49,6 @@
 - [x] 7.3 Verify `No external resources`: scan every generated HTML/CSS file for `src`/`href`/`url(` values with a scheme or `//` that do not come from note content, and confirm no `<script>` tags
 - [x] 7.4 Verify `Unrelated growth`: add 1,000 unrelated journal days to a fixture and confirm `pages/auth.html` is byte-identical
 - [x] 7.5 Verify `Build without network access` by confirming `cargo tree` contains no networking crates and by running a build under `unshare -n` (or equivalent) if available
-- [ ] 7.6 Open the fixture site from disk in a browser with JavaScript disabled and confirm pages, navigation, styles, and fonts work (`Opened from disk`); record the check in the change notes
+- [x] 7.6 Open the fixture site from disk in a browser with JavaScript disabled and confirm pages, navigation, styles, and fonts work (`Opened from disk`); record the check in the change notes
+  - Checked 2026-10-12 by the user: the fixture site (`make site`) opened from disk with JavaScript disabled works as expected.
 - [x] 7.7 Add `make site` (builds `tests/fixtures/notes` into `./site`) and confirm `make lint`, `make test`, and `make test-perf` pass

@@ -1,11 +1,12 @@
 // <hermetic-timeline>: wraps the journal list (`ul.days` links, newest first) and adds a
-// timeline view showing full journal days, loaded as the reader scrolls. Without the
+// timeline view (the default) showing full journal days, loaded as the reader scrolls. Without the
 // script the element is inert and the list inside it shows as usual.
 
 import { fetchPage, readEnv, whenParsed } from "@hermetic/core";
 
 const VIEW_PARAM = "view";
 const TIMELINE = "timeline";
+const LIST = "list";
 const BATCH = 5;
 /** Batches loaded to fill the screen before the reader has scrolled at all. */
 const MAX_UNSCROLLED_BATCHES = 2;
@@ -88,20 +89,21 @@ export class HermeticTimeline extends HTMLElement {
       this.classList.toggle("show-timeline", isTimeline);
       listButton.setAttribute("aria-pressed", String(!isTimeline));
       timelineButton.setAttribute("aria-pressed", String(isTimeline));
+      // The timeline is the default; only the list is named in the URL.
       const url = new URL(location.href);
       if (isTimeline) {
-        url.searchParams.set(VIEW_PARAM, TIMELINE);
+        url.searchParams.delete(VIEW_PARAM);
         observer.observe(sentinel);
       } else {
-        url.searchParams.delete(VIEW_PARAM);
+        url.searchParams.set(VIEW_PARAM, LIST);
         observer.unobserve(sentinel);
       }
       history.replaceState(history.state, "", url.href);
     };
 
-    listButton.addEventListener("click", () => show("list"));
+    listButton.addEventListener("click", () => show(LIST));
     timelineButton.addEventListener("click", () => show(TIMELINE));
-    show(new URL(location.href).searchParams.get(VIEW_PARAM) ?? "list");
+    show(new URL(location.href).searchParams.get(VIEW_PARAM) === LIST ? LIST : TIMELINE);
   }
 }
 

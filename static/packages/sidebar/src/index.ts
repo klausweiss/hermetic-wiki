@@ -3,6 +3,7 @@
 
 import {
   type Env,
+  icon,
   PAGES_CHANGED,
   type Pane,
   SIDEBAR_CLOSE_TOP,
@@ -134,7 +135,7 @@ export class HermeticSidebar extends HTMLElement {
     aside.append(bar, this.placeholder, this.list);
 
     this.toggle = button("", "Show or hide the sidebar (\\)", () => this.toggleHidden());
-    this.toggle.classList.add("sidebar-toggle");
+    this.toggle.classList.add("corner-button", "sidebar-toggle");
     this.append(aside, this.toggle);
 
     // Panes are fetched only when they come near the visible part of the sidebar.
@@ -297,11 +298,22 @@ export class HermeticSidebar extends HTMLElement {
     LAYOUT.toggle("sidebar-empty", this.isEmpty);
     this.placeholder.hidden = !this.isEmpty;
     this.closeAllButton.hidden = this.isEmpty;
-    this.toggle.textContent = !this.sidebarHidden
-      ? "Hide"
+    // An icon: show (panel opening) or hide (panel closing), with the number of open
+    // panes while they are hidden.
+    const label = !this.sidebarHidden
+      ? "Hide the sidebar (\\)"
       : this.isEmpty
-        ? "Sidebar"
-        : `Sidebar (${this.views.length})`;
+        ? "Show the sidebar (\\)"
+        : `Show the sidebar, ${this.views.length} open (\\)`;
+    this.toggle.replaceChildren(icon(this.sidebarHidden ? "panel-right-open" : "panel-right-close"));
+    if (this.sidebarHidden && !this.isEmpty) {
+      const count = document.createElement("span");
+      count.className = "corner-count";
+      count.textContent = String(this.views.length);
+      this.toggle.append(count);
+    }
+    this.toggle.setAttribute("aria-label", label);
+    this.toggle.title = label;
     this.toggle.setAttribute("aria-expanded", String(!this.sidebarHidden));
     for (const view of this.views) {
       view.element.classList.toggle("collapsed", view.pane.collapsed);

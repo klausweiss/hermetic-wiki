@@ -289,3 +289,16 @@ describe("written text parses back into the same tree", () => {
     }
   });
 });
+
+describe("task labels", () => {
+  test("advanceTask cycles TODO → DOING → DONE → TODO and touches only the marker", async () => {
+    const { advanceTask } = await import("./ops");
+    expect(advanceTask("TODO rotate signing keys")).toBe("DOING rotate signing keys");
+    expect(advanceTask("DOING rotate\nowner:: ops\nmore")).toBe("DONE rotate\nowner:: ops\nmore");
+    expect(advanceTask("DONE x")).toBe("TODO x");
+    expect(advanceTask("TODO")).toBe("DOING");
+    expect(advanceTask("TODOS for today")).toBeNull();
+    expect(advanceTask("plain")).toBeNull();
+    expect(advanceTask("note\nTODO not the first line")).toBeNull();
+  });
+});

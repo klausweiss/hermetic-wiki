@@ -129,3 +129,13 @@ export function cycleTask(node: Node, offset: number): Focus {
   const shifted = offset - oldPrefix.length + next.length;
   return { node, offset: Math.max(next.length, Math.min(shifted, node.body.length)) };
 }
+
+/** A click on a task label: TODO → DOING → DONE → TODO. Null when the block is no task. */
+export function advanceTask(body: string): string | null {
+  const nl = body.indexOf("\n");
+  const first = nl < 0 ? body : body.slice(0, nl);
+  const current = MARKERS.findIndex((m) => first === m || first.startsWith(`${m} `));
+  if (current < 0) return null;
+  const next = MARKERS[(current + 1) % MARKERS.length]!;
+  return next + body.slice(MARKERS[current]!.length);
+}

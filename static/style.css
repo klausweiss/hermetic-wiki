@@ -226,7 +226,23 @@ button {
   border: 1px solid var(--border); border-radius: 6px; padding: 0.1rem 0.55rem; cursor: pointer;
 }
 button:hover { color: var(--text); background: var(--surface); }
-hermetic-theme-toggle { margin-left: auto; }
+/* The corner controls: the sidebar's show/hide button in the top-right corner and the
+   theme button just left of it (in the corner itself where there is no sidebar button).
+   Both are fixed, so they stay in place whether the sidebar is shown or hidden; the
+   header and the sidebar's top bar keep that corner free. */
+:root { --corner-size: 2rem; --corner-gap: 0.35rem; --corner-inset: 0.75rem; }
+.corner-button {
+  position: fixed; top: 0.5rem; z-index: 11; width: var(--corner-size); height: var(--corner-size);
+  padding: 0; display: inline-grid; place-items: center; background: var(--bg);
+}
+.corner-button .icon { display: block; }
+.sidebar-toggle { right: var(--corner-inset); }
+.theme-button { right: calc(var(--corner-inset) + var(--corner-size) + var(--corner-gap)); }
+:root:not(:has(.sidebar-toggle)) .theme-button { right: var(--corner-inset); }
+.corner-count {
+  position: absolute; top: -0.4rem; right: -0.4rem; min-width: 1rem; height: 1rem; padding: 0 0.2rem;
+  border-radius: 0.5rem; background: var(--link); color: var(--bg); font-size: 0.65rem; font-weight: 700; line-height: 1rem;
+}
 
 .view-toggle { display: inline-flex; gap: 0.25rem; margin-bottom: 1rem; }
 .view-toggle button[aria-pressed="true"] { color: var(--text); background: var(--surface); }
@@ -257,12 +273,17 @@ hermetic-timeline.show-timeline > h2, hermetic-timeline.show-timeline > ul.days 
 .sidebar-open.sidebar-empty .sidebar { width: var(--sidebar-width-empty); }
 .sidebar-animate body, .sidebar-animate .sidebar { transition: padding-right 0.15s ease, width 0.15s ease; }
 
-/* The one hide/show control sits in the sidebar's top bar when it is open, and in the
-   same spot when it is hidden; the header keeps that corner free. */
-.sidebar-toggle { position: fixed; top: 0.55rem; right: 1rem; z-index: 11; background: var(--bg); }
-.sidebar-hidden .site-header { padding-right: calc(16px + 6.5rem); }
+/* The hide/show control (a corner button, above) sits over the sidebar's top bar when it
+   is open, and in the same spot when it is hidden. */
+/* The centered header reaches the corner only on narrower screens (about measure + 2 ×
+   the corner's width); there it keeps the corner free while the sidebar is hidden. */
+@media (max-width: 54rem) {
+  .sidebar-hidden .site-header, :root:not(:has(.sidebar-toggle)):has(.theme-button) .site-header {
+    padding-right: calc(16px + 2 * var(--corner-size) + var(--corner-gap) + var(--corner-inset));
+  }
+}
 .sidebar-bar {
-  display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 6rem 0.6rem 1rem;
+  display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem calc(2 * var(--corner-size) + var(--corner-gap) + var(--corner-inset) + 0.5rem) 0.6rem 1rem;
   border-bottom: 1px solid var(--border); font-size: 0.85rem; color: var(--muted);
 }
 .sidebar-bar span { margin-right: auto; font-weight: 600; }
@@ -376,3 +397,10 @@ html[data-hermetic-editing] section.content li.block > .block-body { cursor: tex
 .complete-detail { display: block; font-size: 0.78rem; color: var(--muted); }
 .block-menu button { display: block; width: 100%; text-align: left; font: inherit; font-size: 0.9rem; padding: 0.3rem 0.5rem; border: none; border-radius: 6px; background: none; color: var(--text); cursor: pointer; }
 .block-menu button:hover, .block-menu button:focus-visible { background: var(--surface); }
+.task-marker[role="button"] { cursor: pointer; user-select: none; }
+.task-marker[role="button"]:hover { background: var(--surface); }
+.task-marker[role="button"]:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+/* Every block row can be clicked to edit it, also an empty block. */
+html[data-hermetic-editing] section.content li.block > .block-body { min-height: 1.6em; }
+.write-home { font: inherit; font-weight: 600; margin-right: 0.4rem; cursor: pointer; }
+p.warning { border-left: 3px solid var(--todo); padding: 0.4rem 0.75rem; background: var(--surface); border-radius: 4px; }

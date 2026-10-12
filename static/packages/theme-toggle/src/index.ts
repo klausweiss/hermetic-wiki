@@ -1,12 +1,14 @@
 // <hermetic-theme-toggle>: switches between system, light, and dark theme, remembered
-// in the browser. `applyStoredTheme()` must run before the page is painted.
+// in the browser. `applyStoredTheme()` must run before the page is painted. The button
+// is an icon in the top-right corner, next to the sidebar's control (see style.css).
 
-import { whenParsed } from "@hermetic/core";
+import { type IconName, icon, whenParsed } from "@hermetic/core";
 
 type Theme = "system" | "light" | "dark";
 
 const KEY = "hermetic-theme";
 const ORDER: readonly Theme[] = ["system", "light", "dark"];
+const ICONS: Record<Theme, IconName> = { system: "sun-moon", light: "sun", dark: "moon" };
 
 function load(): Theme {
   try {
@@ -57,10 +59,15 @@ export class HermeticThemeToggle extends HTMLElement {
     }
     const button = document.createElement("button");
     button.type = "button";
-    button.title = "Switch between system, light, and dark theme";
+    button.className = "corner-button theme-button";
     let theme = load();
     const show = (): void => {
-      button.textContent = `Theme: ${theme}`;
+      const next = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length] ?? "system";
+      const label = `Theme: ${theme} (switch to ${next})`;
+      button.setAttribute("aria-label", label);
+      button.title = label;
+      button.dataset.theme = theme;
+      button.replaceChildren(icon(ICONS[theme]));
     };
     show();
     button.addEventListener("click", () => {

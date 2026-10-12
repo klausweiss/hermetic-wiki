@@ -60,11 +60,20 @@ pub fn editable_pages(g: &Graph) -> EditMap {
         .collect()
 }
 
-/// The editable page at a site path: a page of the build, or a journal day that has no
-/// page yet (`journals/YYYY-MM-DD.html` with a valid date).
+/// The editable page at a site path: a page of the build, the home page (`index.html`,
+/// even before `index.md` exists), or a journal day that has no page yet
+/// (`journals/YYYY-MM-DD.html` with a valid date).
 pub fn resolve(map: &EditMap, path: &str) -> Option<Editable> {
     if let Some(page) = map.get(path) {
         return Some(page.clone());
+    }
+    // The home page can always be written, which creates the root `index.md`.
+    if path == "index.html" {
+        return Some(Editable {
+            name: layout::ROOT_INDEX_PAGE.to_owned(),
+            date: None,
+            file: None,
+        });
     }
     let day = path
         .strip_prefix(JOURNALS_DIR)?
@@ -84,6 +93,8 @@ pub fn source_path(page: &Editable) -> PathBuf {
     match (&page.file, page.date) {
         (Some(file), _) => file.clone(),
         (None, Some(date)) => layout::journal_file_path(date),
+        // The page `index` is the home page, stored at the notes root.
+        (None, None) if layout::is_home_name(&page.name) => PathBuf::from(ROOT_INDEX),
         (None, None) => layout::page_file_path(&page.name),
     }
 }
@@ -406,11 +417,14 @@ mod tests {
         let day = resolve(&map, "journals/2026-10-13.html").unwrap();
         assert_eq!(day.name, "2026-10-13");
         assert_eq!(source_path(&day), PathBuf::from("journals/2026-10-13.md"));
+        let home = resolve(&map, "index.html").unwrap();
+        assert_eq!(source_path(&home), PathBuf::from("index.md"));
         for path in [
             "journals/2026-13-01.html",
             "journals/2026-10-13.md",
             "journals.html",
             "tasks.html",
+            "pages/index.html",
             "pages/x.html",
             "journals/sub/2026-10-13.html",
         ] {

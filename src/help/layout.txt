@@ -19,9 +19,10 @@ NOTES LAYOUT
 
   index.md
       In the notes root: the page index, shown as the site's home page.
-      Link to it as [[index]]. Without it, the home page shows the journal
-      list. If pages/index.md also exists, the root index.md wins and a
-      warning names both.
+      Link to it as [[index]], which always means the home page. Without
+      it, the home page shows the journal list. The name index is reserved:
+      a pages/index.md is shown as the page "index (in pages)" instead,
+      with a warning on the home page.
 
   assets/, and non-markdown files in journals/ and pages/
       Attachments, such as images. They are copied unchanged to the same

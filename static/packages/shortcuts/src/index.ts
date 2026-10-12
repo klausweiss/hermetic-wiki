@@ -2,6 +2,7 @@
 // the sidebar only through events and the URL, so it works with or without one.
 
 import {
+  OPEN_TODAY,
   SEARCH_FOCUS,
   SIDEBAR_CLOSE_TOP,
   SIDEBAR_TOGGLE,
@@ -39,6 +40,7 @@ const HELP: readonly Shortcut[] = [
   { keys: "g j", what: "Journals" },
   { keys: "g p", what: "All pages" },
   { keys: "g t", what: "Open tasks" },
+  { keys: "g d", what: "Today's journal", editing: true },
   { keys: "/", what: "Search", search: true },
   { keys: MOD_K, what: "Search, even while typing", search: true },
   { keys: "Shift + click", what: "Open a page in the sidebar", sidebar: true },
@@ -98,6 +100,12 @@ export class HermeticShortcuts extends HTMLElement {
     const chord = Date.now() - this.pendingG < CHORD_MS;
     this.pendingG = 0;
     const target = chord ? GO_TARGETS[e.key] : undefined;
+    // `g d`: today's journal, which the editor opens (and creates) where it runs.
+    if (chord && e.key === "d" && document.querySelector("hermetic-editor")) {
+      e.preventDefault();
+      document.dispatchEvent(new Event(OPEN_TODAY));
+      return;
+    }
     if (target) {
       e.preventDefault();
       // Open sidebar panes are mirrored in the URL; carry them along.

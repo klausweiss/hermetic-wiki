@@ -256,7 +256,6 @@ fn not_editable() {
         "journals.html",
         "pages.html",
         "search.html",
-        "index.html",
         "refs/pages/kafka/2.html",
         "pages/kafka.md",
         "../outside.html",
@@ -292,6 +291,34 @@ fn home_page_with_index_md() {
     assert_eq!(
         fs::read_to_string(notes.path().join("index.md")).unwrap(),
         "- hello\n"
+    );
+}
+
+#[test]
+fn write_a_home_page() {
+    let notes = Notes::new(&[("journals/2026-10-12.md", "- [[index]]\n")]);
+    let server = start(notes.path());
+    let r = get_source(server.addr, "index.html");
+    assert_eq!(r.status, 200);
+    assert!(r.body.starts_with(r#"{"exists":false,"#), "{}", r.body);
+    let r = put_source(server.addr, "index.html", "missing", "- welcome\n");
+    assert_eq!(r.status, 200, "{}", r.body);
+    assert_eq!(
+        fs::read_to_string(notes.path().join("index.md")).unwrap(),
+        "- welcome\n"
+    );
+    assert!(!notes.path().join("pages/index.md").exists());
+    assert!(page(server.addr, "index.html").contains("welcome"));
+    // Also when nothing references the page `index`.
+    let empty = Notes::new(&[("journals/2026-10-12.md", "- day\n")]);
+    let server = start(empty.path());
+    assert_eq!(
+        put_source(server.addr, "index.html", "missing", "- hi\n").status,
+        200
+    );
+    assert_eq!(
+        fs::read_to_string(empty.path().join("index.md")).unwrap(),
+        "- hi\n"
     );
 }
 

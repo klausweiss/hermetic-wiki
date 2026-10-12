@@ -18,6 +18,13 @@ pub const EXTENSION: &str = ".md";
 /// The notes root's own markdown file: the page `index`, the site's home page.
 pub const ROOT_INDEX: &str = "index.md";
 pub const ROOT_INDEX_PAGE: &str = "index";
+/// The page a file under `pages/` named `index` becomes: `index` is the home page.
+pub const PAGES_INDEX_PAGE: &str = "index (in pages)";
+
+/// Whether `name` is the home page's name (`index`, matched like page names).
+pub fn is_home_name(name: &str) -> bool {
+    NameKey::new(name) == NameKey::new(ROOT_INDEX_PAGE)
+}
 
 /// Whether a file name is a markdown source file (`x.md`, not a bare `.md`).
 pub fn is_markdown(name: &str) -> bool {

@@ -38,6 +38,9 @@ pub fn page_files(site: &Site, page: PageId) -> Vec<OutFile> {
 
     let mut main = String::from("<article class=\"page\">\n");
     main.push_str(&page_header(site, &path, page));
+    if path == Path::new("index.html") {
+        main.push_str(&home_warning(site, &path));
+    }
     main.push_str(&page_body(site, &path, page));
     main.push_str(&namespace_children(site, &path, page));
     main.push_str(&open_tasks(site, &path, page));
@@ -319,6 +322,22 @@ pub fn journal_index(site: &Site) -> OutFile {
 
 /// The default `index.html` when there is no `index.md`: the journal list, with a hint
 /// that adding `index.md` replaces it.
+/// On the home page: a warning when `pages/index.md` exists, which is not the home page.
+fn home_warning(site: &Site, from: &Path) -> String {
+    let Some(page) = site.g.find_page(crate::layout::PAGES_INDEX_PAGE) else {
+        return String::new();
+    };
+    let Some(file) = &site.g.page(page).file else {
+        return String::new();
+    };
+    format!(
+        "<p class=\"warning\"><code>{}</code> is not the home page: <code>index</code> is reserved for <code>index.md</code> in the notes folder. Its content is shown as <a href=\"{}\">{}</a>; rename the file to avoid confusion.</p>\n",
+        esc(&file.to_string_lossy()),
+        esc(&site.page_href(from, page)),
+        esc(crate::layout::PAGES_INDEX_PAGE)
+    )
+}
+
 pub fn default_home(site: &Site) -> OutFile {
     journal_list(
         site,
@@ -332,6 +351,9 @@ fn journal_list(site: &Site, path: PathBuf, view: &str, footer: &str) -> OutFile
     let mut main = format!(
         "<article class=\"page index\" data-view=\"{view}\">\n<header class=\"page-header\"><h1>Journals</h1></header>\n",
     );
+    if view == "home" {
+        main.push_str(&home_warning(site, &path));
+    }
     if site.journal_days.is_empty() {
         main.push_str("<p class=\"empty\">No journal entries yet. Add files like <code>journals/2026-10-12.md</code>.</p>\n");
     }

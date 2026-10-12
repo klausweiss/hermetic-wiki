@@ -3,7 +3,7 @@
 // a block to edit its markdown, use the outliner keys, and changes are saved to the
 // note file. The page is updated in place from each rebuild instead of reloading.
 
-import { EDITING_ATTR, PAGES_CHANGED, readEnv, readPanes, whenParsed, withPanes } from "@hermetic/core";
+import { EDITING_ATTR, OPEN_TODAY, PAGES_CHANGED, readEnv, readPanes, whenParsed, withPanes } from "@hermetic/core";
 
 import { Conflict, type Refused, SaveQueue, type SaveState, SourceApi } from "./api";
 import { type Doc, type Node, type Payload, flatten, fromPayload, newNode } from "./model";
@@ -15,6 +15,8 @@ import { serialize } from "./serialize";
 export const IDLE_SAVE_MS = 1000;
 /** sessionStorage key: the site path whose first block to edit once it has loaded. */
 const START_KEY = "hermetic-editor-start";
+/** How long after it is recorded a page starts editing when it loads. */
+const START_MS = 5000;
 
 interface Rendered {
   /** The body the server rendered this element for. */
@@ -74,9 +76,12 @@ export class HermeticEditor extends HTMLElement {
     this.root = env.root;
     this.api = new SourceApi(env.root);
     this.addHeaderControls();
+    this.watchTaskLists();
+    document.addEventListener(OPEN_TODAY, () => this.openTodayNow());
 
     const path = sitePath(location.pathname, env.root.pathname);
     const article = document.querySelector<HTMLElement>("main > article.page");
+    if (article?.dataset.view === "home") this.offerHomePage(article);
     if (!path || !article || article.classList.contains("index")) return;
     let payload: Payload;
     try {
@@ -96,6 +101,16 @@ export class HermeticEditor extends HTMLElement {
     }
     this.section = section;
     section.addEventListener("click", (e) => this.onClick(e));
+    section.addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === " ") && (e.target as Element).matches(".task-marker[role=button]")) {
+        e.preventDefault();
+        this.labelClicked(e.target as HTMLElement);
+      }
+    });
+    // A label click must not take the focus from the block being edited.
+    section.addEventListener("mousedown", (e) => {
+      if ((e.target as Element).closest(".task-marker[role=button]")) e.preventDefault();
+    });
     document.documentElement.setAttribute(EDITING_ATTR, "");
 
     this.queue = new SaveQueue(this.api, path, payload.version, {
@@ -120,12 +135,26 @@ export class HermeticEditor extends HTMLElement {
       }
     });
     addEventListener("online", () => this.queue?.retryNow());
-
-    try {
-      if (sessionStorage.getItem(START_KEY) === path) {
-        sessionStorage.removeItem(START_KEY);
+    // Return starts editing at the end of the page, when nothing else takes the key.
+    addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" || e.defaultPrevented || e.isComposing || this.active || !this.doc) return;
+      if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || isControl(e.target)) return;
+      if (document.querySelector("dialog[open]")) return;
+      e.preventDefault();
+      const all = flatten(this.doc);
+      const last = all[all.length - 1]?.node;
+      if (last) {
+        this.edit(last, last.body.length);
+      } else {
         this.startFirst();
       }
+    });
+
+    try {
+      // Kept for a few seconds rather than removed: a write can reload the page twice
+      // (its rebuild, then the action itself), and editing should start after both.
+      const start = JSON.parse(sessionStorage.getItem(START_KEY) ?? "null") as { path: string; at: number } | null;
+      if (start?.path === path && Date.now() - start.at < START_MS) this.startFirst();
     } catch {
       // Storage unavailable: just do not start editing.
     }
@@ -158,9 +187,48 @@ export class HermeticEditor extends HTMLElement {
     nav.querySelector("hermetic-search")?.before(this.status);
   }
 
+  /** On the default home page: "Write a home page" creates the root `index.md`. */
+  private offerHomePage(article: HTMLElement): void {
+    const hint = article.querySelector<HTMLElement>("p.hint");
+    if (!hint || article.querySelector(".write-home")) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "write-home";
+    button.textContent = "Write a home page";
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      // Before the write: the rebuild may reload this page before the write returns.
+      startAfterLoad("index.html");
+      try {
+        await this.api.put("index.html", "missing", "-\n");
+      } catch (e) {
+        if (!(e instanceof Conflict)) {
+          startAfterLoad(null);
+          button.disabled = false;
+          button.textContent = "Could not create index.md; try again";
+          return;
+        }
+      }
+      location.reload();
+    });
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.append(button, " It is saved as index.md in the notes folder and replaces this page.");
+    hint.replaceWith(p);
+  }
+
+  /** Opens today's journal (the "Today" control and the `g d` keys). */
+  openTodayNow(): void {
+    void this.openToday(`journals/${localDate(new Date())}.html`);
+  }
+
   private async openToday(path: string): Promise<void> {
     try {
       const p = await this.api.get(path);
+      // Start writing only in a day without content; otherwise just show it. Recorded
+      // before creating the day: its rebuild may reload this page (the journal list)
+      // before the write returns.
+      if (p.blocks.every((b) => b.body.trim() === "")) startAfterLoad(path);
       if (!p.exists) {
         try {
           await this.api.put(path, p.version, "-\n");
@@ -168,7 +236,6 @@ export class HermeticEditor extends HTMLElement {
           if (!(e instanceof Conflict)) throw e; // created meanwhile: just open it
         }
       }
-      sessionStorage.setItem(START_KEY, path);
     } catch {
       // Open it anyway; the page tells what is wrong.
     }
@@ -265,6 +332,7 @@ export class HermeticEditor extends HTMLElement {
       return;
     }
     section.replaceChildren(this.tree(doc.roots));
+    armLabels(section, ":scope li.block > .block-body > .task-marker");
   }
 
   private tree(nodes: Node[]): HTMLUListElement {
@@ -295,10 +363,101 @@ export class HermeticEditor extends HTMLElement {
     return ul;
   }
 
+  // --- Task labels ----------------------------------------------------------------------
+
+  /** A label of one of this page's own blocks was clicked. */
+  private labelClicked(label: HTMLElement): void {
+    const li = label.closest("li.block");
+    const node = li ? this.nodes.get(li) : undefined;
+    if (node) this.advanceOwn(node);
+  }
+
+  /** Moves a block of this page to its next task state, keeping its rendering. */
+  private advanceOwn(node: Node): boolean {
+    const body = ops.advanceTask(node.body);
+    if (body === null) return false;
+    const r = this.rendered.get(node);
+    const fresh = r !== undefined && r.body === node.body;
+    node.body = body;
+    if (this.active?.node === node) this.active.area.value = body;
+    if (r && fresh) {
+      r.body = body;
+      const state = taskState(body);
+      const label = r.el.querySelector<HTMLElement>(":scope > .task-marker");
+      if (label && state) showState(label, state);
+      r.className = r.className.replace(/\btask-(todo|doing|done)\b/, `task-${state}`);
+    }
+    // Rendering moves the text field of the block being edited; keep its focus.
+    const area = this.active?.area;
+    const [start, end] = area ? [area.selectionStart, area.selectionEnd] : [0, 0];
+    const focused = area !== undefined && document.activeElement === area;
+    this.render();
+    if (area && focused) {
+      area.focus({ preventScroll: true });
+      area.setSelectionRange(start, end);
+    }
+    this.saveNow();
+    return true;
+  }
+
+  /**
+   * Labels in task lists (the open-tasks pages and each page's "Open tasks" section)
+   * move the task they belong to, found through the item's link to its block.
+   */
+  private watchTaskLists(): void {
+    const main = document.querySelector("main");
+    if (!main) return;
+    const lists = ":scope ul.tasks > li > .task-marker";
+    armLabels(main, lists);
+    const act = (label: HTMLElement) => void this.advanceListed(label);
+    main.addEventListener("click", (e) => {
+      const label = (e.target as Element).closest<HTMLElement>("ul.tasks > li > .task-marker[role=button]");
+      if (label) act(label);
+    });
+    main.addEventListener("keydown", (e) => {
+      const target = e.target as Element;
+      if ((e.key === "Enter" || e.key === " ") && target.matches("ul.tasks > li > .task-marker[role=button]")) {
+        e.preventDefault();
+        act(target as HTMLElement);
+      }
+    });
+    document.addEventListener(PAGES_CHANGED, () => armLabels(main, lists));
+  }
+
+  private async advanceListed(label: HTMLElement): Promise<void> {
+    const link = label.parentElement?.querySelector<HTMLAnchorElement>("a.task-source");
+    if (!link || label.dataset.busy) return;
+    const url = new URL(link.href);
+    const path = sitePath(url.pathname, this.root.pathname);
+    const anchor = decodeURIComponent(url.hash.slice(1));
+    if (!path || !anchor || url.origin !== this.root.origin) return;
+    const before = taskState(label.textContent ?? "");
+    if (path === this.path && this.doc) {
+      const node = flatten(this.doc).find((e) => e.node.anchor === anchor)?.node;
+      if (node && this.advanceOwn(node)) showState(label, taskState(node.body)!);
+      return;
+    }
+    label.dataset.busy = "1";
+    if (before) showState(label, NEXT[before]);
+    try {
+      const ok = await advanceRemote(this.api, path, anchor);
+      if (!ok && before) showState(label, before);
+    } catch {
+      if (before) showState(label, before);
+    } finally {
+      delete label.dataset.busy;
+    }
+  }
+
   // --- Editing ------------------------------------------------------------------------
 
   private onClick(e: MouseEvent): void {
     const target = e.target as Element;
+    const label = target.closest<HTMLElement>(".task-marker[role=button]");
+    if (label) {
+      this.labelClicked(label);
+      return;
+    }
     if (target.closest("a, button, textarea, input, .block-menu")) return;
     if (target.closest(".editor-start")) {
       this.doc!.roots.push(newNode());
@@ -553,6 +712,74 @@ function format(area: HTMLTextAreaElement, marker: string): void {
 function autosize(area: HTMLTextAreaElement): void {
   area.style.height = "auto";
   area.style.height = `${area.scrollHeight}px`;
+}
+
+type TaskState = "todo" | "doing" | "done";
+const NEXT: Record<TaskState, TaskState> = { todo: "doing", doing: "done", done: "todo" };
+
+/** The task state a body (or a label's text) starts with. */
+function taskState(text: string): TaskState | null {
+  const m = /^(TODO|DOING|DONE)(?=\s|$)/.exec(text);
+  return m ? (m[1]!.toLowerCase() as TaskState) : null;
+}
+
+function showState(label: HTMLElement, state: TaskState): void {
+  label.textContent = state.toUpperCase();
+  label.classList.remove("task-todo", "task-doing", "task-done");
+  label.classList.add(`task-${state}`);
+  label.title = `${state.toUpperCase()}: click for ${NEXT[state].toUpperCase()}`;
+}
+
+/** Makes task labels matching `selector` under `root` controls. */
+function armLabels(root: Element, selector: string): void {
+  for (const label of root.querySelectorAll<HTMLElement>(selector)) {
+    if (label.getAttribute("role") === "button") continue;
+    label.setAttribute("role", "button");
+    label.tabIndex = 0;
+    const state = taskState(label.textContent ?? "");
+    if (state) label.title = `${state.toUpperCase()}: click for ${NEXT[state].toUpperCase()}`;
+  }
+}
+
+/**
+ * Moves the task at `anchor` on another page to its next state, in that page's file.
+ * Retries once when the file changed meanwhile; false when the block is no task there.
+ */
+async function advanceRemote(api: SourceApi, path: string, anchor: string): Promise<boolean> {
+  for (let attempt = 0; ; attempt++) {
+    const payload = await api.get(path);
+    const doc = fromPayload(payload);
+    const node = flatten(doc).find((e) => e.node.anchor === anchor)?.node;
+    const body = node ? ops.advanceTask(node.body) : null;
+    if (!node || body === null) return false;
+    node.body = body;
+    try {
+      await api.put(path, payload.version, serialize(doc));
+      return true;
+    } catch (e) {
+      if (!(e instanceof Conflict) || attempt > 0) throw e;
+    }
+  }
+}
+
+/** Records (or clears) the page whose first block to edit once it has loaded. */
+function startAfterLoad(path: string | null): void {
+  try {
+    if (path === null) sessionStorage.removeItem(START_KEY);
+    else sessionStorage.setItem(START_KEY, JSON.stringify({ path, at: Date.now() }));
+  } catch {
+    // Without storage, the page opens without editing.
+  }
+}
+
+/** Whether key presses on `target` belong to it (fields, links, buttons, …). */
+function isControl(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    ["INPUT", "TEXTAREA", "SELECT", "BUTTON", "A", "SUMMARY"].includes(target.tagName) ||
+    target.getAttribute("role") === "button"
+  );
 }
 
 /** Today's date in the browser's time zone, as `YYYY-MM-DD`. */

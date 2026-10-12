@@ -134,7 +134,11 @@ pub fn render(
 
     let site = render::Site::new(graph, title);
     let mut pages = 0;
-    for (id, _) in graph.pages() {
+    for (id, page) in graph.pages() {
+        // Without `index.md`, the page `index` is shown by the default home page.
+        if page.is_implicit() && layout::is_home_name(&page.name) {
+            continue;
+        }
         for file in pages::page_files(&site, id) {
             add(file.path, file.html);
         }

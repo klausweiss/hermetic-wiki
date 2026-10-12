@@ -34,3 +34,6 @@ export const SEARCH_FOCUS = "hermetic-search-focus";
  * in `PAGES_CHANGED` instead, so the editor can update the page in place.
  */
 export const EDITING_ATTR = "data-hermetic-editing";
+
+/** Dispatched on `document` (by the `g d` shortcut) to open today's journal. */
+export const OPEN_TODAY = "hermetic-open-today";

@@ -174,7 +174,8 @@ impl Graph {
     pub fn load(root: &Path) -> (Graph, Vec<Diagnostic>) {
         let mut diags = Vec::new();
         let files = layout::scan(root, &mut diags);
-        let loaded = read_and_parse(root, files, &mut diags);
+        let mut loaded = read_and_parse(root, files, &mut diags);
+        reserve_home_name(&mut loaded, &mut diags);
         let keep = pick_colliding_winners(&loaded, &mut diags);
 
         let mut g = Graph {
@@ -657,6 +658,25 @@ fn read_and_parse(root: &Path, files: Vec<SourceFile>, diags: &mut Vec<Diagnosti
     loaded
 }
 
+/// `index` is the home page, stored in the root `index.md`: a file under `pages/` that
+/// would also be `index` becomes the page `index (in pages)` instead.
+fn reserve_home_name(loaded: &mut [Loaded], diags: &mut Vec<Diagnostic>) {
+    for l in loaded.iter_mut() {
+        if l.file.rel.starts_with(layout::PAGES_DIR) && layout::is_home_name(&l.file.name) {
+            diags.push(Diagnostic::new(
+                DiagnosticKind::ReservedName,
+                l.file.rel.clone(),
+                None,
+                format!(
+                    "`index` is the home page (index.md in the notes folder); this file is shown as the page `{}` instead; rename it to avoid confusion",
+                    layout::PAGES_INDEX_PAGE
+                ),
+            ));
+            l.file.name = layout::PAGES_INDEX_PAGE.to_owned();
+        }
+    }
+}
+
 /// For files mapping to the same page, keeps the one whose path sorts first by bytes.
 fn pick_colliding_winners(loaded: &[Loaded], diags: &mut Vec<Diagnostic>) -> Vec<bool> {
     let mut groups: HashMap<NameKey, Vec<usize>> = HashMap::new();
@@ -821,7 +841,13 @@ fn resolve_link_path(file: &Path, dest: &str) -> LinkPath {
     let rel: PathBuf = parts.iter().collect();
     match parts.first().map(String::as_str) {
         Some(PAGES_DIR) if parts.len() > 1 => {
-            LinkPath::Page(layout::page_name_from_path(&rel).unwrap_or_default())
+            let name = layout::page_name_from_path(&rel).unwrap_or_default();
+            // A file under `pages/` named `index` is not the home page (see `Graph::load`).
+            LinkPath::Page(if layout::is_home_name(&name) {
+                layout::PAGES_INDEX_PAGE.to_owned()
+            } else {
+                name
+            })
         }
         Some(JOURNALS_DIR) if parts.len() > 1 => {
             let stem = parts

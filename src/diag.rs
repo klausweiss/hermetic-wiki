@@ -19,6 +19,8 @@ pub enum DiagnosticKind {
     LinkOutsideRoot,
     AttachmentConflict,
     SkippedSymlink,
+    /// A file under `pages/` named like the home page (`index`).
+    ReservedName,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

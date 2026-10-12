@@ -48,6 +48,11 @@ pub const EMBEDDED: &[(&str, &[u8])] = &[
         "_hermetic/fonts/LICENSE-JetBrainsMono.txt",
         include_bytes!("../../static/fonts/LICENSE-JetBrainsMono.txt"),
     ),
+    // The icons of the browser script (static/packages/core/src/icons.ts).
+    (
+        "_hermetic/LICENSE-Lucide.txt",
+        include_bytes!("../../static/icons/LICENSE-Lucide.txt"),
+    ),
 ];
 
 /// Lists attachments (relative paths) to publish, skipping symlinks and files whose

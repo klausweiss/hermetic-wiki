@@ -38,6 +38,7 @@ fn fixture_file_list() {
     files.sort();
     let mut expected = [
         ".hermetic-site",
+        "_hermetic/LICENSE-Lucide.txt",
         "_hermetic/app.js",
         "_hermetic/fonts/InterVariable-Italic.woff2",
         "_hermetic/fonts/InterVariable.woff2",
@@ -102,6 +103,48 @@ fn encoded_page_names() {
     assert!(out.join("pages/C#%3A a.html").is_file());
     let html = fs::read_to_string(out.join("pages/index.html")).unwrap();
     assert!(html.contains(r#"href="C%23%253A%20a.html""#), "{html}");
+}
+
+#[test]
+fn index_is_the_home_page() {
+    // Without index.md, [[index]] links to the default home page, which stays in place.
+    let notes = Notes::new(&[("journals/2026-10-12.md", "- see [[index]]")]);
+    let (_h, out, _) = build_site(notes.path());
+    let day = fs::read_to_string(out.join("journals/2026-10-12.html")).unwrap();
+    assert!(day.contains(r#"href="../index.html""#), "{day}");
+    assert!(!out.join("pages/index.html").exists());
+    let home = fs::read_to_string(out.join("index.html")).unwrap();
+    assert!(home.contains("data-view=\"home\""), "{home}");
+    assert!(!home.contains("class=\"warning\""));
+}
+
+#[test]
+fn conflicting_pages_index() {
+    for with_root in [false, true] {
+        let mut files = vec![("pages/index.md", "- other")];
+        if with_root {
+            files.push(("index.md", "- home"));
+        }
+        let notes = Notes::new(&files);
+        let (_h, out, _) = build_site(notes.path());
+        let home = fs::read_to_string(out.join("index.html")).unwrap();
+        let warning = home
+            .find("class=\"warning\"")
+            .expect("warning on the home page");
+        assert!(
+            home[warning..].contains(r#"<code>pages/index.md</code>"#),
+            "{home}"
+        );
+        assert!(
+            home[warning..].contains(r#"href="pages/index.html""#),
+            "{home}"
+        );
+        let other = fs::read_to_string(out.join("pages/index.html")).unwrap();
+        assert!(
+            other.contains("<h1>index (in pages)</h1>") && other.contains("other"),
+            "{other}"
+        );
+    }
 }
 
 #[test]

@@ -233,18 +233,36 @@ fn home_page_source() {
 }
 
 #[test]
-fn root_index_and_pages_index_collide() {
+fn root_index_and_pages_index() {
     let notes = Notes::new(&[("index.md", "- home"), ("pages/index.md", "- other")]);
     let (g, diags) = notes.load();
-    assert_eq!(kinds(&diags), [DiagnosticKind::CollidingFiles]);
-    assert!(
-        diags[0].message.contains("index.md, pages/index.md"),
-        "{}",
-        diags[0].message
-    );
+    assert_eq!(kinds(&diags), [DiagnosticKind::ReservedName]);
+    assert_eq!(diags[0].file, PathBuf::from("pages/index.md"));
     let index = g.page(page(&g, "index"));
     assert_eq!(index.file, Some(PathBuf::from("index.md")));
     assert_eq!(contents(&g, index.roots.clone()), ["home"]);
+    let other = g.page(page(&g, "index (in pages)"));
+    assert_eq!(other.file, Some(PathBuf::from("pages/index.md")));
+    assert_eq!(contents(&g, other.roots.clone()), ["other"]);
+}
+
+#[test]
+fn pages_index_alone() {
+    let notes = Notes::new(&[
+        ("pages/index.md", "- other"),
+        (
+            "journals/2026-10-12.md",
+            "- [[index]] and [file](../pages/index.md)",
+        ),
+    ]);
+    let (g, diags) = notes.load();
+    assert_eq!(kinds(&diags), [DiagnosticKind::ReservedName]);
+    let other = page(&g, "index (in pages)");
+    assert_eq!(g.page(other).file, Some(PathBuf::from("pages/index.md")));
+    // `[[index]]` means the home page, which has no file here; a link to the file
+    // reaches the file's own page.
+    assert!(g.page(page(&g, "index")).is_implicit());
+    assert_eq!(g.backlinks(other).len(), 1);
 }
 
 #[test]

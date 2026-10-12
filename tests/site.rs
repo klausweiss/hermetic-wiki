@@ -317,6 +317,7 @@ fn fonts_and_licenses_shipped() {
         "_hermetic/fonts/JetBrainsMono-Regular.woff2",
         "_hermetic/fonts/LICENSE-Inter.txt",
         "_hermetic/fonts/LICENSE-JetBrainsMono.txt",
+        "_hermetic/LICENSE-Lucide.txt",
     ] {
         assert!(out.join(f).is_file(), "{f}");
     }
@@ -324,6 +325,7 @@ fn fonts_and_licenses_shipped() {
     assert!(css.contains(r#"url("fonts/InterVariable.woff2")"#));
     assert!(css.contains(r#"font-family: "Inter", sans-serif;"#));
     assert!(read(&out, "_hermetic/fonts/LICENSE-Inter.txt").contains("SIL Open Font License"));
+    assert!(read(&out, "_hermetic/LICENSE-Lucide.txt").contains("ISC License"));
 }
 
 #[test]
@@ -502,10 +504,15 @@ fn custom_home_page() {
 }
 
 #[test]
-fn implicit_index_page_keeps_its_path() {
+fn implicit_index_page_is_the_home_page() {
     let (_n, _h, out, _) = built(&[("journals/2026-10-12.md", "- see [[index]]")]);
-    assert!(out.join("pages/index.html").is_file());
+    assert!(!out.join("pages/index.html").exists());
     assert!(main_of(&out, "index.html").contains(r#"data-view="home""#));
+    let journal = main_of(&out, "journals/2026-10-12.html");
+    assert!(
+        journal.contains(r#"href="../index.html">index</a>"#),
+        "{journal}"
+    );
 }
 
 #[test]

@@ -55,7 +55,7 @@ fn relative_markdown_link_from_a_journal() {
 fn markdown_link_with_encoded_characters() {
     let notes = Notes::new(&[
         (
-            "pages/index.md",
+            "pages/links.md",
             "- [x](Project%20X/Auth%20Flow.md#setup)\n- [y](/pages/C%2523.md)",
         ),
         ("pages/Project X/Auth Flow.md", "- x"),

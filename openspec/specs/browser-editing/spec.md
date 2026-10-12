@@ -1,10 +1,10 @@
-# Spec Delta
+# browser-editing Specification
 
 ## Purpose
 
 Lets the author write the notes in the browser, in a Logseq-style block outliner on the pages they read, while `hermetic serve` keeps the markdown files as the only source of truth and never lets other websites or devices change them.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Where editing is available
 Editing SHALL be available only on pages served by `hermetic serve` to a browser on the same machine: the request comes from a loopback address and its `Host` header names `localhost`, `127.0.0.1`, or `[::1]`. Only then SHALL the served HTML contain the editor element. Editable pages SHALL be journal days (with or without a file), regular pages (with or without a file), and the home page when the notes root contains `index.md`. The journal list, all-pages list, open-tasks page, search page, and continuation files SHALL NOT be editable. Within an editable page, only the page's own blocks SHALL be editable; linked references, related pages, tasks, sidebar panes, and the timeline SHALL stay read-only. Without JavaScript, and in built sites, pages SHALL be exactly as before.
@@ -101,6 +101,7 @@ While a block is being edited, these keys (Cmd instead of Ctrl on macOS) SHALL t
 - **WHEN** the author presses Ctrl+B on a selection and then Ctrl+Z
 - **THEN** the text is as before the Ctrl+B
 
+### Requirement: Saving
 Edits SHALL be saved to the page's markdown file without an explicit save action: when editing of a block ends, after every outliner key that changes the block structure, and 1 second after the last change while typing. Saves of one page SHALL happen one at a time, each including all changes made before it started. The page SHALL show whether all changes are saved, being saved, or not saved. When a save fails because the server cannot be reached, the editor SHALL keep the changes, retry when the server is reachable again, and the browser SHALL warn before leaving the page with unsaved changes. A saved change SHALL be visible on every page it affects within 2 seconds for a notes directory of about 5,000 pages.
 
 #### Scenario: Save while typing

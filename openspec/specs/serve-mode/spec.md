@@ -7,7 +7,7 @@ Lets the author read the notes as a live wiki while writing them: `hermetic serv
 ## Requirements
 
 ### Requirement: Serve command
-`hermetic serve [<dir>] [--port <n>] [--host <address>] [--public]` SHALL build the notes directory `<dir>` (default: the current directory) and serve the result over HTTP until interrupted. The served site SHALL have the same files and content as `hermetic build` would produce for the same notes, except that served HTML pages additionally contain the live-reload element. It SHALL NOT write the site or anything else to disk. Diagnostics SHALL be printed as for `build`. When `<dir>` is not a directory, or an option is invalid, it SHALL print an error and exit with status 1 (status 2 for usage errors) without serving.
+`hermetic serve [<dir>] [--port <n>] [--host <address>] [--public]` SHALL build the notes directory `<dir>` (default: the current directory) and serve the result over HTTP until interrupted. The served site SHALL have the same files and content as `hermetic build` would produce for the same notes, except that served HTML pages additionally contain the live-reload element and, for requests from the same machine, the editor element. It SHALL NOT write the site to disk, and SHALL write nothing else except note files saved through browser editing (see `browser-editing`). Diagnostics SHALL be printed as for `build`. When `<dir>` is not a directory, or an option is invalid, it SHALL print an error and exit with status 1 (status 2 for usage errors) without serving.
 
 #### Scenario: Serve the current directory
 - **WHEN** the user runs `hermetic serve` inside a notes directory
@@ -15,14 +15,14 @@ Lets the author read the notes as a live wiki while writing them: `hermetic serv
 
 #### Scenario: Same output as build
 - **WHEN** a notes directory is served and also built with `hermetic build`
-- **THEN** every built file is served at the same path with the same bytes, except HTML pages, which differ only by the injected live-reload element
+- **THEN** every built file is served at the same path with the same bytes, except HTML pages, which differ only by the injected live-reload and editor elements
 
 #### Scenario: Missing notes directory
 - **WHEN** the user runs `hermetic serve nope` and `nope` does not exist
 - **THEN** an error is printed and the exit status is 1
 
 ### Requirement: HTTP behavior
-The server SHALL answer `GET` and `HEAD` requests for the site's files with status 200 and a correct `Content-Type` for HTML, CSS, JavaScript, fonts, images, and other common types (`application/octet-stream` otherwise). A path ending in `/` SHALL serve that directory's `index.html` when the site has one. Paths SHALL be percent-decoded before lookup, and any path that is not a file of the current build SHALL get a 404 page linking to the home page. Other methods SHALL get 405. Responses SHALL not be cached by the browser (`Cache-Control: no-store`), so a reload always shows the current build.
+The server SHALL answer `GET` and `HEAD` requests for the site's files with status 200 and a correct `Content-Type` for HTML, CSS, JavaScript, fonts, images, and other common types (`application/octet-stream` otherwise). A path ending in `/` SHALL serve that directory's `index.html` when the site has one. Paths SHALL be percent-decoded before lookup, and any path that is not a file of the current build SHALL get a 404 page linking to the home page. Other methods SHALL get 405, except `PUT` to the edit API of `browser-editing`. Responses SHALL not be cached by the browser (`Cache-Control: no-store`), so a reload always shows the current build.
 
 #### Scenario: Encoded path
 - **WHEN** the browser requests `/pages/Project%20X/Auth%20Flow.html`
@@ -36,8 +36,12 @@ The server SHALL answer `GET` and `HEAD` requests for the site's files with stat
 - **WHEN** the browser requests `/`
 - **THEN** the home page (`index.html`) is returned
 
+#### Scenario: Other methods
+- **WHEN** a client sends `POST /pages/auth.html` or `PUT /pages/auth.html`
+- **THEN** the response is 405 and nothing is written
+
 ### Requirement: Rebuild on change
-The server SHALL detect created, modified, and deleted notes and attachments (files under `journals/`, `pages/`, `assets/`, and the root `index.md`) and rebuild the site. Several changes in quick succession SHALL lead to one rebuild. For a notes directory of about 5,000 pages, a change SHALL be served within 2 seconds of the file being saved. While rebuilding, and if a rebuild fails, the server SHALL keep serving the last successful build and SHALL report the failure on standard error.
+The server SHALL detect created, modified, and deleted notes and attachments (files under `journals/`, `pages/`, `assets/`, and the root `index.md`) and rebuild the site. Several changes in quick succession SHALL lead to one rebuild. A file saved through browser editing SHALL be rebuilt immediately, without waiting for change detection, and SHALL NOT cause a second rebuild when change detection notices it. For a notes directory of about 5,000 pages, a change SHALL be served within 2 seconds of the file being saved. While rebuilding, and if a rebuild fails, the server SHALL keep serving the last successful build and SHALL report the failure on standard error.
 
 #### Scenario: New page appears
 - **WHEN** the server is running and the author saves a new journal containing `[[kafka]]`
@@ -52,11 +56,19 @@ The server SHALL detect created, modified, and deleted notes and attachments (fi
 - **THEN** the server rebuilds once for that burst
 
 ### Requirement: Live reload
-Pages served by `hermetic serve` SHALL receive, after every rebuild, the list of site paths whose content changed or which were removed. A tab SHALL reload only when its own page is in that list, keeping its scroll position and open sidebar panes; a sidebar pane whose page is in the list SHALL refresh its content in place, and a pane whose page was removed SHALL close. When the connection to the server is lost, the page SHALL keep working and reconnect when the server is back. Built sites (`hermetic build`) SHALL contain no live-reload behavior.
+Pages served by `hermetic serve` SHALL receive, after every rebuild, the list of site paths whose content changed or which were removed. A tab SHALL reload only when its own page is in that list, keeping its scroll position and open sidebar panes, unless the page is open for editing, in which case it SHALL update in place as `browser-editing` requires; a sidebar pane whose page is in the list SHALL refresh its content in place, and a pane whose page was removed SHALL close. When the connection to the server is lost, the page SHALL keep working and reconnect when the server is back. Built sites (`hermetic build`) SHALL contain no live-reload behavior.
 
 #### Scenario: Editing the page being read
-- **WHEN** `pages/auth.html` is open, scrolled halfway, and the author edits `pages/auth.md`
+- **WHEN** `pages/auth.html` is open on another device (where it is not open for editing), scrolled halfway, and the author edits `pages/auth.md`
 - **THEN** the tab reloads and returns to about the same scroll position
+
+#### Scenario: Editing the page open for editing
+- **WHEN** `pages/auth.html` is open on the same machine (open for editing), scrolled halfway, and the author edits `pages/auth.md` in another editor
+- **THEN** the tab does not reload, shows the new content, and keeps its scroll position
+
+#### Scenario: Pages that are not editable still reload
+- **WHEN** `journals.html` is open on the same machine and a new journal day is saved
+- **THEN** the tab reloads and lists the new day
 
 #### Scenario: Editing an unrelated note
 - **WHEN** `pages/auth.html` is open and the author edits a note that neither links to `auth` nor is linked from it

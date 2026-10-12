@@ -1,0 +1,71 @@
+journal "2026-09-30" (journals/2026-09-30.md)
+  - "kickoff for [[Project X]] with [[Claude]]" @1
+      -> Page "Project X" = page "Project X"
+      -> Page "Claude" = page "Claude"
+    - TODO "pick a storage engine" @2
+    - "looked at [[redis]] #ops" @3
+        -> Page "redis" = page "redis"
+        -> Tag "ops" = page "ops"
+  open task: "pick a storage engine"
+journal "2026-10-12" (journals/2026-10-12.md)
+  - "standup" @1
+    - "[[Project X/Auth Flow]] token refresh shipped" @2
+        -> Page "Project X/Auth Flow" = page "Project X/Auth Flow"
+      - "the TTL bug was ((ttl-bug))" @3
+          -> Block "ttl-bug" = block "TTL defaults were wrong"
+    - DOING "write the ADR for [auth](../pages/Project%20X/Auth%20Flow.md)" @4
+        -> MdLink "../pages/Project%20X/Auth%20Flow.md" = page "Project X/Auth Flow"
+  - "trip planning for [[Zürich]] and [[Claude]]" @5
+      -> Page "Zürich" = page "Zürich"
+      -> Page "Claude" = page "Claude"
+  - TODO "follow up on ((no-such-block)) and [old notes](../pages/old.md)" @6
+      -> Block "no-such-block" = unresolved
+      -> MdLink "../pages/old.md" = unresolved
+  open task: "write the ADR for [auth](../pages/Project%20X/Auth%20Flow.md)"
+  open task: "follow up on ((no-such-block)) and [old notes](../pages/old.md)"
+page "2026-13-01" (journals/2026-13-01.md)
+  - "this file name is not a date" @1
+page "Project X" (pages/Project X.md)
+  - "The umbrella page for Project X." @1
+  - "" @3
+      goals:: "ship [[Project X/Auth Flow]]"
+      -> Page "Project X/Auth Flow" = page "Project X/Auth Flow"
+  - DONE "initial scoping" @4
+  linked from "2026-09-30": "kickoff for [[Project X]] with [[Claude]]" via []
+  open task: "pick a storage engine"
+  related: "Claude" x1
+page "Project X/Auth Flow" (pages/Project X/Auth Flow.md)
+  namespace parent: "Project X"
+  - "uses JWT" @1
+      status:: "accepted"
+  - "```\n- [[not a link]]\n```" @3
+  linked from "2026-10-12": "[[Project X/Auth Flow]] token refresh shipped" via ["standup"]
+  linked from "2026-10-12": "write the ADR for [auth](../pages/Project%20X/Auth%20Flow.md)" via ["standup"]
+  linked from "Project X": "" via []
+  open task: "write the ADR for [auth](../pages/Project%20X/Auth%20Flow.md)"
+page "Zürich" (pages/Zürich.md)
+  - "Zu\u{308}rich is in NFD here" @1
+  linked from "2026-10-12": "trip planning for [[Zürich]] and [[Claude]]" via []
+  related: "Claude" x1
+page "redis" (pages/redis.md)
+  - "TTL defaults were wrong" @1
+      id:: "ttl-bug"
+  linked from "2026-10-12": "the TTL bug was ((ttl-bug))" via ["standup", "[[Project X/Auth Flow]] token refresh shipped"]
+  linked from "2026-09-30": "looked at [[redis]] #ops" via ["kickoff for [[Project X]] with [[Claude]]"]
+  related: "ops" x1
+page "Claude" (implicit)
+  linked from "2026-10-12": "trip planning for [[Zürich]] and [[Claude]]" via []
+  linked from "2026-09-30": "kickoff for [[Project X]] with [[Claude]]" via []
+  open task: "pick a storage engine"
+  related: "Zürich" x1
+  related: "Project X" x1
+page "ops" (implicit)
+  linked from "2026-09-30": "looked at [[redis]] #ops" via ["kickoff for [[Project X]] with [[Claude]]"]
+  related: "redis" x1
+open task: "pick a storage engine"
+open task: "write the ADR for [auth](../pages/Project%20X/Auth%20Flow.md)"
+open task: "follow up on ((no-such-block)) and [old notes](../pages/old.md)"
+diagnostic InvalidJournalName: journals/2026-13-01.md: journal file name is not a valid YYYY-MM-DD date; treated as a regular page
+diagnostic InvalidUtf8: pages/broken.md: file is not valid UTF-8; skipped
+diagnostic DanglingBlockRef: journals/2026-10-12.md:6: no block has id `no-such-block`
+diagnostic BrokenLink: journals/2026-10-12.md:6: link `../pages/old.md` points to a missing file

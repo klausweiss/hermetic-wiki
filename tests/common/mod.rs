@@ -1,0 +1,83 @@
+#![allow(dead_code)]
+
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use hermetic::graph::{BlockId, PageId};
+use hermetic::{Diagnostic, DiagnosticKind, Graph};
+
+/// A temporary notes directory, removed on drop.
+pub struct Notes {
+    pub root: PathBuf,
+}
+
+impl Notes {
+    pub fn new(files: &[(&str, &str)]) -> Notes {
+        let notes = Notes::empty();
+        for (path, content) in files {
+            notes.write(path, content.as_bytes());
+        }
+        notes
+    }
+
+    pub fn empty() -> Notes {
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let root = std::env::temp_dir().join(format!(
+            "hermetic-test-{}-{}",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        Notes { root }
+    }
+
+    pub fn write(&self, path: &str, content: &[u8]) {
+        let full = self.root.join(path);
+        fs::create_dir_all(full.parent().unwrap()).unwrap();
+        fs::write(full, content).unwrap();
+    }
+
+    pub fn load(&self) -> (Graph, Vec<Diagnostic>) {
+        Graph::load(&self.root)
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.root
+    }
+}
+
+impl Drop for Notes {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.root);
+    }
+}
+
+pub fn page(g: &Graph, name: &str) -> PageId {
+    g.find_page(name)
+        .unwrap_or_else(|| panic!("no page named {name:?}"))
+}
+
+pub fn names(g: &Graph, pages: impl IntoIterator<Item = PageId>) -> Vec<String> {
+    pages.into_iter().map(|p| g.page(p).name.clone()).collect()
+}
+
+/// The block whose content is exactly `content`.
+pub fn block(g: &Graph, content: &str) -> BlockId {
+    g.blocks()
+        .find(|(_, b)| b.content == content)
+        .map(|(id, _)| id)
+        .unwrap_or_else(|| panic!("no block with content {content:?}"))
+}
+
+pub fn contents(g: &Graph, blocks: impl IntoIterator<Item = BlockId>) -> Vec<String> {
+    blocks
+        .into_iter()
+        .map(|b| g.block(b).content.clone())
+        .collect()
+}
+
+pub fn kinds(diags: &[Diagnostic]) -> Vec<DiagnosticKind> {
+    diags.iter().map(|d| d.kind).collect()
+}

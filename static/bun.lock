@@ -11,6 +11,7 @@
     "packages/app": {
       "name": "@hermetic/app",
       "dependencies": {
+        "@hermetic/live-reload": "workspace:*",
         "@hermetic/shortcuts": "workspace:*",
         "@hermetic/sidebar": "workspace:*",
         "@hermetic/theme-toggle": "workspace:*",
@@ -19,6 +20,12 @@
     },
     "packages/core": {
       "name": "@hermetic/core",
+    },
+    "packages/live-reload": {
+      "name": "@hermetic/live-reload",
+      "dependencies": {
+        "@hermetic/core": "workspace:*",
+      },
     },
     "packages/shortcuts": {
       "name": "@hermetic/shortcuts",
@@ -49,6 +56,8 @@
     "@hermetic/app": ["@hermetic/app@workspace:packages/app"],
 
     "@hermetic/core": ["@hermetic/core@workspace:packages/core"],
+
+    "@hermetic/live-reload": ["@hermetic/live-reload@workspace:packages/live-reload"],
 
     "@hermetic/shortcuts": ["@hermetic/shortcuts@workspace:packages/shortcuts"],
 

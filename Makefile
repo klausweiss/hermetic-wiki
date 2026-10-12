@@ -1,4 +1,4 @@
-.PHONY: build test test-perf run site lint fmt frontend clean
+.PHONY: build test test-perf run site serve lint fmt frontend clean
 
 # Arguments passed to the binary, e.g. `make run ARGS="build notes/"`.
 ARGS ?=
@@ -20,6 +20,10 @@ run:
 # Builds the test fixture notes into ./site, for looking at the output in a browser.
 site:
 	cargo run -- build tests/fixtures/notes site
+
+# Serves the test fixture notes with live reload (Ctrl+C to stop).
+serve:
+	cargo run -- serve tests/fixtures/notes
 
 lint:
 	cargo fmt --check

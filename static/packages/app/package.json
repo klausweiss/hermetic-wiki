@@ -4,6 +4,7 @@
   "type": "module",
   "description": "The bundle every generated site loads (_hermetic/app.js): all of hermetic's elements.",
   "dependencies": {
+    "@hermetic/live-reload": "workspace:*",
     "@hermetic/shortcuts": "workspace:*",
     "@hermetic/sidebar": "workspace:*",
     "@hermetic/theme-toggle": "workspace:*",

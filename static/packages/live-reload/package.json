@@ -1,0 +1,8 @@
+{
+  "name": "@hermetic/live-reload",
+  "private": true,
+  "type": "module",
+  "description": "<hermetic-live-reload>: reloads or refreshes pages that changed while `hermetic serve` runs.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@hermetic/core": "workspace:*" }
+}

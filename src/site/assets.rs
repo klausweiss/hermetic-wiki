@@ -50,21 +50,20 @@ pub const EMBEDDED: &[(&str, &[u8])] = &[
     ),
 ];
 
-/// Copies attachments from `notes` into `out`, skipping symlinks and files whose output
-/// path is already taken by a generated page. Returns the number of files copied.
-pub fn copy_attachments(
+/// Lists attachments (relative paths) to publish, skipping symlinks and files whose
+/// output path is already taken by a generated page, with a diagnostic for each.
+pub fn attachments(
     notes: &Path,
-    out: &Path,
     generated: &HashSet<PathBuf>,
     diags: &mut Vec<Diagnostic>,
-) -> io::Result<usize> {
+) -> io::Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     // Every input directory: their non-markdown files are attachments.
     for dir in layout::INPUT_DIRS {
         collect(notes, Path::new(dir), &mut files, diags)?;
     }
     files.sort();
-    let mut copied = 0;
+    let mut kept = Vec::with_capacity(files.len());
     for rel in files {
         if generated.contains(&rel) {
             diags.push(Diagnostic::new(
@@ -73,16 +72,11 @@ pub fn copy_attachments(
                 None,
                 "attachment has the same path as a generated page; skipped",
             ));
-            continue;
+        } else {
+            kept.push(rel);
         }
-        let target = out.join(&rel);
-        if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::copy(notes.join(&rel), target)?;
-        copied += 1;
     }
-    Ok(copied)
+    Ok(kept)
 }
 
 fn collect(

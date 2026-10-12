@@ -37,7 +37,7 @@ A watcher thread scans the notes directory's inputs every 250 ms, comparing `(pa
 The `Host` check runs before routing when bound to the default loopback address: allowed hosts are `localhost`, `127.0.0.1`, and `[::1]`, with the bound port.
 
 ### Live reload over Server-Sent Events
-- **Server:** `GET /_hermetic/events` is a long-lived `text/event-stream` response. Each rebuild compares the new `SiteFiles` with the previous one by content: equal bytes means unchanged, and for `File` entries size and mtime are compared. It broadcasts `{"changed": [...], "removed": [...]}` with root-relative, percent-encoded paths, in the same form as the sidebar's pane paths. A comment line every 15 s keeps idle connections alive. The broadcast list is a `Mutex<Vec<Sender>>` pruned when a send fails.
+- **Server:** `GET /_hermetic/events` is a long-lived `text/event-stream` response. Each rebuild compares the new `SiteFiles` with the previous one by content: equal bytes means unchanged, and for `File` entries size and mtime are compared. It broadcasts `{"changed": [...], "removed": [...]}` with root-relative, percent-decoded site paths; the page and the sidebar decode their own paths before comparing, which avoids differences in how browsers percent-encode URL paths. A comment line every 15 s keeps idle connections alive. The broadcast list is a `Mutex<Vec<Sender>>` pruned when a send fails.
 - **Client:** a new workspace package `@hermetic/live-reload` defines `<hermetic-live-reload>`. It opens an `EventSource` to `<root>/_hermetic/events` (`EventSource` reconnects by itself). On a message:
   - if the current page's path is in either list, it stores `scrollY` in `sessionStorage` keyed by path and calls `location.reload()`; after the reload the element restores the scroll position once;
   - otherwise it dispatches `hermetic-pages-changed` on `document` with the lists.
@@ -48,7 +48,7 @@ Built sites never contain the element, because only the server injects it.
 *Alternative:* the element always present in built HTML and switched on by a meta tag. Rejected: it adds dead markup to every built page.
 
 ### Ports and addresses
-Binding tries `127.0.0.1:8000…8099` unless `--port` is given, in which case only that port is tried. `--host` parses an `IpAddr`. `--public` binds `0.0.0.0` (plus `[::]` when available) and finds the local-network address by connecting a UDP socket to a documentation address (`192.0.2.1:9`) and reading its local address. UDP `connect` sends no packets, so no network traffic happens. It prints the `localhost` URL and, if one was found, the network URL.
+Binding tries `127.0.0.1:8000…8099` unless `--port` is given, in which case only that port is tried. `--host` parses an `IpAddr`. `--public` binds `0.0.0.0` (IPv4 only for now; IPv6 can be added when needed) and finds the local-network address by connecting a UDP socket to a documentation address (`192.0.2.1:9`) and reading its local address. UDP `connect` sends no packets, so no network traffic happens. It prints the `localhost` URL and, if one was found, the network URL.
 
 ### The file:// placeholder
 The sidebar's `file://` text recommends `hermetic serve` in place of `python3 -m http.server`.

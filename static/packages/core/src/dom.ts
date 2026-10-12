@@ -18,3 +18,9 @@ export function whenParsed(fn: () => void): void {
  */
 export const SIDEBAR_CLOSE_TOP = "hermetic-sidebar-close-top";
 export const SIDEBAR_TOGGLE = "hermetic-sidebar-toggle";
+
+/**
+ * Dispatched on `document` by <hermetic-live-reload> when pages other than the current
+ * one changed; `detail` is `{ changed: string[], removed: string[] }` (site paths).
+ */
+export const PAGES_CHANGED = "hermetic-pages-changed";

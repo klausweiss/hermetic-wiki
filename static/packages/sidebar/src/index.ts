@@ -3,6 +3,7 @@
 
 import {
   type Env,
+  PAGES_CHANGED,
   type Pane,
   SIDEBAR_CLOSE_TOP,
   SIDEBAR_TOGGLE,
@@ -125,7 +126,7 @@ export class HermeticSidebar extends HTMLElement {
     this.placeholder.textContent = env.interactive
       ? "Shift+click a link to open its page here, next to the one you are reading."
       : "Pages open here with Shift+click when the site is served over http:// " +
-        "(for example with: python3 -m http.server). Browsers do not allow it for " +
+        "(run `hermetic serve` in the notes folder). Browsers do not allow it for " +
         "pages opened directly from disk.";
 
     this.list = document.createElement("div");
@@ -151,6 +152,10 @@ export class HermeticSidebar extends HTMLElement {
 
     document.addEventListener(SIDEBAR_CLOSE_TOP, () => this.closeTop());
     document.addEventListener(SIDEBAR_TOGGLE, () => this.toggleHidden());
+    document.addEventListener(PAGES_CHANGED, (e) => {
+      const detail = (e as CustomEvent<{ changed: string[]; removed: string[] }>).detail;
+      this.onPagesChanged(detail.changed, detail.removed);
+    });
 
     if (env.interactive) {
       // Over file:// the browser does not let us fetch other pages, so links keep
@@ -217,7 +222,22 @@ export class HermeticSidebar extends HTMLElement {
     this.render();
   }
 
-  private async load(view: PaneView): Promise<void> {
+  /** Live reload: refresh panes whose pages changed, close panes whose pages are gone. */
+  private onPagesChanged(changed: string[], removed: string[]): void {
+    for (const view of [...this.views]) {
+      const path = decodePath(view.pane.path);
+      if (removed.includes(path)) {
+        this.close(view);
+      } else if (changed.includes(path)) {
+        view.loaded = false;
+        if (!view.pane.collapsed) {
+          void this.load(view, false);
+        }
+      }
+    }
+  }
+
+  private async load(view: PaneView, scroll = true): Promise<void> {
     if (view.loaded || !this.env) {
       return;
     }
@@ -234,7 +254,9 @@ export class HermeticSidebar extends HTMLElement {
     }
     view.title.textContent = page.title;
     view.body.replaceChildren(page.article);
-    scrollToTarget(view);
+    if (scroll) {
+      scrollToTarget(view);
+    }
   }
 
   private toggleCollapsed(view: PaneView): void {
@@ -291,6 +313,15 @@ export class HermeticSidebar extends HTMLElement {
   /** Mirrors the panes into the URL without adding a history entry. */
   private persist(): void {
     history.replaceState(history.state, "", withPanes(location.href, this.panes));
+  }
+}
+
+/** A pane path as the server names site paths: percent-decoded. */
+function decodePath(path: string): string {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
   }
 }
 

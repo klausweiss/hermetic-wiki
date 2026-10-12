@@ -6,7 +6,7 @@ Browser editing can create pages and journal days but not remove them. Deleting 
 
 ## What Changes
 
-- In edit mode, a page's header offers "Delete page". It is available for regular pages and journal days that have a file, and for the home page's `index.md`.
+- In edit mode, a page's header offers "Delete page" in a small page actions menu (a menu button), so the action stays out of the way. It is available for regular pages and journal days that have a file, and for the home page's `index.md`.
 - A confirmation names the file and how many blocks on other pages reference the page. The page is deleted only after it is confirmed.
 - Deleting moves the file into `.trash/` in the notes folder, at its original relative path with a timestamp. Dot-folders are ignored by the build and the watcher, so the page disappears from the site, and moving the file back restores it. Namespace directories under `pages/` that become empty are removed.
 - After deleting, the browser goes to the home page. A page that is still referenced stays as a page without a file, like any referenced name.

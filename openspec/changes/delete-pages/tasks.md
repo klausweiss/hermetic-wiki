@@ -8,7 +8,7 @@
 
 ## 2. Editor (TypeScript)
 
-- [x] 2.1 "Delete page" in the page header for pages with a file; a confirmation dialog naming the file and the count of referencing blocks (from the page's linked references); on confirm `DELETE`, then open the home page; verify `Delete a page`, `Still referenced`, and `Cancel` in the browser
+- [x] 2.1 "Delete page" in a page actions menu (menu button in the page header, Escape and outside clicks close it) for pages with a file; a confirmation dialog naming the file and the count of referencing blocks (from the page's linked references); on confirm `DELETE`, then open the home page; verify `Delete a page`, `Still referenced`, and `Cancel` in the browser
 
 ## 3. Integration
 
@@ -21,4 +21,6 @@
     - The source payload now names the page's file, so the confirmation can show it.
     - A `.trash` that is a symbolic link out of the notes is refused before anything is created.
     - "Today" and "Write a home page" could be cut off when the write's rebuild reloaded the current page first. Clicking "Today" on the journal list could then fail to navigate at all (intermittent, seen in Firefox). Live reload is now held during those actions; covered by `Today from the journal list`, with Firefox run four times.
+  - Follow-up: "Delete page" moved from a header button into a page actions menu (☰). The editing suite checks the menu (closed at first, opens, Escape closes it and returns focus) and is now 64/64 in both engines.
+  - Also fixed: at exactly 900px the stylesheet's overlay rule (`max-width: 900px`) disagreed with the sidebar script (`899.98px`), so the empty sidebar covered the page. The stylesheet now uses the script's breakpoint.
 

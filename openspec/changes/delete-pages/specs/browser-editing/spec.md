@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Deleting pages
-Where editing is available, a page that has a file (a regular page, a journal day, or the home page's `index.md`) SHALL offer "Delete page" in its header. Choosing it SHALL ask for confirmation, naming the file and the number of blocks on other pages that reference the page; nothing SHALL change unless the author confirms. A confirmed deletion SHALL move the file to the trash (see "Safe writes"), open the home page, and leave every other file unchanged. A page that is still referenced SHALL remain as a page without a file. Pages without a file SHALL NOT offer the control.
+Where editing is available, a page that has a file (a regular page, a journal day, or the home page's `index.md`) SHALL offer "Delete page" in a page actions menu: a small menu button in the page header that opens the menu, which closes again on Escape (returning focus to the button), on a click elsewhere, or once an action is chosen. Choosing "Delete page" SHALL ask for confirmation, naming the file and the number of blocks on other pages that reference the page; nothing SHALL change unless the author confirms. A confirmed deletion SHALL move the file to the trash (see "Safe writes"), open the home page, and leave every other file unchanged. A page that is still referenced SHALL remain as a page without a file. Pages without a file SHALL NOT offer the action (nor, while it is the only action, the menu).
 
 #### Scenario: Delete a page
 - **WHEN** the author deletes the page `scratch` (`pages/scratch.md`), which nothing references, and confirms
@@ -12,6 +12,10 @@ Where editing is available, a page that has a file (a regular page, a journal da
 #### Scenario: Still referenced
 - **WHEN** the author deletes `pages/redis.md` while a journal contains `[[redis]]`
 - **THEN** the confirmation mentions 1 referencing block, and after deleting `pages/redis.html` shows the page without content and with its linked reference
+
+#### Scenario: Out of the way
+- **WHEN** a page with a file is opened in edit mode
+- **THEN** its header shows only a small menu button, and "Delete page" appears when that button is chosen
 
 #### Scenario: Cancel
 - **WHEN** the author chooses "Delete page" and cancels the confirmation

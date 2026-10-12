@@ -306,7 +306,7 @@ hermetic-timeline.show-timeline > h2, hermetic-timeline.show-timeline > ul.days 
 .pane-body .page-header { display: none; }
 .pane-body [data-hermetic-target] > .block-body { background: var(--surface); border-radius: 4px; }
 
-@media (max-width: 900px) {
+@media (max-width: 899.98px) { /* the same breakpoint as the sidebar script */
   .sidebar-open body { padding-right: 0; }
   .sidebar-open .sidebar, .sidebar-open.sidebar-empty .sidebar { width: 100%; left: 0; border-left: none; }
 }

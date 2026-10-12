@@ -1035,6 +1035,13 @@ mod tests {
     }
 
     proptest::proptest! {
+        #![proptest_config(proptest::test_runner::Config {
+            // Keep regression seeds next to the source instead of in a top-level directory.
+            failure_persistence: Some(Box::new(
+                proptest::test_runner::FileFailurePersistence::WithSource("proptest-regressions"),
+            )),
+            ..Default::default()
+        })]
         /// Parsing never panics, and the blocks' sources reassemble the text exactly
         /// (a text of only blank lines has no blocks).
         #[test]

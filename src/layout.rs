@@ -619,6 +619,13 @@ mod tests {
     }
 
     proptest! {
+        #![proptest_config(proptest::test_runner::Config {
+            // Keep regression seeds next to the source instead of in a top-level directory.
+            failure_persistence: Some(Box::new(
+                proptest::test_runner::FileFailurePersistence::WithSource("proptest-regressions"),
+            )),
+            ..Default::default()
+        })]
         #[test]
         fn encoding_round_trips(name in valid_name()) {
             let path = page_file_path(&name);

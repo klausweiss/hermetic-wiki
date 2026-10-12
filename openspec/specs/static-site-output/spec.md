@@ -7,7 +7,7 @@ Defines the static HTML site produced from the notes graph: its layout, what eve
 ## Requirements
 
 ### Requirement: Output layout
-The output SHALL contain one HTML file per page in the graph, including implicit pages. A page backed by a file SHALL be written at its source path with `.md` replaced by `.html`; an implicit regular page at the encoded path of its name under `pages/`; an implicit journal page at `journals/YYYY-MM-DD.html`. Site-wide pages SHALL be `index.html` (home page), `journals.html` (journal list), `pages.html` (all pages), and `tasks.html` (open tasks). Files belonging to hermetic itself SHALL be under `_hermetic/`. Continuation files SHALL be under `refs/` and `tasks/`.
+The output SHALL contain one HTML file per page in the graph, including implicit pages. A page backed by a file SHALL be written at its source path with `.md` replaced by `.html`; an implicit regular page at the encoded path of its name under `pages/`; an implicit journal page at `journals/YYYY-MM-DD.html`. Site-wide pages SHALL be `index.html` (home page), `journals.html` (journal list), `pages.html` (all pages), `tasks.html` (open tasks), and `search.html` (search results). Files belonging to hermetic itself SHALL be under `_hermetic/`. Continuation files SHALL be under `refs/` and `tasks/`. The search index SHALL be under `search/`.
 
 #### Scenario: Pages, journals, and implicit pages
 - **WHEN** the notes contain `journals/2026-10-12.md` linking to `[[kafka]]` and `[[2026-10-01]]`, and `pages/Project X/Auth Flow.md`
@@ -19,7 +19,7 @@ The output SHALL contain one HTML file per page in the graph, including implicit
 
 #### Scenario: Site-wide pages
 - **WHEN** any notes directory is built
-- **THEN** the output contains `index.html`, `journals.html`, `pages.html`, and `tasks.html`
+- **THEN** the output contains `index.html`, `journals.html`, `pages.html`, `tasks.html`, `search.html`, and `search/meta.json`
 
 ### Requirement: Works offline and without JavaScript
 Every generated page SHALL be fully usable when opened directly from disk (`file://`) with JavaScript disabled: all content, navigation, linked references, related pages, and tasks SHALL be present in the HTML. Pages SHALL NOT load any resource from outside the output directory, and all links between generated files SHALL be relative. Pages MAY load hermetic's own bundled script from `_hermetic/`; nothing on a page SHALL depend on it to be shown or reached.
@@ -128,7 +128,7 @@ Each page SHALL show its co-mentioned pages in the graph's order, each with its 
 - **THEN** `pages.html` lists both, with `kafka` marked as having no file
 
 ### Requirement: Bounded file sizes
-Apart from the journal index and the all-pages list, which list only names, the size of every generated file SHALL depend only on the content of one page, its linked references and related blocks up to the pagination limit, or one page of tasks, and SHALL NOT grow with the total size of the wiki.
+Apart from the journal index and the all-pages list, which list only names, and the search index under `search/`, whose size is governed by the `search` capability, the size of every generated file SHALL depend only on the content of one page, its linked references and related blocks up to the pagination limit, or one page of tasks, and SHALL NOT grow with the total size of the wiki.
 
 #### Scenario: Unrelated growth
 - **WHEN** 1,000 journal days unrelated to page `auth` are added

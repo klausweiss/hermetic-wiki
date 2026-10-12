@@ -1,0 +1,36 @@
+# journal-timeline Specification
+
+## Purpose
+
+Lets a reader scroll through journal days as one continuous timeline, assembled in the browser from the per-day pages, as a separate view next to the journal list.
+
+## Requirements
+
+### Requirement: Timeline view
+When the script is active on the journal list page, it SHALL offer a toggle between the list (default) and a timeline view. The timeline SHALL show the full content of journal days that have a source file, newest first, each headed by a link to its day page, with the day's own blocks and without its linked references, related pages, or open tasks sections. The selected view SHALL be reflected in the URL so that reloading or sharing the URL keeps it.
+
+#### Scenario: Switch to timeline
+- **WHEN** the user opens `journals.html` and selects the timeline view
+- **THEN** the newest journal days are shown with their full content, newest first
+
+#### Scenario: Reload keeps the view
+- **WHEN** the timeline view is selected and the page is reloaded
+- **THEN** the timeline view is shown
+
+### Requirement: Loading as you scroll
+The timeline SHALL initially load a small batch of days and load the next older batch when the reader scrolls near its end, until all days are shown. Each day SHALL be fetched from its own page; no other file listing all journal content SHALL be needed.
+
+#### Scenario: Scrolling loads older days
+- **WHEN** the site has 400 journal days and the user scrolls to the end of the timeline
+- **THEN** older days are appended without a page reload, and the first load fetched no more than 10 day pages
+
+#### Scenario: End of the journal
+- **WHEN** the oldest day has been loaded
+- **THEN** no further requests are made and the timeline shows that it has reached the beginning
+
+### Requirement: Timeline links and panes
+Links and Shift+click inside the timeline SHALL behave as on any page: plain clicks navigate, Shift+click opens a sidebar pane.
+
+#### Scenario: Open a topic from the timeline
+- **WHEN** the user Shift+clicks `[[auth]]` inside a day in the timeline
+- **THEN** the `auth` page opens in the sidebar and the timeline stays in place

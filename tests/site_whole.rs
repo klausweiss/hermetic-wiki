@@ -6,10 +6,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use common::Notes;
-use hermetic::site;
-
-const FIXTURE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/notes");
+use common::{FIXTURE, Notes, build_site};
 
 /// All files under `dir` with their bytes, keyed by relative path.
 fn snapshot(dir: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
@@ -31,16 +28,9 @@ fn snapshot(dir: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
     out
 }
 
-fn build(notes: &Path) -> (Notes, PathBuf) {
-    let holder = Notes::empty();
-    let out = holder.path().join("site");
-    site::build(notes, &out).unwrap();
-    (holder, out)
-}
-
 #[test]
 fn fixture_file_list() {
-    let (_h, out) = build(Path::new(FIXTURE));
+    let (_h, out, _) = build_site(Path::new(FIXTURE));
     let mut files: Vec<String> = snapshot(&out)
         .keys()
         .map(|p| p.to_string_lossy().into_owned())
@@ -79,7 +69,7 @@ fn pages_journals_and_implicit_pages() {
         ("journals/2026-10-12.md", "- [[kafka]] [[2026-10-01]]"),
         ("pages/Project X/Auth Flow.md", "- x"),
     ]);
-    let (_h, out) = build(notes.path());
+    let (_h, out, _) = build_site(notes.path());
     for f in [
         "journals/2026-10-12.html",
         "journals/2026-10-01.html",
@@ -97,7 +87,7 @@ fn encoded_page_names() {
         ("pages/C#%3A a.md", "- x"),
         ("pages/index.md", "- [[C#: a]]"),
     ]);
-    let (_h, out) = build(notes.path());
+    let (_h, out, _) = build_site(notes.path());
     assert!(out.join("pages/C#%3A a.html").is_file());
     let html = fs::read_to_string(out.join("pages/index.html")).unwrap();
     assert!(html.contains(r#"href="C%23%253A%20a.html""#), "{html}");
@@ -105,8 +95,8 @@ fn encoded_page_names() {
 
 #[test]
 fn rebuild_is_identical() {
-    let (_h1, a) = build(Path::new(FIXTURE));
-    let (_h2, b) = build(Path::new(FIXTURE));
+    let (_h1, a, _) = build_site(Path::new(FIXTURE));
+    let (_h2, b, _) = build_site(Path::new(FIXTURE));
     assert!(snapshot(&a) == snapshot(&b), "two builds differ");
 }
 
@@ -144,7 +134,7 @@ fn no_external_resources() {
         ),
         ("pages/b.md", "- TODO x ((nope))"),
     ]);
-    let (_h, out) = build(notes.path());
+    let (_h, out, _) = build_site(notes.path());
     let mut checked = 0;
     for (path, bytes) in snapshot(&out) {
         let ext = path
@@ -177,7 +167,7 @@ fn unrelated_growth_does_not_change_a_page() {
         ("pages/auth.md", "- the auth page"),
         ("journals/2026-10-12.md", "- about [[auth]] and [[redis]]"),
     ]);
-    let (_h1, before) = build(notes.path());
+    let (_h1, before, _) = build_site(notes.path());
     for i in 0..1000 {
         let date = format!(
             "{}-{:02}-{:02}",
@@ -190,7 +180,7 @@ fn unrelated_growth_does_not_change_a_page() {
             format!("- unrelated {i} [[topic {i}]] #misc").as_bytes(),
         );
     }
-    let (_h2, after) = build(notes.path());
+    let (_h2, after, _) = build_site(notes.path());
     for page in ["pages/auth.html", "pages/redis.html"] {
         assert_eq!(
             fs::read(before.join(page)).unwrap(),

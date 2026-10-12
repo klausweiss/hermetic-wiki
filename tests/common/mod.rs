@@ -5,7 +5,11 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use hermetic::graph::{BlockId, PageId};
+use hermetic::site::{self, BuildReport};
 use hermetic::{Diagnostic, DiagnosticKind, Graph};
+
+/// The shared fixture notes directory.
+pub const FIXTURE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/notes");
 
 /// A temporary notes directory, removed on drop.
 pub struct Notes {
@@ -52,6 +56,15 @@ impl Drop for Notes {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.root);
     }
+}
+
+/// Builds `notes` into `site/` inside a fresh temporary directory, which is returned
+/// so it lives as long as the caller needs the output.
+pub fn build_site(notes: &Path) -> (Notes, PathBuf, BuildReport) {
+    let holder = Notes::empty();
+    let out = holder.path().join("site");
+    let report = site::build(notes, &out).expect("build succeeds");
+    (holder, out, report)
 }
 
 pub fn page(g: &Graph, name: &str) -> PageId {

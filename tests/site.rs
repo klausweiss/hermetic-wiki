@@ -5,16 +5,14 @@ mod common;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use common::Notes;
+use common::{Notes, build_site, kinds};
 use hermetic::DiagnosticKind;
 use hermetic::site::{self, BuildError, MARKER};
 
 /// Builds `files` into a fresh output directory; returns (notes, out holder, out path).
 fn built(files: &[(&str, &str)]) -> (Notes, Notes, PathBuf, Vec<hermetic::Diagnostic>) {
     let notes = Notes::new(files);
-    let holder = Notes::empty();
-    let out = holder.path().join("site");
-    let report = site::build(notes.path(), &out).expect("build succeeds");
+    let (holder, out, report) = build_site(notes.path());
     (notes, holder, out, report.diagnostics)
 }
 
@@ -334,9 +332,7 @@ fn image_next_to_a_page() {
         ("assets/logo.svg", "<svg/>"),
     ]);
     notes.write("pages/auth-flow.png", b"\x89PNG fake");
-    let holder = Notes::empty();
-    let out = holder.path().join("site");
-    site::build(notes.path(), &out).unwrap();
+    let (_h, out, _) = build_site(notes.path());
     assert_eq!(
         fs::read(out.join("pages/auth-flow.png")).unwrap(),
         b"\x89PNG fake"
@@ -353,10 +349,8 @@ fn attachment_conflicts_and_symlinks() {
         ("pages/.secret.txt", "s"),
     ]);
     std::os::unix::fs::symlink("/etc/hostname", notes.path().join("pages/host.txt")).unwrap();
-    let holder = Notes::empty();
-    let out = holder.path().join("site");
-    let report = site::build(notes.path(), &out).unwrap();
-    let kinds: Vec<_> = report.diagnostics.iter().map(|d| d.kind).collect();
+    let (_h, out, report) = build_site(notes.path());
+    let kinds = kinds(&report.diagnostics);
     assert!(
         kinds.contains(&DiagnosticKind::AttachmentConflict),
         "{kinds:?}"

@@ -11,7 +11,15 @@ use crate::diag::{Diagnostic, DiagnosticKind};
 
 pub const JOURNALS_DIR: &str = "journals";
 pub const PAGES_DIR: &str = "pages";
-const EXTENSION: &str = ".md";
+pub const ASSETS_DIR: &str = "assets";
+/// Directories under the notes root that are read as input.
+pub const INPUT_DIRS: [&str; 3] = [JOURNALS_DIR, PAGES_DIR, ASSETS_DIR];
+pub const EXTENSION: &str = ".md";
+
+/// Whether a file name is a markdown source file (`x.md`, not a bare `.md`).
+pub fn is_markdown(name: &str) -> bool {
+    name.ends_with(EXTENSION) && name.len() > EXTENSION.len()
+}
 
 // ---------------------------------------------------------------------------
 // Names
@@ -420,7 +428,7 @@ fn collect_markdown(root: &Path, rel: &Path, out: &mut Vec<PathBuf>, diags: &mut
         let is_dir = file_type.is_dir() || (file_type.is_symlink() && root.join(&child).is_dir());
         if is_dir {
             collect_markdown(root, &child, out, diags);
-        } else if name.ends_with(EXTENSION) && name.len() > EXTENSION.len() {
+        } else if is_markdown(name) {
             out.push(child);
         }
     }

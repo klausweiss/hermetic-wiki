@@ -15,11 +15,11 @@ pub fn output_path(g: &Graph, page: PageId) -> PathBuf {
     }
 }
 
-/// Replaces a trailing `.md` with `.html`. Names may contain other dots, so this is a
+/// Replaces the trailing markdown extension with `.html`. Names may contain other dots, so this is a
 /// string operation rather than an extension swap.
 fn md_to_html(path: &Path) -> PathBuf {
     let s = path.to_string_lossy();
-    let stem = s.strip_suffix(".md").unwrap_or(&s);
+    let stem = s.strip_suffix(layout::EXTENSION).unwrap_or(&s);
     PathBuf::from(format!("{stem}.html"))
 }
 

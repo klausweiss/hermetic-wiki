@@ -36,6 +36,15 @@ impl TaskState {
             TaskState::Done => "DONE",
         }
     }
+
+    /// Lowercase name used in CSS classes.
+    pub fn css_name(self) -> &'static str {
+        match self {
+            TaskState::Todo => "todo",
+            TaskState::Doing => "doing",
+            TaskState::Done => "done",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

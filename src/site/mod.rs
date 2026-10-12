@@ -3,7 +3,7 @@
 mod assets;
 mod html;
 mod pages;
-pub mod paths;
+mod paths;
 mod render;
 
 use std::collections::HashSet;
@@ -14,8 +14,7 @@ use std::path::{Component, Path, PathBuf};
 
 use crate::diag::Diagnostic;
 use crate::graph::Graph;
-
-pub use pages::{REFS_PER_FILE, TASKS_PER_FILE};
+use crate::layout;
 
 /// Name of the file marking a directory as hermetic output.
 pub const MARKER: &str = ".hermetic-site";
@@ -74,14 +73,9 @@ pub fn build(notes: &Path, out: &Path) -> Result<BuildReport, BuildError> {
     if tmp.exists() {
         fs::remove_dir_all(&tmp).map_err(io_err(format!("cannot remove {}", tmp.display())))?;
     }
-    let result = render_into(&graph, &title, &notes, &tmp, &mut diagnostics);
-    let pages = match result {
-        Ok(pages) => pages,
-        Err(e) => {
-            let _ = fs::remove_dir_all(&tmp);
-            return Err(e);
-        }
-    };
+    let pages = render_into(&graph, &title, &notes, &tmp, &mut diagnostics).inspect_err(|_| {
+        let _ = fs::remove_dir_all(&tmp);
+    })?;
     if out.exists() {
         fs::remove_dir_all(&out).map_err(io_err(format!("cannot replace {}", out.display())))?;
     }
@@ -149,7 +143,7 @@ fn check_output(notes: &Path, out: &Path) -> Result<(), BuildError> {
     if notes.starts_with(out) {
         return refuse("it contains the notes directory");
     }
-    for dir in ["journals", "pages", "assets"] {
+    for dir in layout::INPUT_DIRS {
         if out.starts_with(notes.join(dir)) {
             return refuse("it is inside a notes directory that is read as input");
         }

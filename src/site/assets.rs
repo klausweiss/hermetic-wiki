@@ -6,6 +6,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::diag::{Diagnostic, DiagnosticKind};
+use crate::layout;
 
 /// Files written under `_hermetic/` in every build.
 pub const EMBEDDED: &[(&str, &[u8])] = &[
@@ -43,9 +44,6 @@ pub const EMBEDDED: &[(&str, &[u8])] = &[
     ),
 ];
 
-/// Directories under the notes root whose non-markdown files are copied.
-const ATTACHMENT_DIRS: &[&str] = &["journals", "pages", "assets"];
-
 /// Copies attachments from `notes` into `out`, skipping symlinks and files whose output
 /// path is already taken by a generated page. Returns the number of files copied.
 pub fn copy_attachments(
@@ -55,7 +53,8 @@ pub fn copy_attachments(
     diags: &mut Vec<Diagnostic>,
 ) -> io::Result<usize> {
     let mut files = Vec::new();
-    for dir in ATTACHMENT_DIRS {
+    // Every input directory: their non-markdown files are attachments.
+    for dir in layout::INPUT_DIRS {
         collect(notes, Path::new(dir), &mut files, diags)?;
     }
     files.sort();
@@ -101,7 +100,7 @@ fn collect(
         let child = rel.join(name);
         let file_type = entry.file_type()?;
         if file_type.is_symlink() {
-            if !name.ends_with(".md") {
+            if !layout::is_markdown(name) {
                 diags.push(Diagnostic::new(
                     DiagnosticKind::SkippedSymlink,
                     child,
@@ -111,7 +110,7 @@ fn collect(
             }
         } else if file_type.is_dir() {
             collect(notes, &child, out, diags)?;
-        } else if file_type.is_file() && !name.ends_with(".md") {
+        } else if file_type.is_file() && !layout::is_markdown(name) {
             out.push(child);
         }
     }

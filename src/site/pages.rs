@@ -1,12 +1,14 @@
 //! Whole pages: a note's page (with its sections and continuation files) and the
 //! site-wide journal index, all-pages list, and open-tasks list.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use super::html::{document, esc};
 use super::paths::{href, refs_continuation_path, tasks_continuation_path};
 use super::render::{Mode, Site, task_badge};
 use crate::graph::{BlockId, LinkedRef, PageId};
+use crate::layout::Date;
 
 /// Linked references shown per file.
 pub const REFS_PER_FILE: usize = 100;
@@ -32,13 +34,7 @@ pub fn page_files(site: &Site, page: PageId) -> Vec<OutFile> {
         .flat_map(|group| group.refs.into_iter().map(move |r| (group.page, r)))
         .collect();
     let chunks: Vec<&[(PageId, LinkedRef)]> = refs.chunks(REFS_PER_FILE).collect();
-    let chunk_path = |n: usize| {
-        if n == 1 {
-            path.clone()
-        } else {
-            refs_continuation_path(&path, n)
-        }
-    };
+    let paths = file_paths(&path, chunks.len(), |n| refs_continuation_path(&path, n));
 
     let mut main = String::from("<article class=\"page\">\n");
     main.push_str(&page_header(site, &path, page));
@@ -52,7 +48,7 @@ pub fn page_files(site: &Site, page: PageId) -> Vec<OutFile> {
     ));
     if let Some(first) = chunks.first() {
         main.push_str(&ref_groups(site, &path, first));
-        main.push_str(&pager(&path, 1, chunks.len(), &chunk_path));
+        main.push_str(&pager(&path, 1, &paths));
     } else {
         main.push_str("<p class=\"empty\">No other page references this one yet.</p>\n");
     }
@@ -64,7 +60,7 @@ pub fn page_files(site: &Site, page: PageId) -> Vec<OutFile> {
     }];
     for (i, chunk) in chunks.iter().enumerate().skip(1) {
         let n = i + 1;
-        let file = chunk_path(n);
+        let file = paths[i].clone();
         let main = format!(
             "<article class=\"page\">\n<header class=\"page-header\"><h1><a href=\"{}\">{}</a> <span class=\"muted\">references {}–{} of {}</span></h1></header>\n<section class=\"linked-refs\">\n{}{}</section>\n</article>\n",
             esc(&href(&file, &path, None)),
@@ -73,7 +69,7 @@ pub fn page_files(site: &Site, page: PageId) -> Vec<OutFile> {
             i * REFS_PER_FILE + chunk.len(),
             refs.len(),
             ref_groups(site, &file, chunk),
-            pager(&file, n, chunks.len(), &chunk_path),
+            pager(&file, n, &paths),
         );
         files.push(OutFile {
             html: document(
@@ -116,7 +112,7 @@ fn page_header(site: &Site, from: &Path, page: PageId) -> String {
                 esc(&p.name),
                 date.weekday()
             ));
-            out.push_str(&day_nav(site, from, page));
+            out.push_str(&day_nav(site, from, date));
         }
         None => out.push_str(&format!("<h1>{}</h1>\n", esc(p.leaf_name()))),
     }
@@ -125,19 +121,14 @@ fn page_header(site: &Site, from: &Path, page: PageId) -> String {
 }
 
 /// Links to the nearest earlier and later journal days that have a file.
-fn day_nav(site: &Site, from: &Path, page: PageId) -> String {
-    let Some(date) = site.g.page(page).date() else {
-        return String::new();
-    };
+fn day_nav(site: &Site, from: &Path, date: Date) -> String {
     let days = &site.journal_days;
-    let pos = days.partition_point(|&(d, _)| d < date);
-    let prev = pos.checked_sub(1).map(|i| days[i]);
-    let next_pos = if days.get(pos).is_some_and(|&(d, _)| d == date) {
-        pos + 1
-    } else {
-        pos
-    };
-    let next = days.get(next_pos).copied();
+    let prev = days[..days.partition_point(|&(d, _)| d < date)]
+        .last()
+        .copied();
+    let next = days[days.partition_point(|&(d, _)| d <= date)..]
+        .first()
+        .copied();
     if prev.is_none() && next.is_none() {
         return String::new();
     }
@@ -224,6 +215,8 @@ fn related(site: &Site, from: &Path, page: PageId) -> String {
     if related.is_empty() {
         return String::new();
     }
+    // A block mentioning several related pages is listed under each of them.
+    let mut bodies: HashMap<BlockId, String> = HashMap::new();
     let mut out = String::from("<section class=\"related\">\n<h2>Related</h2>\n");
     for r in related {
         out.push_str(&format!(
@@ -237,7 +230,7 @@ fn related(site: &Site, from: &Path, page: PageId) -> String {
                 "<li><a class=\"source\" href=\"{}\">{}</a>{}</li>",
                 esc(&site.block_href(from, b)),
                 esc(&site.page_title(site.g.block(b).page)),
-                site.block_body(from, b)
+                bodies.entry(b).or_insert_with(|| site.block_body(from, b))
             ));
         }
         out.push_str("</ul>\n</details>\n");
@@ -250,47 +243,54 @@ fn related(site: &Site, from: &Path, page: PageId) -> String {
 /// repeats its header.
 fn ref_groups(site: &Site, from: &Path, refs: &[(PageId, LinkedRef)]) -> String {
     let mut out = String::new();
-    let mut current: Option<PageId> = None;
-    for (source, r) in refs {
-        if current != Some(*source) {
-            if current.is_some() {
-                out.push_str("</div>\n");
-            }
-            out.push_str(&format!(
-                "<div class=\"ref-group\">\n<h3><a href=\"{}\">{}</a></h3>\n",
-                esc(&site.page_href(from, *source)),
-                esc(&site.page_title(*source))
-            ));
-            current = Some(*source);
+    for group in refs.chunk_by(|a, b| a.0 == b.0) {
+        let source = group[0].0;
+        out.push_str(&format!(
+            "<div class=\"ref-group\">\n<h3><a href=\"{}\">{}</a></h3>\n",
+            esc(&site.page_href(from, source)),
+            esc(&site.page_title(source))
+        ));
+        for (_, r) in group {
+            out.push_str(&linked_ref(site, from, r));
         }
-        out.push_str("<div class=\"linked-ref\">");
-        if !r.breadcrumb.is_empty() {
-            out.push_str("<nav class=\"breadcrumb\">");
-            let crumbs: Vec<String> = r
-                .breadcrumb
-                .iter()
-                .map(|&a| {
-                    format!(
-                        "<a href=\"{}\">{}</a>",
-                        esc(&site.block_href(from, a)),
-                        site.plain(from, a)
-                    )
-                })
-                .collect();
-            out.push_str(&crumbs.join(" › "));
-            out.push_str("</nav>");
-        }
-        out.push_str(&site.tree(from, &[r.block], false));
-        out.push_str("</div>\n");
-    }
-    if current.is_some() {
         out.push_str("</div>\n");
     }
     out
 }
 
-/// Previous/next links between the files of a paginated list.
-fn pager(from: &Path, n: usize, total: usize, path_of: &dyn Fn(usize) -> PathBuf) -> String {
+fn linked_ref(site: &Site, from: &Path, r: &LinkedRef) -> String {
+    let mut out = String::from("<div class=\"linked-ref\">");
+    if !r.breadcrumb.is_empty() {
+        out.push_str("<nav class=\"breadcrumb\">");
+        let crumbs: Vec<String> = r
+            .breadcrumb
+            .iter()
+            .map(|&a| {
+                format!(
+                    "<a href=\"{}\">{}</a>",
+                    esc(&site.block_href(from, a)),
+                    site.plain(from, a)
+                )
+            })
+            .collect();
+        out.push_str(&crumbs.join(" › "));
+        out.push_str("</nav>");
+    }
+    out.push_str(&site.tree(from, &[r.block], false));
+    out.push_str("</div>\n");
+    out
+}
+
+/// Paths of a paginated list's `count` files: `first`, then `continuation(n)` for n >= 2.
+fn file_paths(first: &Path, count: usize, continuation: impl Fn(usize) -> PathBuf) -> Vec<PathBuf> {
+    std::iter::once(first.to_path_buf())
+        .chain((2..=count).map(continuation))
+        .collect()
+}
+
+/// Previous/next links between the files of a paginated list; `from` is file `n` of `paths`.
+fn pager(from: &Path, n: usize, paths: &[PathBuf]) -> String {
+    let total = paths.len();
     if total <= 1 {
         return String::new();
     }
@@ -298,14 +298,14 @@ fn pager(from: &Path, n: usize, total: usize, path_of: &dyn Fn(usize) -> PathBuf
     if n > 1 {
         out.push_str(&format!(
             "<a rel=\"prev\" href=\"{}\">← Previous</a>",
-            esc(&href(from, &path_of(n - 1), None))
+            esc(&href(from, &paths[n - 2], None))
         ));
     }
     out.push_str(&format!("<span>{n} / {total}</span>"));
     if n < total {
         out.push_str(&format!(
             "<a rel=\"next\" href=\"{}\">Next →</a>",
-            esc(&href(from, &path_of(n + 1), None))
+            esc(&href(from, &paths[n], None))
         ));
     }
     out.push_str("</nav>\n");
@@ -321,26 +321,23 @@ pub fn journal_index(site: &Site) -> OutFile {
     if site.journal_days.is_empty() {
         main.push_str("<p class=\"empty\">No journal entries yet. Add files like <code>journals/2026-10-12.md</code>.</p>\n");
     }
-    let mut month: Option<(u16, u8)> = None;
-    for &(date, page) in site.journal_days.iter().rev() {
-        if month != Some((date.year, date.month)) {
-            if month.is_some() {
-                main.push_str("</ul>\n");
-            }
-            main.push_str(&format!(
-                "<h2>{} {}</h2>\n<ul class=\"days\">",
-                date.month_name(),
-                date.year
-            ));
-            month = Some((date.year, date.month));
-        }
+    let months = site
+        .journal_days
+        .chunk_by(|(a, _), (b, _)| (a.year, a.month) == (b.year, b.month));
+    for month in months.rev() {
+        let first = month[0].0;
         main.push_str(&format!(
-            "<li><a href=\"{}\">{date}</a> <span class=\"weekday\">{}</span></li>",
-            esc(&site.page_href(&path, page)),
-            date.weekday()
+            "<h2>{} {}</h2>\n<ul class=\"days\">",
+            first.month_name(),
+            first.year
         ));
-    }
-    if month.is_some() {
+        for &(date, page) in month.iter().rev() {
+            main.push_str(&format!(
+                "<li><a href=\"{}\">{date}</a> <span class=\"weekday\">{}</span></li>",
+                esc(&site.page_href(&path, page)),
+                date.weekday()
+            ));
+        }
         main.push_str("</ul>\n");
     }
     main.push_str("</article>\n");
@@ -391,17 +388,15 @@ pub fn all_pages(site: &Site) -> OutFile {
 pub fn task_files(site: &Site) -> Vec<OutFile> {
     let tasks = site.g.open_tasks();
     let chunks: Vec<&[BlockId]> = tasks.chunks(TASKS_PER_FILE).collect();
-    let total = chunks.len().max(1);
-    let path_of = |n: usize| {
-        if n == 1 {
-            PathBuf::from("tasks.html")
-        } else {
-            tasks_continuation_path(n)
-        }
-    };
+    let paths = file_paths(
+        Path::new("tasks.html"),
+        chunks.len(),
+        tasks_continuation_path,
+    );
     let mut files = Vec::new();
-    for n in 1..=total {
-        let path = path_of(n);
+    for (i, path) in paths.iter().enumerate() {
+        let n = i + 1;
+        let path = path.clone();
         let mut main = format!(
             "<article class=\"page index\">\n<header class=\"page-header\"><h1>Open tasks <span class=\"count\">{}</span></h1></header>\n",
             tasks.len()
@@ -409,26 +404,22 @@ pub fn task_files(site: &Site) -> Vec<OutFile> {
         match chunks.get(n - 1) {
             None => main.push_str("<p class=\"empty\">No open tasks.</p>\n"),
             Some(chunk) => {
-                let mut current: Option<PageId> = None;
-                for &t in chunk.iter() {
-                    let page = site.g.block(t).page;
-                    if current != Some(page) {
-                        if current.is_some() {
-                            main.push_str("</ul>\n");
-                        }
-                        main.push_str(&format!(
-                            "<h2><a href=\"{}\">{}</a></h2>\n<ul class=\"tasks\">",
-                            esc(&site.page_href(&path, page)),
-                            esc(&site.page_title(page))
-                        ));
-                        current = Some(page);
+                let page_of = |t: &BlockId| site.g.block(*t).page;
+                for group in chunk.chunk_by(|a, b| page_of(a) == page_of(b)) {
+                    let page = page_of(&group[0]);
+                    main.push_str(&format!(
+                        "<h2><a href=\"{}\">{}</a></h2>\n<ul class=\"tasks\">",
+                        esc(&site.page_href(&path, page)),
+                        esc(&site.page_title(page))
+                    ));
+                    for &t in group {
+                        main.push_str(&task_item(site, &path, t));
                     }
-                    main.push_str(&task_item(site, &path, t));
+                    main.push_str("</ul>\n");
                 }
-                main.push_str("</ul>\n");
             }
         }
-        main.push_str(&pager(&path, n, total, &path_of));
+        main.push_str(&pager(&path, n, &paths));
         main.push_str("</article>\n");
         files.push(OutFile {
             html: document(&site.title, &path, "Open tasks", &main),

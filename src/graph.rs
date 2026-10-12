@@ -93,6 +93,8 @@ pub struct Ref {
 #[derive(Debug, Clone)]
 pub struct Block {
     pub page: PageId,
+    /// 0-based position among its page's blocks, in document order.
+    pub index: u32,
     pub parent: Option<BlockId>,
     pub children: Vec<BlockId>,
     pub kind: BlockKind,
@@ -496,6 +498,7 @@ impl Graph {
             raw_refs.push(refs);
             self.blocks.push(Block {
                 page,
+                index: id.0 - base,
                 parent,
                 children: Vec::new(),
                 kind: pb.kind,

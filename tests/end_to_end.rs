@@ -6,11 +6,9 @@ use std::fmt::Write;
 use std::path::Path;
 use std::time::Instant;
 
-use common::Notes;
+use common::{FIXTURE, Notes};
 use hermetic::graph::{PageKind, RefTarget};
 use hermetic::{Diagnostic, Graph};
-
-const FIXTURE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/notes");
 
 /// A readable, deterministic dump of everything the graph exposes.
 fn dump(g: &Graph, diags: &[Diagnostic]) -> String {

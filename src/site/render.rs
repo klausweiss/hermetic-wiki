@@ -1,5 +1,6 @@
 //! Rendering blocks: markdown, references, properties, tasks, and block trees.
 
+use std::fmt::Write;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 
@@ -16,8 +17,6 @@ pub struct Site<'g> {
     pub g: &'g Graph,
     pub title: String,
     out: Vec<PathBuf>,
-    /// Per page: id of its first block, used to number blocks for anchors.
-    first_block: Vec<u32>,
     /// File-backed journal days, ascending.
     pub journal_days: Vec<(Date, PageId)>,
 }
@@ -32,12 +31,7 @@ pub enum Mode {
 
 impl<'g> Site<'g> {
     pub fn new(g: &'g Graph, title: impl Into<String>) -> Self {
-        let pages: Vec<PageId> = g.pages().map(|(id, _)| id).collect();
-        let out = pages.iter().map(|&p| output_path(g, p)).collect();
-        let first_block = pages
-            .iter()
-            .map(|&p| g.page(p).roots.first().map_or(u32::MAX, |b| b.0))
-            .collect();
+        let out = g.pages().map(|(id, _)| output_path(g, id)).collect();
         let mut journal_days: Vec<(Date, PageId)> = g
             .pages()
             .filter(|(_, p)| !p.is_implicit())
@@ -48,7 +42,6 @@ impl<'g> Site<'g> {
             g,
             title: title.into(),
             out,
-            first_block,
             journal_days,
         }
     }
@@ -62,7 +55,7 @@ impl<'g> Site<'g> {
         let b = self.g.block(block);
         match &b.id {
             Some(id) => format!("id-{id}"),
-            None => format!("b{}", block.0 - self.first_block[b.page.0 as usize] + 1),
+            None => format!("b{}", b.index + 1),
         }
     }
 
@@ -125,17 +118,13 @@ impl<'g> Site<'g> {
                     }
                     edits.push((dest, url));
                 }
-                (RawRefKind::Page, RefTarget::Page(p)) => {
+                (kind @ (RawRefKind::Page | RawRefKind::Tag), RefTarget::Page(p)) => {
+                    let (class, prefix) = match kind {
+                        RawRefKind::Tag => ("tag", "#"),
+                        _ => ("page-ref", ""),
+                    };
                     let html = format!(
-                        "<a class=\"page-ref\" href=\"{}\">{}</a>",
-                        esc(&self.page_href(from, p)),
-                        esc(&r.text)
-                    );
-                    edits.push((r.range.clone(), placeholder(html)));
-                }
-                (RawRefKind::Tag, RefTarget::Page(p)) => {
-                    let html = format!(
-                        "<a class=\"tag\" href=\"{}\">#{}</a>",
+                        "<a class=\"{class}\" href=\"{}\">{prefix}{}</a>",
                         esc(&self.page_href(from, p)),
                         esc(&r.text)
                     );
@@ -167,16 +156,19 @@ impl<'g> Site<'g> {
                 _ => {}
             }
         }
-        edits.sort_by_key(|e| std::cmp::Reverse(e.0.start));
-        let mut src = text.to_owned();
+        edits.sort_by_key(|e| e.0.start);
+        let mut src = String::with_capacity(text.len());
+        let mut pos = 0;
         for (range, replacement) in edits {
-            src.replace_range(range, &replacement);
+            if range.start < pos {
+                continue;
+            }
+            src.push_str(&text[pos..range.start]);
+            src.push_str(&replacement);
+            pos = range.end;
         }
-        let mut html = markdown(&src);
-        for (i, fragment) in fragments.iter().enumerate() {
-            html = html.replace(&format!("\u{E000}{i}\u{E001}"), fragment);
-        }
-        html
+        src.push_str(&text[pos..]);
+        fill_placeholders(&markdown(&src), &fragments)
     }
 
     /// A block's content as HTML; a single paragraph is unwrapped so it flows inline.
@@ -230,38 +222,70 @@ impl<'g> Site<'g> {
     /// Blocks and their subtrees as nested lists. Anchors are emitted only on the
     /// block's own page (`with_ids`), so they stay unique.
     pub fn tree(&self, from: &Path, blocks: &[BlockId], with_ids: bool) -> String {
+        let mut out = String::new();
+        self.push_tree(&mut out, from, blocks, with_ids);
+        out
+    }
+
+    fn push_tree(&self, out: &mut String, from: &Path, blocks: &[BlockId], with_ids: bool) {
         if blocks.is_empty() {
-            return String::new();
+            return;
         }
-        let mut out = String::from("<ul class=\"blocks\">");
+        out.push_str("<ul class=\"blocks\">");
         for &block in blocks {
             let b = self.g.block(block);
-            let class = match b.task {
-                Some(state) => format!("block task-{}", state.marker().to_lowercase()),
-                None => "block".to_owned(),
-            };
-            let id = if with_ids {
-                format!(" id=\"{}\"", esc(&self.anchor(block)))
-            } else {
-                String::new()
-            };
-            out.push_str(&format!(
-                "<li class=\"{class}\"{id}>{}{}</li>",
-                self.block_body(from, block),
-                self.tree(from, &b.children, with_ids)
-            ));
+            out.push_str("<li class=\"block");
+            if let Some(state) = b.task {
+                let _ = write!(out, " task-{}", state.css_name());
+            }
+            out.push('"');
+            if with_ids {
+                let _ = write!(out, " id=\"{}\"", esc(&self.anchor(block)));
+            }
+            out.push('>');
+            out.push_str(&self.block_body(from, block));
+            self.push_tree(out, from, &b.children, with_ids);
+            out.push_str("</li>");
         }
         out.push_str("</ul>");
-        out
     }
 }
 
 pub fn task_badge(state: TaskState) -> String {
-    let m = state.marker();
     format!(
-        "<span class=\"task-marker task-{}\">{m}</span>",
-        m.to_lowercase()
+        "<span class=\"task-marker task-{}\">{}</span>",
+        state.css_name(),
+        state.marker()
     )
+}
+
+/// Replaces each `\u{E000}<i>\u{E001}` placeholder in `html` with `fragments[i]`.
+fn fill_placeholders(html: &str, fragments: &[String]) -> String {
+    if fragments.is_empty() {
+        return html.to_owned();
+    }
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    while let Some(start) = rest.find('\u{E000}') {
+        out.push_str(&rest[..start]);
+        let after = &rest[start + '\u{E000}'.len_utf8()..];
+        let fragment = after.split_once('\u{E001}').and_then(|(index, tail)| {
+            let f = fragments.get(index.parse::<usize>().ok()?)?;
+            Some((f, tail))
+        });
+        match fragment {
+            Some((f, tail)) => {
+                out.push_str(f);
+                rest = tail;
+            }
+            None => {
+                out.push('\u{E000}');
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 fn markdown(src: &str) -> String {

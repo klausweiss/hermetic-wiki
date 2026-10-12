@@ -404,3 +404,34 @@ html[data-hermetic-editing] section.content li.block > .block-body { cursor: tex
 html[data-hermetic-editing] section.content li.block > .block-body { min-height: 1.6em; }
 .write-home { font: inherit; font-weight: 600; margin-right: 0.4rem; cursor: pointer; }
 p.warning { border-left: 3px solid var(--todo); padding: 0.4rem 0.75rem; background: var(--surface); border-radius: 4px; }
+.page-header { position: relative; }
+.page-menu { position: absolute; top: 0.3rem; right: 0; }
+.page-menu-button {
+  display: inline-grid; place-items: center; width: 1.9rem; height: 1.9rem; padding: 0;
+  border-color: transparent; opacity: 0.6;
+}
+.page-menu-button:hover, .page-menu-button:focus-visible, .page-menu-button[aria-expanded="true"] {
+  opacity: 1; border-color: var(--border);
+}
+.page-menu-items {
+  position: absolute; top: calc(100% + 0.3rem); right: 0; z-index: 20; min-width: 11rem; padding: 0.25rem;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+}
+.page-menu-items[hidden] { display: none; }
+.page-menu-items button {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%; text-align: left; border: none;
+  border-radius: 6px; padding: 0.35rem 0.5rem; color: var(--text); font-size: 0.9rem;
+}
+.page-menu-items button:hover, .page-menu-items button:focus-visible { background: var(--surface); }
+.page-menu-items .icon { width: 15px; height: 15px; }
+.page-header:has(.page-menu) h1 { padding-right: 2.5rem; }
+dialog.confirm-delete {
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text);
+  padding: 1rem 1.5rem; max-width: min(30rem, 90vw);
+}
+dialog.confirm-delete::backdrop { background: rgb(0 0 0 / 0.35); }
+dialog.confirm-delete h2 { margin-top: 0; font-size: 1.15rem; }
+dialog.confirm-delete .error { color: var(--todo); }
+.dialog-buttons { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
+button.danger { color: var(--bg); background: var(--todo); border-color: var(--todo); }
+button.danger:hover { color: var(--bg); background: var(--todo); filter: brightness(1.1); }

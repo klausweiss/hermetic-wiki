@@ -3,7 +3,7 @@
 // a block to edit its markdown, use the outliner keys, and changes are saved to the
 // note file. The page is updated in place from each rebuild instead of reloading.
 
-import { EDITING_ATTR, OPEN_TODAY, PAGES_CHANGED, readEnv, readPanes, whenParsed, withPanes } from "@hermetic/core";
+import { EDITING_ATTR, OPEN_TODAY, PAGES_CHANGED, icon, readEnv, readPanes, whenParsed, withPanes } from "@hermetic/core";
 
 import { Conflict, type Refused, SaveQueue, type SaveState, SourceApi } from "./api";
 import { type Doc, type Node, type Payload, flatten, fromPayload, newNode } from "./model";
@@ -151,8 +151,8 @@ export class HermeticEditor extends HTMLElement {
     });
 
     try {
-      // Kept for a few seconds rather than removed: a write can reload the page twice
-      // (its rebuild, then the action itself), and editing should start after both.
+      // Kept for a few seconds rather than removed, so a page that is loaded twice in a
+      // row (e.g. reloaded by the browser) still starts editing.
       const start = JSON.parse(sessionStorage.getItem(START_KEY) ?? "null") as { path: string; at: number } | null;
       if (start?.path === path && Date.now() - start.at < START_MS) this.startFirst();
     } catch {
@@ -197,8 +197,8 @@ export class HermeticEditor extends HTMLElement {
     button.textContent = "Write a home page";
     button.addEventListener("click", async () => {
       button.disabled = true;
-      // Before the write: the rebuild may reload this page before the write returns.
       startAfterLoad("index.html");
+      holdLiveReload();
       try {
         await this.api.put("index.html", "missing", "-\n");
       } catch (e) {
@@ -223,11 +223,10 @@ export class HermeticEditor extends HTMLElement {
   }
 
   private async openToday(path: string): Promise<void> {
+    holdLiveReload();
     try {
       const p = await this.api.get(path);
-      // Start writing only in a day without content; otherwise just show it. Recorded
-      // before creating the day: its rebuild may reload this page (the journal list)
-      // before the write returns.
+      // Start writing only in a day without content; otherwise just show it.
       if (p.blocks.every((b) => b.body.trim() === "")) startAfterLoad(path);
       if (!p.exists) {
         try {
@@ -258,6 +257,7 @@ export class HermeticEditor extends HTMLElement {
    * same position.
    */
   private resync(payload: Payload, html: Element | null): void {
+    this.showPageMenu(payload);
     const before = this.doc ? flatten(this.doc).map((e) => e.node) : [];
     const activeIndex = this.active ? before.indexOf(this.active.node) : -1;
     this.doc = fromPayload(payload);
@@ -361,6 +361,125 @@ export class HermeticEditor extends HTMLElement {
       ul.append(li);
     }
     return ul;
+  }
+
+  // --- Deleting the page ----------------------------------------------------------------
+
+  /**
+   * The page's actions menu: a small menu button in the page header ("Delete page" is
+   * its one action, so the menu is shown only while the page has a file).
+   */
+  private showPageMenu(payload: Payload): void {
+    const header = document.querySelector("main > article.page > header.page-header");
+    let menu = header?.querySelector<HTMLElement>(".page-menu") ?? null;
+    if (!header || !payload.exists) {
+      menu?.remove();
+      return;
+    }
+    if (!menu) {
+      menu = document.createElement("div");
+      menu.className = "page-menu";
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "page-menu-button";
+      toggle.setAttribute("aria-label", "Page actions");
+      toggle.title = "Page actions";
+      toggle.setAttribute("aria-haspopup", "menu");
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.append(icon("menu"));
+      const items = document.createElement("div");
+      items.className = "page-menu-items";
+      items.setAttribute("role", "menu");
+      items.hidden = true;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "page-delete";
+      remove.setAttribute("role", "menuitem");
+      remove.append(icon("trash-2"), "Delete page");
+      items.append(remove);
+      menu.append(toggle, items);
+      header.append(menu);
+
+      const close = (focusToggle: boolean) => {
+        items.hidden = true;
+        toggle.setAttribute("aria-expanded", "false");
+        if (focusToggle) toggle.focus();
+      };
+      toggle.addEventListener("click", () => {
+        const open = items.hidden;
+        items.hidden = !open;
+        toggle.setAttribute("aria-expanded", String(open));
+        if (open) remove.focus();
+      });
+      remove.addEventListener("click", () => {
+        close(false);
+        void this.confirmDelete();
+      });
+      menu.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && !items.hidden) {
+          e.preventDefault();
+          e.stopPropagation();
+          close(true);
+        }
+      });
+      document.addEventListener("click", (e) => {
+        if (!items.hidden && !menu!.contains(e.target as globalThis.Node)) close(false);
+      });
+    }
+    menu.dataset.file = payload.file;
+  }
+
+  private async confirmDelete(): Promise<void> {
+    const file = document.querySelector<HTMLElement>(".page-menu")?.dataset.file ?? "";
+    const count = Number(document.querySelector("section.linked-refs h2 .count")?.textContent ?? "0") || 0;
+    const dialog = document.createElement("dialog");
+    dialog.className = "confirm-delete";
+    const heading = document.createElement("h2");
+    heading.textContent = "Delete this page?";
+    const what = document.createElement("p");
+    what.append("The file ");
+    const code = document.createElement("code");
+    code.textContent = file;
+    what.append(code, " will be moved to .trash/ in the notes folder; move it back to restore the page.");
+    const refs = document.createElement("p");
+    refs.textContent =
+      count === 0
+        ? "No block on another page references it."
+        : `${count} block${count === 1 ? "" : "s"} on other pages reference${count === 1 ? "s" : ""} it; the page stays, without content, for ${count === 1 ? "that reference" : "those references"}.`;
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.textContent = "Cancel";
+    cancel.autofocus = true;
+    const confirm = document.createElement("button");
+    confirm.type = "button";
+    confirm.className = "danger";
+    confirm.textContent = "Move to trash";
+    const error = document.createElement("p");
+    error.className = "error";
+    error.hidden = true;
+    const buttons = document.createElement("div");
+    buttons.className = "dialog-buttons";
+    buttons.append(cancel, confirm);
+    dialog.append(heading, what, refs, error, buttons);
+    this.append(dialog);
+    dialog.addEventListener("close", () => dialog.remove());
+    cancel.addEventListener("click", () => dialog.close());
+    confirm.addEventListener("click", async () => {
+      confirm.disabled = true;
+      this.end(false);
+      try {
+        await this.api.delete(this.path, this.queue?.version ?? "");
+        location.href = new URL("index.html", this.root).href;
+      } catch (e) {
+        error.hidden = false;
+        error.textContent =
+          e instanceof Conflict
+            ? "The page changed since it was loaded; nothing was deleted. Reload and try again."
+            : "The page could not be deleted; nothing was changed.";
+        confirm.disabled = false;
+      }
+    });
+    dialog.showModal();
   }
 
   // --- Task labels ----------------------------------------------------------------------
@@ -760,6 +879,15 @@ async function advanceRemote(api: SourceApi, path: string, anchor: string): Prom
       if (!(e instanceof Conflict) || attempt > 0) throw e;
     }
   }
+}
+
+/**
+ * Keeps live reload from reloading this page while an action that writes a note
+ * navigates away by itself: the write's rebuild would otherwise reload the page first
+ * and cut the action off (live reload hands changes to the editor instead).
+ */
+function holdLiveReload(): void {
+  document.documentElement.setAttribute(EDITING_ATTR, "");
 }
 
 /** Records (or clears) the page whose first block to edit once it has loaded. */

@@ -79,7 +79,7 @@ describe("serialize", () => {
   });
 
   test("an empty page gets its first block", () => {
-    const doc = fromPayload({ exists: false, version: "missing", text: "", indent: "  ", blocks: [] });
+    const doc = fromPayload({ exists: false, file: "pages/new.md", version: "missing", text: "", indent: "  ", blocks: [] });
     expect(serialize(doc)).toBe("");
     doc.roots.push({ body: "first note", bullet: true, children: [] });
     expect(serialize(doc)).toBe("- first note\n");
@@ -133,7 +133,7 @@ describe("outliner operations", () => {
 
   test("Tab and Shift+Tab (Indent and outdent)", () => {
     const doc = fromPayload({
-      exists: true, version: "v", text: "- a\n- b\n- c\n", indent: "  ",
+      exists: true, file: "pages/t.md", version: "v", text: "- a\n- b\n- c\n", indent: "  ",
       blocks: [
         { lines: [0, 1], first: 0, depth: 0, bullet: true, anchor: "b1", body: "a", column: 2 },
         { lines: [1, 2], first: 1, depth: 0, bullet: true, anchor: "b2", body: "b", column: 2 },
@@ -189,7 +189,7 @@ describe("outliner operations", () => {
 
   test("Backspace joins with the previous block (Join with previous)", () => {
     const doc = fromPayload({
-      exists: true, version: "v", text: "- one\n- two\n", indent: "  ",
+      exists: true, file: "pages/t.md", version: "v", text: "- one\n- two\n", indent: "  ",
       blocks: [
         { lines: [0, 1], first: 0, depth: 0, bullet: true, anchor: "b1", body: "one", column: 2 },
         { lines: [1, 3], first: 1, depth: 0, bullet: true, anchor: "b2", body: "two", column: 2 },

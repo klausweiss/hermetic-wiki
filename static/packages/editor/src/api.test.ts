@@ -6,7 +6,7 @@ import type { Payload } from "./model";
 const ROOT = new URL("http://127.0.0.1:8000/");
 
 function payload(version: string, text = ""): Payload {
-  return { exists: true, version, text, indent: "  ", blocks: [] };
+  return { exists: true, file: "pages/a.md", version, text, indent: "  ", blocks: [] };
 }
 
 interface Call {

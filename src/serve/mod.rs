@@ -373,8 +373,8 @@ fn handle(state: &State, mut stream: TcpStream) -> io::Result<()> {
     stream.write_all(&http::response(200, content_type, &body, head))
 }
 
-/// The edit API: `GET` returns a page's source payload, `PUT` saves it (see
-/// `browser-editing`). Returns the status and body.
+/// The edit API: `GET` returns a page's source payload, `PUT` saves it, `DELETE` moves
+/// its file to the trash (see `browser-editing`). Returns the status and body.
 fn source(
     state: &State,
     request: &http::Request,
@@ -382,10 +382,11 @@ fn source(
     same_machine: bool,
 ) -> (u16, Vec<u8>) {
     let put = request.method == "PUT";
-    if !put && request.method != "GET" {
+    let delete = request.method == "DELETE";
+    if !put && !delete && request.method != "GET" {
         return (405, Vec::new());
     }
-    if !same_machine || (put && !edit::from_editor(request)) {
+    if !same_machine || ((put || delete) && !edit::from_editor(request)) {
         return (403, Vec::new());
     }
     let body = if put {
@@ -415,10 +416,32 @@ fn source(
         Err(e) if e.kind() == io::ErrorKind::NotFound => None,
         Err(e) => return (500, format!("{e}\n").into_bytes()),
     };
-    let payload = |bytes: Option<&[u8]>| match edit::source_json(bytes) {
+    let file = edit::source_path(&page);
+    let payload = |bytes: Option<&[u8]>| match edit::source_json(&file, bytes) {
         Some(json) => (200, json.into_bytes()),
         None => (500, b"the file is not UTF-8\n".to_vec()),
     };
+    if delete {
+        let Some(bytes) = current else {
+            return (404, b"the page has no file\n".to_vec());
+        };
+        if request.header(edit::VERSION_HEADER) != Some(edit::version(Some(&bytes)).as_str()) {
+            let (status, json) = payload(Some(&bytes));
+            return (if status == 200 { 409 } else { status }, json);
+        }
+        let trashed = match edit::move_to_trash(&state.notes, &target) {
+            Ok(trashed) => trashed,
+            Err(edit::Unsafe::Outside) => return (403, b"outside the notes\n".to_vec()),
+            Err(edit::Unsafe::Io(e)) => return (500, format!("{e}\n").into_bytes()),
+        };
+        *state.snapshot.lock().expect("snapshot lock") = watch::snapshot(&state.notes);
+        rebuild(state);
+        let json = format!(
+            "{{\"deleted\":true,\"trash\":{}}}",
+            json_string(&trashed.to_string_lossy())
+        );
+        return (200, json.into_bytes());
+    }
     let Some(body) = body else {
         return payload(current.as_deref());
     };

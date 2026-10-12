@@ -263,10 +263,84 @@ pub fn write_atomic(root: &Path, path: &Path, bytes: &[u8]) -> Result<(), Unsafe
     Ok(result?)
 }
 
-/// The source payload: whether the page has a file, its version, its text (LF line
+/// The trash, in the notes root: a dot-directory, so the build and the watcher ignore it.
+pub const TRASH_DIR: &str = ".trash";
+
+/// Moves `path` (a checked target, see [`checked_target`]) to
+/// `.trash/<timestamp>/<its path relative to root>`, then removes directories under
+/// `pages/` that this left empty. Returns the trash path relative to `root`.
+pub fn move_to_trash(root: &Path, path: &Path) -> Result<PathBuf, Unsafe> {
+    if !allowed(root, path) {
+        return Err(Unsafe::Outside);
+    }
+    let rel = path.strip_prefix(root).map_err(|_| Unsafe::Outside)?;
+    let stamp = timestamp(std::time::SystemTime::now());
+    let mut trashed = PathBuf::from(TRASH_DIR).join(&stamp).join(rel);
+    let mut n = 1;
+    while root.join(&trashed).exists() {
+        n += 1;
+        trashed = PathBuf::from(TRASH_DIR)
+            .join(format!("{stamp}-{n}"))
+            .join(rel);
+    }
+    // `.trash` must not lead out of the notes (e.g. as a symbolic link): checked before
+    // anything is created in it, and again after.
+    let trash = root.join(TRASH_DIR);
+    if fs::symlink_metadata(&trash).is_ok() && !fs::canonicalize(&trash)?.starts_with(root) {
+        return Err(Unsafe::Outside);
+    }
+    let dest = root.join(&trashed);
+    let dir = dest.parent().ok_or(Unsafe::Outside)?;
+    fs::create_dir_all(dir)?;
+    if !fs::canonicalize(dir)?.starts_with(root) {
+        return Err(Unsafe::Outside);
+    }
+    fs::rename(path, &dest)?;
+    prune_empty_dirs(root, path.parent());
+    Ok(trashed)
+}
+
+/// Removes now-empty directories from `dir` upwards, inside `pages/` only (never
+/// `pages/` itself).
+fn prune_empty_dirs(root: &Path, mut dir: Option<&Path>) {
+    let pages = root.join(PAGES_DIR);
+    while let Some(d) = dir {
+        if d == pages || !d.starts_with(&pages) || fs::remove_dir(d).is_err() {
+            return;
+        }
+        dir = d.parent();
+    }
+}
+
+/// A UTC timestamp usable in file names on every platform: `2026-10-12T14-03-05Z`.
+fn timestamp(time: std::time::SystemTime) -> String {
+    let secs = time
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs()) as i64;
+    let (days, rest) = (secs.div_euclid(86_400), secs.rem_euclid(86_400));
+    // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}-{:02}-{:02}Z",
+        rest / 3600,
+        rest % 3600 / 60,
+        rest % 60
+    )
+}
+
+/// The source payload: whether the page has a file, the file's path relative to the
+/// notes root (where it is or would be), its version, its text (LF line
 /// endings), the indentation unit for new children, and its blocks in document order.
 /// `None` when the file is not UTF-8.
-pub fn source_json(bytes: Option<&[u8]>) -> Option<String> {
+pub fn source_json(file: &Path, bytes: Option<&[u8]>) -> Option<String> {
     let text = match bytes {
         Some(b) => std::str::from_utf8(b).ok()?.replace("\r\n", "\n"),
         None => String::new(),
@@ -274,8 +348,9 @@ pub fn source_json(bytes: Option<&[u8]>) -> Option<String> {
     let blocks = parse::parse_blocks(&text);
     let mut depths: Vec<u32> = Vec::with_capacity(blocks.len());
     let mut out = format!(
-        "{{\"exists\":{},\"version\":{},\"text\":{},\"indent\":{},\"blocks\":[",
+        "{{\"exists\":{},\"file\":{},\"version\":{},\"text\":{},\"indent\":{},\"blocks\":[",
         bytes.is_some(),
+        json_string(&file.to_string_lossy().replace('\\', "/")),
         json_string(&version(bytes)),
         json_string(&text),
         json_string(&indent_unit(&text)),
@@ -385,6 +460,14 @@ mod tests {
     }
 
     #[test]
+    fn timestamps() {
+        let at = |s: u64| timestamp(std::time::UNIX_EPOCH + std::time::Duration::from_secs(s));
+        assert_eq!(at(0), "1970-01-01T00-00-00Z");
+        assert_eq!(at(1_791_806_585), "2026-10-12T12-03-05Z");
+        assert_eq!(at(951_782_400), "2000-02-29T00-00-00Z");
+    }
+
+    #[test]
     fn versions() {
         assert_eq!(version(None), "missing");
         assert_eq!(version(Some(b"")), "cbf29ce484222325");
@@ -434,8 +517,15 @@ mod tests {
 
     #[test]
     fn payload() {
-        let json = source_json(Some(b"intro\n\n- a\n  id:: x1\n\t- b\r\n  more\n- \n")).unwrap();
-        assert!(json.starts_with(r#"{"exists":true,"version":""#), "{json}");
+        let json = source_json(
+            Path::new("pages/a.md"),
+            Some(b"intro\n\n- a\n  id:: x1\n\t- b\r\n  more\n- \n"),
+        )
+        .unwrap();
+        assert!(
+            json.starts_with(r#"{"exists":true,"file":"pages/a.md","version":""#),
+            "{json}"
+        );
         assert!(json.contains(r#""indent":"\u0009""#), "{json}");
         assert!(json.contains(r#"{"lines":[0,2],"first":0,"depth":0,"bullet":false,"anchor":"b1","body":"intro","column":0}"#), "{json}");
         assert!(json.contains(r#"{"lines":[2,4],"first":2,"depth":0,"bullet":true,"anchor":"id-x1","body":"a\u000aid:: x1","column":2}"#), "{json}");
@@ -449,12 +539,12 @@ mod tests {
             json.contains(r#""anchor":"b4","body":"","column":2"#),
             "{json}"
         );
-        let none = source_json(None).unwrap();
+        let none = source_json(Path::new("pages/b.md"), None).unwrap();
         assert_eq!(
             none,
-            r#"{"exists":false,"version":"missing","text":"","indent":"  ","blocks":[]}"#
+            r#"{"exists":false,"file":"pages/b.md","version":"missing","text":"","indent":"  ","blocks":[]}"#
         );
-        assert_eq!(source_json(Some(b"\xff")), None);
+        assert_eq!(source_json(Path::new("x.md"), Some(b"\xff")), None);
     }
 
     #[cfg(unix)]

@@ -130,7 +130,7 @@ fn read_a_page() {
     assert_eq!(r.status, 200);
     assert!(
         r.body
-            .starts_with(r#"{"exists":false,"version":"missing","text":"""#),
+            .starts_with(r#"{"exists":false,"file":"pages/JWT.md","version":"missing","text":"""#),
         "{}",
         r.body
     );
@@ -433,8 +433,11 @@ fn typescript_test_fixtures_are_current() {
         .flatten()
     {
         let name = entry.file_name().to_string_lossy().replace(".md", ".json");
-        let json =
-            hermetic::serve::edit::source_json(Some(&fs::read(entry.path()).unwrap())).unwrap();
+        let json = hermetic::serve::edit::source_json(
+            &Path::new("pages").join(entry.file_name()),
+            Some(&fs::read(entry.path()).unwrap()),
+        )
+        .unwrap();
         expected.insert(
             std::path::PathBuf::from(name),
             format!("{json}\n").into_bytes(),
@@ -451,4 +454,149 @@ fn typescript_test_fixtures_are_current() {
         target.is_dir() && common::tree(&target) == expected,
         "static/packages/editor/test-fixtures is out of date: run UPDATE_SNAPSHOTS=1 cargo test --test edit"
     );
+}
+
+fn delete_source(addr: SocketAddr, path: &str, version: &str) -> Response {
+    send(
+        addr,
+        "DELETE",
+        &source_url(path),
+        &editor_headers(addr, version),
+        "",
+    )
+}
+
+/// Files under `.trash/`, relative to it.
+fn trashed(notes: &Path) -> Vec<String> {
+    common::tree(&notes.join(".trash"))
+        .keys()
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect()
+}
+
+#[test]
+fn delete_a_page() {
+    let notes = Notes::new(&[
+        ("pages/scratch.md", "- temporary\n"),
+        ("journals/2026-10-12.md", "- day\n"),
+    ]);
+    let server = start(notes.path());
+    let version = field(
+        &get_source(server.addr, "pages/scratch.html").body,
+        "version",
+    );
+    let before = server.rebuilds();
+    let r = delete_source(server.addr, "pages/scratch.html", &version);
+    assert_eq!(r.status, 200, "{}", r.body);
+    assert!(!notes.path().join("pages/scratch.md").exists());
+    let trash = trashed(notes.path());
+    assert_eq!(trash.len(), 1);
+    assert!(
+        trash[0].ends_with("pages/scratch.md") && r.body.contains(&trash[0]),
+        "{trash:?} {}",
+        r.body
+    );
+    assert_eq!(
+        fs::read_to_string(notes.path().join(".trash").join(&trash[0])).unwrap(),
+        "- temporary\n"
+    );
+    // Rebuilt before the response; once, and the trash is not picked up.
+    assert!(!page(server.addr, "pages/scratch.html").contains("temporary"));
+    std::thread::sleep(Duration::from_millis(400));
+    assert_eq!(server.rebuilds(), before + 1);
+    assert_eq!(
+        fs::read_to_string(notes.path().join("journals/2026-10-12.md")).unwrap(),
+        "- day\n"
+    );
+}
+
+#[test]
+fn delete_keeps_referenced_pages_and_prunes_directories() {
+    let notes = Notes::new(&[
+        ("pages/redis.md", "- cache\n"),
+        ("pages/Project X/Auth.md", "- auth\n"),
+        ("journals/2026-10-12.md", "- [[redis]]\n"),
+    ]);
+    let server = start(notes.path());
+    let v = field(&get_source(server.addr, "pages/redis.html").body, "version");
+    assert_eq!(
+        delete_source(server.addr, "pages/redis.html", &v).status,
+        200
+    );
+    let redis = page(server.addr, "pages/redis.html");
+    assert!(
+        !redis.contains("cache") && redis.contains("Linked references"),
+        "{redis}"
+    );
+    // The page has no file now: deleting again is 404.
+    assert_eq!(
+        delete_source(server.addr, "pages/redis.html", &v).status,
+        404
+    );
+
+    let v = field(
+        &get_source(server.addr, "pages/Project X/Auth.html").body,
+        "version",
+    );
+    assert_eq!(
+        delete_source(server.addr, "pages/Project X/Auth.html", &v).status,
+        200
+    );
+    assert!(!notes.path().join("pages/Project X").exists());
+    assert!(notes.path().join("pages").is_dir());
+    assert_eq!(trashed(notes.path()).len(), 2);
+}
+
+#[test]
+fn delete_with_a_stale_version_or_from_elsewhere() {
+    let notes = Notes::new(&[("pages/a.md", "- a\n")]);
+    let server = start(notes.path());
+    let addr = server.addr;
+    let v = field(&get_source(addr, "pages/a.html").body, "version");
+    notes.write("pages/a.md", b"- changed\n");
+    let r = delete_source(addr, "pages/a.html", &v);
+    assert_eq!(r.status, 409);
+    assert!(r.body.contains("changed"));
+    let v = field(&r.body, "version");
+    // Cross-site: other origin, or no edit header.
+    let target = source_url("pages/a.html");
+    let evil = vec![
+        ("Origin", "https://evil.example".to_owned()),
+        ("X-Hermetic-Edit", "1".to_owned()),
+        ("X-Hermetic-Version", v.clone()),
+    ];
+    assert_eq!(send(addr, "DELETE", &target, &evil, "").status, 403);
+    let no_header = vec![
+        editor_headers(addr, &v)[0].clone(),
+        ("X-Hermetic-Version", v.clone()),
+    ];
+    assert_eq!(send(addr, "DELETE", &target, &no_header, "").status, 403);
+    assert_eq!(
+        send(
+            addr,
+            "DELETE",
+            "/pages/a.html",
+            &editor_headers(addr, &v),
+            ""
+        )
+        .status,
+        405
+    );
+    assert!(notes.path().join("pages/a.md").exists());
+    assert!(!notes.path().join(".trash").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn delete_never_leaves_the_notes() {
+    let outside = Notes::empty();
+    let notes = Notes::new(&[("pages/a.md", "- a\n")]);
+    // A `.trash` that is a symbolic link out of the notes is refused.
+    std::os::unix::fs::symlink(outside.path(), notes.path().join(".trash")).unwrap();
+    let server = start(notes.path());
+    let v = field(&get_source(server.addr, "pages/a.html").body, "version");
+    assert_eq!(delete_source(server.addr, "pages/a.html", &v).status, 403);
+    assert!(notes.path().join("pages/a.md").exists());
+    // Not even an empty directory was created there.
+    assert_eq!(fs::read_dir(outside.path()).unwrap().count(), 0);
 }

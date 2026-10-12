@@ -20,6 +20,8 @@ export interface PayloadBlock {
 /** The source payload of one page. */
 export interface Payload {
   exists: boolean;
+  /** The page's file relative to the notes root (where it is, or would be created). */
+  file: string;
   version: string;
   /** The file's text with LF line endings. */
   text: string;

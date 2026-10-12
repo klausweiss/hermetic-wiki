@@ -37,6 +37,16 @@ export class SourceApi {
     return (await r.json()) as Payload;
   }
 
+  /** Moves the page's file to the trash, if it is still at `version`. */
+  async delete(path: string, version: string): Promise<void> {
+    const r = await this.fetchFn(this.url(path), {
+      method: "DELETE",
+      headers: { "X-Hermetic-Edit": "1", "X-Hermetic-Version": version },
+    });
+    if (r.status === 409) throw new Conflict((await r.json()) as Payload);
+    if (!r.ok) throw new Refused(r.status);
+  }
+
   /** Saves `text` as the page's source, based on `version`. Network errors throw TypeError. */
   async put(path: string, version: string, text: string): Promise<Payload> {
     const r = await this.fetchFn(this.url(path), {

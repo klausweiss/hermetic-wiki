@@ -1,0 +1,27 @@
+# Proposal
+
+## Why
+
+hermetic has zero configuration, so everything it does depends on conventions: which files become pages, how `journals/` and the root `index.md` are treated, what `[[links]]`, `#tags`, `((ids))`, properties, and `TODO` markers mean, and how backlinks and tasks are collected. Today these rules are written down only in the OpenSpec specs inside the repository. A user writing notes has nowhere to look them up, and `hermetic --help` only lists commands.
+
+## What Changes
+
+- **`hermetic help`** prints a complete, plain-text reference to standard output: the commands, how a notes directory is read (`journals/`, `pages/`, namespaces, `index.md`, `assets/`, what is ignored, file-name encoding, case-insensitive names), the note syntax (blocks and nesting, properties, block ids, tasks, page links, tags, markdown links, block references, code exclusions and escapes), and how pages are assembled from it (implicit pages, linked references, inherited references and tasks, related pages, namespace children, the home page, diagnostics).
+- **`hermetic help <topic>`** prints one section of that reference. Topics: `commands`, `layout`, `syntax`, `pages`. An unknown topic prints an error and the list of topics to standard error and exits with status 2.
+- **`hermetic --help`, `-h`, and no arguments** keep printing the short usage, which gains a line pointing to `hermetic help`. `hermetic help` stops being an alias for `--help` — it now prints the longer reference instead of the short usage.
+- The reference describes only what is implemented. Text stays within 80 columns, uses no colors or pager, and is built into the binary like every other asset.
+
+## Capabilities
+
+### New Capabilities
+<!-- none -->
+
+### Modified Capabilities
+- `cli`: adds a "Help reference" requirement (the `help` command, its topics, and what the reference must cover), and changes "Usage and version" so the short usage mentions `hermetic help` and `help` is no longer an alias for `--help`.
+
+## Impact
+
+- `src/main.rs`: new `help` dispatch; `USAGE` gains a line.
+- New `src/help.rs` (or text files under `src/help/` pulled in with `include_str!`) holding the reference sections.
+- `tests/cli.rs`: tests for `help`, each topic, unknown topics, line width, and that the reference's syntax examples behave as described when built.
+- No new dependencies; no change to `build`, `serve`, or the generated site.

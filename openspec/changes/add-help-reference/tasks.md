@@ -1,0 +1,21 @@
+# Tasks
+
+## 1. Help module and dispatch
+
+- [ ] 1.1 Add `src/help.rs` (exported from `src/lib.rs`) with the topic list `commands`, `layout`, `syntax`, `pages`, a lookup by name, and the full reference (title line plus the four sections joined by blank lines), each section read with `include_str!` from `src/help/<topic>.txt` (placeholder text for now); verify with a unit test that the full reference contains the four sections in order and lookup of an unknown name returns none
+- [ ] 1.2 In `src/main.rs`, stop matching `help` as an alias of `--help`; route `["help"]` to the full reference on stdout (exit 0), `["help", topic]` to that section (exit 0) or `error: unknown help topic ...` naming all topics on stderr with empty stdout (exit 2); add the `hermetic help [<topic>]` line to `USAGE`; verify with `tests/cli.rs` tests for the full reference, each topic, an unknown topic, `help a b` (usage on stderr, exit 2), and that `--help` lists `hermetic help` and is shorter than `hermetic help`
+- [ ] 1.3 Update the existing `help_and_version` test in `tests/cli.rs` for the new usage line and verify `cargo test --test cli` passes
+
+## 2. Reference text
+
+- [ ] 2.1 Write `src/help/commands.txt`: `build` (default output `site`, marker file and which output directories are refused, warnings never fail the build), `serve` (default directory `.`, `--port` with the next-free-port fallback, `--host`, `--public` and its exposure warning, no files written, rebuild and live reload), `help`, `--version`; verify each option and default against `src/main.rs` and `openspec/specs/cli` and `serve-mode`
+- [ ] 2.2 Write `src/help/layout.txt` covering every item the `layout` topic must cover in the `cli` "Help reference" requirement, including invalid journal names becoming regular pages with a warning, root `index.md` vs `pages/index.md` collision, `assets/` and non-markdown attachments copied as-is, ignored dotfiles and other root files, `%XX` escaping with one example, namespaces as subdirectories with `pages/Project X.md` beside `pages/Project X/`, and case-/normalization-insensitive names; verify against `openspec/specs/source-layout` and the attachment and home page requirements of `static-site-output`
+- [ ] 2.3 Write `src/help/syntax.txt` with a short example line for each construct the `syntax` topic must cover (bullets and nesting, multi-line blocks, prose outside bullets, `key:: value`, `id::`, `TODO`/`DOING`/`DONE`, `[[name]]`, `[[Project X/Auth Flow]]`, `[[2026-10-01]]`, `#tag`, `#[[multi word]]`, `[text](../pages/auth.md)`, `((id))`, and the code-span, fence, and `\[[` exclusions); verify against `openspec/specs/block-model` and `reference-graph`
+- [ ] 2.4 Add `tests/help.rs` with a table of every one-line `syntax.txt` example and its stated effect (reference target and kind, property, id, or task state), checked through `hermetic::parse` or a loaded graph, plus a check that each table entry's example text appears verbatim in the `syntax` section; verify `cargo test --test help` passes
+- [ ] 2.5 Add the worked example under `src/help/example/` (`index.md`, `journals/2026-10-12.md`, `pages/auth.md`) and write `src/help/pages.txt` covering every item the `pages` topic must cover, ending with the example files spliced in (indented, with their paths) and what they produce: an implicit page, a linked reference with breadcrumb, an inherited task, related pages, the home page; verify with a test in `tests/help.rs` that loads `src/help/example/` and asserts each stated outcome, and that the printed `pages` section contains each example file's text
+- [ ] 2.6 Add a test that every line of `hermetic help` is at most 80 characters and contains no `\x1b`; verify `cargo test` passes
+
+## 3. Integration check
+
+- [ ] 3.1 Run `cargo build --release`, read `hermetic help` and each `hermetic help <topic>` in an 80-column terminal end to end, and fix anything unclear or inaccurate; run `cargo test` and `cargo clippy --all-targets` with no failures or warnings
+- [ ] 3.2 Add a note to `openspec/changes/search/tasks.md` that applying `search` must also update `hermetic help` so the `pages` section describes the search box and `search.html`; verify the note is present

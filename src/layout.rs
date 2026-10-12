@@ -15,6 +15,9 @@ pub const ASSETS_DIR: &str = "assets";
 /// Directories under the notes root that are read as input.
 pub const INPUT_DIRS: [&str; 3] = [JOURNALS_DIR, PAGES_DIR, ASSETS_DIR];
 pub const EXTENSION: &str = ".md";
+/// The notes root's own markdown file: the page `index`, the site's home page.
+pub const ROOT_INDEX: &str = "index.md";
+pub const ROOT_INDEX_PAGE: &str = "index";
 
 /// Whether a file name is a markdown source file (`x.md`, not a bare `.md`).
 pub fn is_markdown(name: &str) -> bool {
@@ -370,6 +373,14 @@ pub fn scan(root: &Path, diags: &mut Vec<Diagnostic>) -> Vec<SourceFile> {
                 kind: SourceKind::Regular,
             });
         }
+    }
+
+    if root.join(ROOT_INDEX).is_file() {
+        pages.push(SourceFile {
+            rel: PathBuf::from(ROOT_INDEX),
+            name: ROOT_INDEX_PAGE.to_owned(),
+            kind: SourceKind::Regular,
+        });
     }
 
     journals.sort_by(|a, b| {

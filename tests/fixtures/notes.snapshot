@@ -23,6 +23,12 @@ journal "2026-10-12" (journals/2026-10-12.md)
       -> MdLink "../pages/old.md" = unresolved
   open task: "write the ADR for [auth](../pages/Project%20X/Auth%20Flow.md)"
   open task: "follow up on ((no-such-block)) and [old notes](../pages/old.md)"
+page "index" (index.md)
+  - "Welcome. Start with [[Project X]] or the [redis notes](pages/redis.md)." @1
+      -> Page "Project X" = page "Project X"
+      -> MdLink "pages/redis.md" = page "redis"
+  - TODO "keep this page current" @2
+  open task: "keep this page current"
 page "2026-13-01" (journals/2026-13-01.md)
   - "this file name is not a date" @1
 page "Project X" (pages/Project X.md)
@@ -32,8 +38,10 @@ page "Project X" (pages/Project X.md)
       -> Page "Project X/Auth Flow" = page "Project X/Auth Flow"
   - DONE "initial scoping" @4
   linked from "2026-09-30": "kickoff for [[Project X]] with [[Claude]]" via []
+  linked from "index": "Welcome. Start with [[Project X]] or the [redis notes](pages/redis.md)." via []
   open task: "pick a storage engine"
   related: "Claude" x1
+  related: "redis" x1
 page "Project X/Auth Flow" (pages/Project X/Auth Flow.md)
   namespace parent: "Project X"
   - "uses JWT" @1
@@ -52,7 +60,9 @@ page "redis" (pages/redis.md)
       id:: "ttl-bug"
   linked from "2026-10-12": "the TTL bug was ((ttl-bug))" via ["standup", "[[Project X/Auth Flow]] token refresh shipped"]
   linked from "2026-09-30": "looked at [[redis]] #ops" via ["kickoff for [[Project X]] with [[Claude]]"]
+  linked from "index": "Welcome. Start with [[Project X]] or the [redis notes](pages/redis.md)." via []
   related: "ops" x1
+  related: "Project X" x1
 page "Claude" (implicit)
   linked from "2026-10-12": "trip planning for [[Zürich]] and [[Claude]]" via []
   linked from "2026-09-30": "kickoff for [[Project X]] with [[Claude]]" via []
@@ -65,6 +75,7 @@ page "ops" (implicit)
 open task: "pick a storage engine"
 open task: "write the ADR for [auth](../pages/Project%20X/Auth%20Flow.md)"
 open task: "follow up on ((no-such-block)) and [old notes](../pages/old.md)"
+open task: "keep this page current"
 diagnostic InvalidJournalName: journals/2026-13-01.md: journal file name is not a valid YYYY-MM-DD date; treated as a regular page
 diagnostic InvalidUtf8: pages/broken.md: file is not valid UTF-8; skipped
 diagnostic DanglingBlockRef: journals/2026-10-12.md:6: no block has id `no-such-block`

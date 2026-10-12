@@ -312,14 +312,34 @@ fn pager(from: &Path, n: usize, paths: &[PathBuf]) -> String {
     out
 }
 
-/// `index.html`: file-backed journal days, newest first, grouped by month.
+/// `journals.html`: file-backed journal days, newest first, grouped by month.
 pub fn journal_index(site: &Site) -> OutFile {
-    let path = PathBuf::from("index.html");
-    let mut main = String::from(
-        "<article class=\"page index\">\n<header class=\"page-header\"><h1>Journals</h1></header>\n",
+    journal_list(site, PathBuf::from("journals.html"), "journals", "")
+}
+
+/// The default `index.html` when there is no `index.md`: the journal list, with a hint
+/// that adding `index.md` replaces it.
+pub fn default_home(site: &Site) -> OutFile {
+    journal_list(
+        site,
+        PathBuf::from("index.html"),
+        "home",
+        "<p class=\"hint\">Add an <code>index.md</code> to the notes folder to replace this page with your own home page.</p>\n",
+    )
+}
+
+fn journal_list(site: &Site, path: PathBuf, view: &str, footer: &str) -> OutFile {
+    let mut main = format!(
+        "<article class=\"page index\" data-view=\"{view}\">\n<header class=\"page-header\"><h1>Journals</h1></header>\n",
     );
     if site.journal_days.is_empty() {
         main.push_str("<p class=\"empty\">No journal entries yet. Add files like <code>journals/2026-10-12.md</code>.</p>\n");
+    }
+    // On the journal list, <hermetic-timeline> adds the timeline view around the list;
+    // without the script it is inert and the list inside shows as usual.
+    let timeline = view == "journals";
+    if timeline {
+        main.push_str("<hermetic-timeline>\n");
     }
     let months = site
         .journal_days
@@ -340,6 +360,10 @@ pub fn journal_index(site: &Site) -> OutFile {
         }
         main.push_str("</ul>\n");
     }
+    if timeline {
+        main.push_str("</hermetic-timeline>\n");
+    }
+    main.push_str(footer);
     main.push_str("</article>\n");
     OutFile {
         html: document(&site.title, &path, "Journals", &main),
@@ -361,7 +385,7 @@ pub fn all_pages(site: &Site) -> OutFile {
         (name.to_lowercase(), name.clone())
     });
     let mut main = format!(
-        "<article class=\"page index\">\n<header class=\"page-header\"><h1>All pages <span class=\"count\">{}</span></h1></header>\n<ul class=\"all-pages\">",
+        "<article class=\"page index\" data-view=\"pages\">\n<header class=\"page-header\"><h1>All pages <span class=\"count\">{}</span></h1></header>\n<ul class=\"all-pages\">",
         pages.len()
     );
     for p in pages {
@@ -398,7 +422,7 @@ pub fn task_files(site: &Site) -> Vec<OutFile> {
         let n = i + 1;
         let path = path.clone();
         let mut main = format!(
-            "<article class=\"page index\">\n<header class=\"page-header\"><h1>Open tasks <span class=\"count\">{}</span></h1></header>\n",
+            "<article class=\"page index\" data-view=\"tasks\">\n<header class=\"page-header\"><h1>Open tasks <span class=\"count\">{}</span></h1></header>\n",
             tasks.len()
         );
         match chunks.get(n - 1) {

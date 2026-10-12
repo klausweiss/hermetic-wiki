@@ -263,7 +263,8 @@ fn journal_index() {
         ("journals/2026-10-12.md", "- b"),
         ("journals/2026-10-01.md", "- c"),
     ]);
-    let html = main_of(&out, "index.html");
+    let html = main_of(&out, "journals.html");
+    assert!(html.contains(r#"data-view="journals""#));
     let pos = |s: &str| {
         html.find(s)
             .unwrap_or_else(|| panic!("missing {s}: {html}"))
@@ -453,4 +454,120 @@ fn output_inside_notes_root_is_not_read_as_notes() {
     assert!(report.diagnostics.is_empty());
     let (g, _) = hermetic::Graph::load(notes.path());
     assert_eq!(g.pages().count(), 1);
+}
+
+#[test]
+fn site_wide_pages() {
+    let (_n, _h, out, _) = built(&[("pages/a.md", "- x")]);
+    for f in ["index.html", "journals.html", "pages.html", "tasks.html"] {
+        assert!(out.join(f).is_file(), "{f}");
+    }
+}
+
+#[test]
+fn default_home_page() {
+    let (_n, _h, out, _) = built(&[("journals/2026-10-12.md", "- a")]);
+    let home = main_of(&out, "index.html");
+    assert!(home.contains(r#"data-view="home""#));
+    assert!(home.contains("2026-10-12.html"));
+    assert!(home.contains(r#"<p class="hint">"#) && home.contains("<code>index.md</code>"));
+    assert!(!main_of(&out, "journals.html").contains("class=\"hint\""));
+}
+
+#[test]
+fn custom_home_page() {
+    let (_n, _h, out, _) = built(&[
+        ("index.md", "- Start at [[auth]]"),
+        ("pages/auth.md", "- x"),
+        ("journals/2026-10-12.md", "- see [[index]]"),
+    ]);
+    let home = main_of(&out, "index.html");
+    assert!(
+        home.contains(r#"Start at <a class="page-ref" href="pages/auth.html">auth</a>"#),
+        "{home}"
+    );
+    assert!(!home.contains(r#"class="hint""#));
+    let auth = main_of(&out, "pages/auth.html");
+    assert!(
+        auth.contains(r#"<h3><a href="../index.html">index</a></h3>"#),
+        "{auth}"
+    );
+    let journal = main_of(&out, "journals/2026-10-12.html");
+    assert!(
+        journal.contains(r#"<a class="page-ref" href="../index.html">index</a>"#),
+        "{journal}"
+    );
+    assert!(main_of(&out, "pages.html").contains(r#"<a href="index.html">index</a>"#));
+    assert!(!out.join("pages/index.html").exists());
+}
+
+#[test]
+fn implicit_index_page_keeps_its_path() {
+    let (_n, _h, out, _) = built(&[("journals/2026-10-12.md", "- see [[index]]")]);
+    assert!(out.join("pages/index.html").is_file());
+    assert!(main_of(&out, "index.html").contains(r#"data-view="home""#));
+}
+
+#[test]
+fn html_hooks_for_the_script() {
+    let (_n, _h, out, _) = built(&[
+        ("journals/2026-10-12.md", "- [[auth]]"),
+        ("pages/auth.md", "- TODO x"),
+    ]);
+    for (file, view) in [
+        ("journals.html", "journals"),
+        ("pages.html", "pages"),
+        ("tasks.html", "tasks"),
+        ("index.html", "home"),
+    ] {
+        let html = read(&out, file);
+        assert!(
+            html.contains(r#"<meta name="hermetic-root" content=".">"#),
+            "{file}"
+        );
+        assert!(
+            main_of(&out, file).contains(&format!(
+                r#"<article class="page index" data-view="{view}">"#
+            )),
+            "{file}"
+        );
+    }
+    let page = read(&out, "pages/auth.html");
+    assert!(page.contains(r#"<meta name="hermetic-root" content="..">"#));
+    assert!(page.contains(r#"<section class="content">"#));
+    assert!(page.contains(r#"<section class="linked-refs">"#));
+    assert!(read(&out, "journals.html").contains(r#"<ul class="days">"#));
+}
+
+#[test]
+fn web_component_tags() {
+    let (_n, _h, out, _) = built(&[("journals/2026-10-12.md", "- [[auth]]")]);
+    for file in [
+        "index.html",
+        "journals.html",
+        "pages/auth.html",
+        "journals/2026-10-12.html",
+    ] {
+        let html = read(&out, file);
+        // Empty, so pages look the same without the script that defines them.
+        for tag in [
+            "hermetic-theme-toggle",
+            "hermetic-sidebar",
+            "hermetic-shortcuts",
+        ] {
+            assert_eq!(
+                html.matches(&format!("<{tag}></{tag}>")).count(),
+                1,
+                "{file}: {tag}"
+            );
+        }
+    }
+    // The timeline wraps the journal list on journals.html only.
+    let journals = main_of(&out, "journals.html");
+    let start = journals
+        .find("<hermetic-timeline>")
+        .expect("timeline on journals.html");
+    let end = journals.find("</hermetic-timeline>").unwrap();
+    assert!(journals[start..end].contains(r#"<ul class="days">"#));
+    assert!(!main_of(&out, "index.html").contains("hermetic-timeline"));
 }

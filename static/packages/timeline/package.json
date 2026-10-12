@@ -1,0 +1,8 @@
+{
+  "name": "@hermetic/timeline",
+  "private": true,
+  "type": "module",
+  "description": "<hermetic-timeline>: continuous journal view around the journal list.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@hermetic/core": "workspace:*" }
+}

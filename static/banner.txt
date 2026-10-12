@@ -1,0 +1,18 @@
+/*
+ * GENERATED FILE - DO NOT EDIT.
+ *
+ * This is hermetic's browser script: the web components in static/packages/,
+ * bundled from TypeScript (entry point: static/packages/app/src/main.ts) with Bun
+ * @BUN_VERSION@:
+ *
+ *     make -C static build
+ *     (in packages/app: bun build src/main.ts --target browser --minify
+ *      --banner <this comment> --outfile ../../dist/app.js)
+ *
+ * It is committed to the repository on purpose: the Rust binary embeds this file
+ * (src/site/assets.rs) and writes it to _hermetic/app.js in every generated site,
+ * and committing it keeps `cargo build` working on machines without Bun.
+ * `make -C static verify` (run by `make lint`) rebuilds it and fails if this copy
+ * is out of date. To change the script, edit the packages and run
+ * `make -C static build`.
+ */

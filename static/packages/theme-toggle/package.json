@@ -1,0 +1,12 @@
+{
+  "name": "@hermetic/theme-toggle",
+  "private": true,
+  "type": "module",
+  "description": "<hermetic-theme-toggle>: system, light, and dark theme switch.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@hermetic/core": "workspace:*"
+  }
+}

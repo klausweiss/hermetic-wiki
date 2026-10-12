@@ -1,0 +1,10 @@
+{
+  "name": "hermetic-frontend",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.2",
+  "workspaces": ["packages/*"],
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

@@ -48,12 +48,17 @@
   --doing: #1f5fbf;
   --done: #2e7d32;
   --broken: #c62828;
-  --measure: 46rem;
+  /* About 75 characters of body text per line. */
+  --measure: 40rem;
+  --sidebar-width: min(34rem, 42vw);
+  --sidebar-width-empty: 15rem;
   color-scheme: light;
 }
 
+/* Dark palette: follows the system unless the reader picked a theme (data-theme,
+   set by the script). The variables are repeated because CSS cannot share them. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #17181a;
     --surface: #202124;
     --text: #e6e6e3;
@@ -68,10 +73,25 @@
     color-scheme: dark;
   }
 }
+:root[data-theme="dark"] {
+  --bg: #17181a;
+  --surface: #202124;
+  --text: #e6e6e3;
+  --muted: #9a9ea5;
+  --border: #2f3134;
+  --link: #79a8ff;
+  --tag: #b49cff;
+  --todo: #ffb366;
+  --doing: #79a8ff;
+  --done: #7bc47f;
+  --broken: #ff6b6b;
+  color-scheme: dark;
+}
 
 * { box-sizing: border-box; }
 
 html { font-size: 17px; -webkit-text-size-adjust: 100%; }
+html, body { overflow-x: hidden; }
 
 body {
   margin: 0;
@@ -194,3 +214,90 @@ ul.tasks > li { margin: 0.3rem 0; }
   html { font-size: 16px; }
   .page-header h1 { font-size: 1.5rem; }
 }
+
+/* Default home page hint */
+
+.hint { margin-top: 2.5rem; font-size: 0.85rem; color: var(--muted); }
+
+/* Controls added by the script (never present without it) */
+
+button {
+  font: inherit; font-size: 0.85rem; color: var(--muted); background: none;
+  border: 1px solid var(--border); border-radius: 6px; padding: 0.1rem 0.55rem; cursor: pointer;
+}
+button:hover { color: var(--text); background: var(--surface); }
+hermetic-theme-toggle { margin-left: auto; }
+
+.view-toggle { display: inline-flex; gap: 0.25rem; margin-bottom: 1rem; }
+.view-toggle button[aria-pressed="true"] { color: var(--text); background: var(--surface); }
+
+/* Journal timeline */
+
+hermetic-timeline { display: block; }
+hermetic-timeline > .timeline { display: none; }
+hermetic-timeline.show-timeline > .timeline { display: block; }
+hermetic-timeline.show-timeline > h2, hermetic-timeline.show-timeline > ul.days { display: none; }
+.timeline-day { padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+.timeline-day > h2 { font-size: 1.3rem; margin-top: 1.75rem; }
+.timeline-sentinel { height: 1px; }
+.timeline-end { color: var(--muted); font-style: italic; text-align: center; margin: 2rem 0; }
+
+/* Sidebar */
+
+.sidebar { display: none; }
+.sidebar-open .sidebar {
+  display: flex; flex-direction: column;
+  position: fixed; top: 0; right: 0; bottom: 0; width: var(--sidebar-width);
+  background: var(--bg); border-left: 1px solid var(--border); z-index: 10;
+}
+/* The layout classes are on <html>, set before first paint. Transitions are enabled
+   (sidebar-animate) only once the page has settled, so loading a page never slides. */
+.sidebar-open body { padding-right: var(--sidebar-width); }
+.sidebar-open.sidebar-empty body { padding-right: var(--sidebar-width-empty); }
+.sidebar-open.sidebar-empty .sidebar { width: var(--sidebar-width-empty); }
+.sidebar-animate body, .sidebar-animate .sidebar { transition: padding-right 0.15s ease, width 0.15s ease; }
+
+/* The one hide/show control sits in the sidebar's top bar when it is open, and in the
+   same spot when it is hidden; the header keeps that corner free. */
+.sidebar-toggle { position: fixed; top: 0.55rem; right: 1rem; z-index: 11; background: var(--bg); }
+.sidebar-hidden .site-header { padding-right: calc(16px + 6.5rem); }
+.sidebar-bar {
+  display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 6rem 0.6rem 1rem;
+  border-bottom: 1px solid var(--border); font-size: 0.85rem; color: var(--muted);
+}
+.sidebar-bar span { margin-right: auto; font-weight: 600; }
+.panes { overflow-y: auto; flex: 1; padding: 0 1rem 2rem; }
+.sidebar-placeholder { margin: 1.5rem 1rem; color: var(--muted); font-size: 0.85rem; }
+.sidebar-placeholder[hidden], .sidebar-bar button[hidden] { display: none; }
+.pane {
+  border-bottom: 1px solid var(--border); padding: 0.5rem 0 1rem;
+  /* Off-screen panes are neither laid out nor painted. */
+  content-visibility: auto; contain-intrinsic-size: auto 30rem;
+}
+.pane.collapsed { contain-intrinsic-size: auto 2.5rem; }
+.pane.collapsed > .pane-body { display: none; }
+/* z-index keeps the sticky header above the positioned blocks scrolling under it. */
+.pane-header { display: flex; align-items: center; gap: 0.4rem; position: sticky; top: 0; z-index: 1; background: var(--bg); padding: 0.25rem 0; }
+.pane-title { font-weight: 650; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pane-collapse, .pane-close { border: none; padding: 0 0.3rem; font-size: 1rem; line-height: 1.4; }
+.pane-body { font-size: 0.92rem; }
+.pane-body .page-header h1 { font-size: 1.35rem; }
+.pane-body .page-header { display: none; }
+.pane-body [data-hermetic-target] > .block-body { background: var(--surface); border-radius: 4px; }
+
+@media (max-width: 900px) {
+  .sidebar-open body { padding-right: 0; }
+  .sidebar-open .sidebar, .sidebar-open.sidebar-empty .sidebar { width: 100%; left: 0; border-left: none; }
+}
+
+/* Keyboard shortcut help */
+
+dialog.shortcuts {
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text);
+  padding: 1rem 1.5rem; max-width: min(28rem, 90vw);
+}
+dialog.shortcuts::backdrop { background: rgb(0 0 0 / 0.35); }
+dialog.shortcuts h2 { margin-top: 0; }
+dialog.shortcuts dl { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 1rem; }
+dialog.shortcuts dt { font-family: "JetBrains Mono", monospace; font-size: 0.85rem; }
+dialog.shortcuts dd { margin: 0; }

@@ -38,6 +38,7 @@ fn fixture_file_list() {
     files.sort();
     let mut expected = [
         ".hermetic-site",
+        "_hermetic/app.js",
         "_hermetic/fonts/InterVariable-Italic.woff2",
         "_hermetic/fonts/InterVariable.woff2",
         "_hermetic/fonts/JetBrainsMono-Bold.woff2",
@@ -47,6 +48,7 @@ fn fixture_file_list() {
         "_hermetic/fonts/LICENSE-JetBrainsMono.txt",
         "_hermetic/style.css",
         "index.html",
+        "journals.html",
         "journals/2026-09-30.html",
         "journals/2026-10-12.html",
         "journals/2026-13-01.html",
@@ -145,7 +147,17 @@ fn no_external_resources() {
             continue;
         }
         let text = String::from_utf8(bytes).unwrap();
-        assert!(!text.contains("<script"), "{} has a script", path.display());
+        if ext == "html" {
+            // Only hermetic's own script, loaded by URL, never inline.
+            let depth = path.components().count() - 1;
+            let expected = format!("{}_hermetic/app.js", "../".repeat(depth));
+            assert_eq!(text.matches("<script").count(), 1, "{}", path.display());
+            assert!(
+                text.contains(&format!(r#"<script src="{expected}"></script>"#)),
+                "{} loads another script",
+                path.display()
+            );
+        }
         for url in urls(&text) {
             if is_external(&url) {
                 assert_eq!(

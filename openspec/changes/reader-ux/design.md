@@ -27,34 +27,37 @@ New constraints from the user: TypeScript compiled with Bun, as few JS dependenc
 ### Site-wide pages
 `journal_index` renders the list into `journals.html`. When the page `index` is file-backed, its own page file is `index.html`; otherwise `index.html` is the same list plus a `<p class="hint">` mentioning `index.md`. (An implicit page `index`, created by a `[[index]]` link without an `index.md`, keeps its normal path `pages/index.html`.) The header's title links to `index.html` and "Journals" to `journals.html`. `html::document` adds `<meta name="hermetic-root" content="…">` (`.` at the root) and `<script src="{root}/_hermetic/app.js"></script>` in `<head>` (not `defer`: see theming).
 
-### Frontend tree and toolchain
+### Frontend: web components in a Bun workspace (revised)
+Each feature is a standalone, reusable custom element in its own Bun project with its own `package.json`, `tsconfig.json`, `Makefile`, and tests. The projects form a Bun workspace (monorepo). Shared non-UI logic lives in `core`.
+
 ```
  static/
-   Makefile            build | check | test | verify | clean
-   package.json        private; devDependencies: { "typescript": "…" }; "packageManager": "bun@1.4.2"
+   Makefile              runs build/check/test in every package; verify; clean
+   package.json          private; workspaces: ["packages/*"]; devDependencies: typescript only
    bun.lock
-   tsconfig.json       strict, noEmit, lib ["dom", "es2022"], noUncheckedIndexedAccess
-   ts/
-     main.ts           entry: theme first, then the rest on DOMContentLoaded
-     env.ts            site root from <meta>, protocol check (http/https only)
-     links.ts          classify a link: page / block-in-page / other   (pure)
-     state.ts          pane list <-> URL query (?p=…, ~ prefix = collapsed) (pure)
-     fetchpage.ts      fetch + DOMParser, extract main article, absolutize href/src, strip ids
-     sidebar.ts        pane stack UI, collapse/close, overlay on narrow screens
-     timeline.ts       list/timeline toggle, batches of 5 days, IntersectionObserver
-     keys.ts           g-prefixed shortcuts, Escape, \, ?, help dialog
-     theme.ts          system/light/dark cycle stored in localStorage
-     *.test.ts         bun test for links, state, URL rewriting (no DOM library)
-   dist/app.js         committed build output, embedded by assets.rs
+   tsconfig.base.json    strict settings shared by all packages
+   types/bun-test.d.ts   minimal bun:test types (no @types/bun)
+   banner.txt            header of the committed bundle
+   dist/app.js           committed bundle, embedded by assets.rs
+   packages/
+     core/               @hermetic/core: env, link classification, pane URL state, fetchPage,
+                         whenParsed(); no UI, no custom elements
+     theme-toggle/       <hermetic-theme-toggle>
+     sidebar/            <hermetic-sidebar>: pane stack, Shift+click, URL state
+     timeline/           <hermetic-timeline>: wraps the journal list, adds the timeline view
+     shortcuts/          <hermetic-shortcuts>: keyboard shortcuts and help dialog
+     app/                imports every element, applies the theme first, builds dist/app.js
 ```
-- `make -C static build` runs `bun build ts/main.ts --target browser --minify --outfile dist/app.js`.
-- `make -C static check` runs `bunx tsc --noEmit`.
-- `make -C static test` runs `bun test`.
-- `make -C static verify` rebuilds into a temp file and fails if it differs from `dist/app.js`.
 
-The top-level `make lint` and `make test` call `check`/`verify` and `test` respectively.
+- Every package exports its element class and a `define()` function. `make build` in a component package bundles `src/register.ts` into its own `dist/<name>.js`, which proves the component works standalone. Those per-package bundles are build artifacts and are not committed.
+- The `app` package is the only bundle the site loads. It is built with the banner into `static/dist/app.js`.
+- Packages depend on `@hermetic/core` via `workspace:*`; TypeScript is the only (development) dependency, hoisted to the workspace root.
+- **Rust emits the tags.** `html::document` adds `<hermetic-theme-toggle>` to the header nav and `<hermetic-sidebar>`/`<hermetic-shortcuts>` at the end of `<body>`. `journals.html` wraps the month list in `<hermetic-timeline>`. Without JavaScript these are unknown, inert elements: the empty ones render nothing and the timeline's children (the list) render as usual.
+- **Light DOM.** Elements render into the page's DOM so panes, timeline days, and controls use the site stylesheet and theme variables; no shadow roots.
+- **Upgrade timing.** Because `app.js` runs in `<head>`, elements are defined before the body is parsed and are upgraded while their children are still missing; `core.whenParsed()` delays each element's setup until `DOMContentLoaded`.
+- `make -C static check` type-checks every package, `make -C static test` runs every package's `bun test`, and `make -C static verify` rebuilds `dist/app.js` and compares it with the committed copy.
 
-The compiled file is committed so the Rust build stays independent of Bun; `verify` keeps it honest.
+*Alternatives considered:* one file per component loaded separately (more requests, and the single-script rule would change); the script creating the elements at runtime (less declarative); shadow DOM (page content needs the site CSS, and theming would be duplicated).
 
 ### Banner on the compiled script
 `bun build` is run with `--banner` holding a block comment, so `dist/app.js` starts with an explanation that survives minification:
@@ -86,7 +89,7 @@ The banner text lives in `static/banner.txt` (with the Bun version filled in by 
 CSS keeps `@media (prefers-color-scheme: dark)` for the no-JS case, scoped as `:root:not([data-theme="light"])`, plus explicit `:root[data-theme="dark"]` / `[data-theme="light"]` blocks. The script is loaded synchronously in `<head>` and its first statement applies the stored theme to `<html data-theme>` before first paint; everything else waits for `DOMContentLoaded`. The theme toggle is created by the script, so it never appears without it.
 
 ### Sidebar mechanics
-- **Trigger:** a delegated `click` listener on `document` handles Shift+click on links classified as pages. Pages are same-origin `.html` paths under the site root, not under `_hermetic/`.
+- **Trigger:** `<hermetic-sidebar>` installs a delegated `click` listener on `document` that handles Shift+click on links classified as pages. Pages are same-origin `.html` paths under the site root, not under `_hermetic/`.
 - **Fetching a pane:** the target is fetched and `main > article` is extracted. Every `href`/`src` is rewritten to an absolute URL against the target's URL so relative links keep working. `id` attributes are removed so main-page anchors stay unique; when the link carried a fragment, the matching element is located first and scrolled into view.
 - **Navigation:** plain clicks on page links (main or pane) are intercepted only to carry the current `?p=` query into the next URL; navigation itself is a normal page load. Pane changes use `history.replaceState`, so the URL always reflects the panes without polluting history.
 - **Layout:** the layout becomes a two-column grid when the sidebar is open. Each pane has `content-visibility: auto; contain-intrinsic-size: auto 30rem`. Below 900px the sidebar is a fixed overlay with hide/show buttons.

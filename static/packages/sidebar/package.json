@@ -1,0 +1,8 @@
+{
+  "name": "@hermetic/sidebar",
+  "private": true,
+  "type": "module",
+  "description": "<hermetic-sidebar>: pages opened with Shift+click, stacked next to the current one.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@hermetic/core": "workspace:*" }
+}

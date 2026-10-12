@@ -216,3 +216,41 @@ fn scan_order_is_journals_by_date_then_pages_by_path() {
     let order: Vec<String> = g.blocks().map(|(_, b)| b.content.clone()).collect();
     assert_eq!(order, ["j1", "j2", "a", "az", "b"]);
 }
+
+#[test]
+fn home_page_source() {
+    let notes = Notes::new(&[
+        ("index.md", "- Start at [[auth]]"),
+        ("pages/auth.md", "- x"),
+    ]);
+    let (g, diags) = notes.load();
+    assert!(diags.is_empty(), "{diags:?}");
+    let index = g.page(page(&g, "index"));
+    assert_eq!(index.kind, PageKind::Regular);
+    assert_eq!(index.file, Some(PathBuf::from("index.md")));
+    // The home page takes part in the graph like any page.
+    assert_eq!(g.backlinks(page(&g, "auth")).len(), 1);
+}
+
+#[test]
+fn root_index_and_pages_index_collide() {
+    let notes = Notes::new(&[("index.md", "- home"), ("pages/index.md", "- other")]);
+    let (g, diags) = notes.load();
+    assert_eq!(kinds(&diags), [DiagnosticKind::CollidingFiles]);
+    assert!(
+        diags[0].message.contains("index.md, pages/index.md"),
+        "{}",
+        diags[0].message
+    );
+    let index = g.page(page(&g, "index"));
+    assert_eq!(index.file, Some(PathBuf::from("index.md")));
+    assert_eq!(contents(&g, index.roots.clone()), ["home"]);
+}
+
+#[test]
+fn other_root_files_are_still_ignored() {
+    let notes = Notes::new(&[("README.md", "- [[x]]"), ("notes.md", "- [[y]]")]);
+    let (g, diags) = notes.load();
+    assert!(diags.is_empty());
+    assert_eq!(g.pages().count(), 0);
+}

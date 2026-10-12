@@ -1,0 +1,7 @@
+{
+  "name": "@hermetic/core",
+  "private": true,
+  "type": "module",
+  "description": "Shared logic without UI: site root, links, pane URL state, page fetching.",
+  "exports": { ".": "./src/index.ts" }
+}

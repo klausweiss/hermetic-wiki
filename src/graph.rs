@@ -743,7 +743,10 @@ impl Resolver<'_> {
                         DiagnosticKind::LinkOutsideRoot,
                         file,
                         line,
-                        format!("link `{}` points outside journals/ and pages/", raw.text),
+                        format!(
+                            "link `{}` points outside journals/, pages/, and index.md",
+                            raw.text
+                        ),
                     ));
                     return None;
                 }
@@ -811,6 +814,9 @@ fn resolve_link_path(file: &Path, dest: &str) -> LinkPath {
             }
             s => parts.push(s.to_owned()),
         }
+    }
+    if parts.len() == 1 && parts[0] == layout::ROOT_INDEX {
+        return LinkPath::Page(layout::ROOT_INDEX_PAGE.to_owned());
     }
     let rel: PathBuf = parts.iter().collect();
     match parts.first().map(String::as_str) {

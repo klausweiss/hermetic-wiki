@@ -1,0 +1,8 @@
+{
+  "name": "@hermetic/shortcuts",
+  "private": true,
+  "type": "module",
+  "description": "<hermetic-shortcuts>: keyboard shortcuts and their help dialog.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@hermetic/core": "workspace:*" }
+}

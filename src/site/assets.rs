@@ -14,6 +14,12 @@ pub const EMBEDDED: &[(&str, &[u8])] = &[
         "_hermetic/style.css",
         include_bytes!("../../static/style.css"),
     ),
+    // Compiled from static/ts/ by `make -C static build`; committed so building
+    // hermetic needs no JavaScript tooling.
+    (
+        "_hermetic/app.js",
+        include_bytes!("../../static/dist/app.js"),
+    ),
     (
         "_hermetic/fonts/InterVariable.woff2",
         include_bytes!("../../static/fonts/InterVariable.woff2"),

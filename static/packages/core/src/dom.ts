@@ -1,0 +1,20 @@
+// Helpers for custom elements defined before the document body is parsed.
+
+/**
+ * Runs `fn` once the document has been parsed. hermetic's script runs in <head>, so
+ * elements are upgraded while their children are still missing; setup waits for them.
+ */
+export function whenParsed(fn: () => void): void {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", fn, { once: true });
+  } else {
+    fn();
+  }
+}
+
+/**
+ * Events through which components talk without depending on each other: dispatched on
+ * `document` by whoever wants the sidebar to act, handled by <hermetic-sidebar>.
+ */
+export const SIDEBAR_CLOSE_TOP = "hermetic-sidebar-close-top";
+export const SIDEBAR_TOGGLE = "hermetic-sidebar-toggle";

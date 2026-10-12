@@ -116,6 +116,10 @@ fn render_into(
         pages += 1;
     }
     let mut site_files = vec![pages::journal_index(&site), pages::all_pages(&site)];
+    // A root `index.md` is the page `index`, already written as `index.html`.
+    if !generated.contains(Path::new("index.html")) {
+        site_files.push(pages::default_home(&site));
+    }
     site_files.extend(pages::task_files(&site));
     for file in site_files {
         write(&file.path, file.html.as_bytes())?;

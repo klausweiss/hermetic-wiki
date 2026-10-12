@@ -1,0 +1,2 @@
+- Welcome. Start with [[Project X]] or the [redis notes](pages/redis.md).
+- TODO keep this page current

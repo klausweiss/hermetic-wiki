@@ -32,11 +32,11 @@ Pages SHALL be usable from 320px wide upward without horizontal page scrolling; 
 - **THEN** the page does not scroll horizontally and the table scrolls within its own box
 
 ### Requirement: Progressive enhancement
-The bundled script SHALL only add behavior to pages that are already complete without it. It SHALL activate interactive features (sidebar, timeline, keyboard shortcuts that fetch pages) only when the page is served over `http:` or `https:`; over `file:` it SHALL leave link behavior unchanged. Controls that need the script SHALL only be added by the script, so they never appear when it does not run. The script SHALL load no other resource from outside the output directory.
+The bundled script SHALL only add behavior to pages that are already complete without it. It SHALL activate features that fetch other pages (opening sidebar panes, the timeline) only when the page is served over `http:` or `https:`; over `file:` it SHALL leave link behavior unchanged and offer no control that cannot work, explaining in the sidebar instead why it stays empty. Controls that need the script SHALL only be added by the script, so they never appear when it does not run. The script SHALL load no other resource from outside the output directory.
 
 #### Scenario: Opened from disk with JavaScript enabled
 - **WHEN** a page is opened via `file://` with JavaScript enabled and the user Shift+clicks a page link
-- **THEN** the browser's default behavior happens and no sidebar or timeline control is shown
+- **THEN** the browser's default behavior happens, no pane opens, no timeline control is shown, and the sidebar explains that opening pages there needs the site to be served over `http://`
 
 #### Scenario: JavaScript disabled
 - **WHEN** a page is served over `http://` with JavaScript disabled

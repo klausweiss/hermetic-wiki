@@ -438,3 +438,19 @@ fn co_mention_ordering() {
     );
     assert_eq!(related[0].weight(), 3);
 }
+
+#[test]
+fn markdown_link_to_the_home_page() {
+    let notes = Notes::new(&[
+        ("index.md", "- home"),
+        (
+            "pages/auth.md",
+            "- [home](../index.md) and [readme](../README.md)",
+        ),
+        ("journals/2026-10-12.md", "- [home](/index.md)"),
+    ]);
+    let (g, diags) = notes.load();
+    assert_eq!(kinds(&diags), [DiagnosticKind::LinkOutsideRoot]);
+    assert!(diags[0].message.contains("README.md"));
+    assert_eq!(g.backlinks(page(&g, "index")).len(), 2);
+}

@@ -78,7 +78,29 @@ Text outside bullets keeps its form. New blocks SHALL always be bullet blocks, a
 - **WHEN** the author presses Ctrl+Enter twice in the block `write tests`
 - **THEN** the block is `DOING write tests`
 
-### Requirement: Saving
+### Requirement: Formatting keys
+While a block is being edited, these keys (Cmd instead of Ctrl on macOS) SHALL toggle inline markdown formatting: Ctrl+B bold (`**`), Ctrl+I italic (`*`), Ctrl+Shift+S strikethrough (`~~`), and Ctrl+E inline code (`` ` ``). With text selected, the key SHALL wrap the selection in the markers and keep it selected; when the selection is already wrapped in those markers (just outside it, or as its first and last characters), the key SHALL remove them instead. Without a selection, the key SHALL insert a pair of markers with the cursor between them, or remove an empty pair the cursor sits in. Bold and italic SHALL be told apart by the run of `*` characters, so italic never removes half of a bold marker. The browser's own undo SHALL be able to revert each change. The keys SHALL take precedence over the browser's own bindings for them, and the shortcuts dialog SHALL list them.
+
+#### Scenario: Bold a selection
+- **WHEN** the author selects `world` in `hello world` and presses Ctrl+B
+- **THEN** the text is `hello **world**` and `world` is still selected
+
+#### Scenario: Toggle off
+- **WHEN** the author selects `world` in `hello **world**` and presses Ctrl+B
+- **THEN** the text is `hello world`
+
+#### Scenario: Italic inside bold
+- **WHEN** the author selects `world` in `hello **world**` and presses Ctrl+I
+- **THEN** the text is `hello ***world***`
+
+#### Scenario: No selection
+- **WHEN** the cursor is at the end of `note ` and the author presses Ctrl+B, types `x`, and presses Ctrl+B again on an empty pair elsewhere
+- **THEN** the first press gives `note ****` with the cursor in the middle, typing gives `note **x**`, and Ctrl+B in an empty pair `****` removes it
+
+#### Scenario: Undo
+- **WHEN** the author presses Ctrl+B on a selection and then Ctrl+Z
+- **THEN** the text is as before the Ctrl+B
+
 Edits SHALL be saved to the page's markdown file without an explicit save action: when editing of a block ends, after every outliner key that changes the block structure, and 1 second after the last change while typing. Saves of one page SHALL happen one at a time, each including all changes made before it started. The page SHALL show whether all changes are saved, being saved, or not saved. When a save fails because the server cannot be reached, the editor SHALL keep the changes, retry when the server is reachable again, and the browser SHALL warn before leaving the page with unsaved changes. A saved change SHALL be visible on every page it affects within 2 seconds for a notes directory of about 5,000 pages.
 
 #### Scenario: Save while typing

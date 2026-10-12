@@ -34,6 +34,13 @@
 - [x] 4.3 `((` block list using block hits; choosing a block without id adds one on its page (GET, insert, PUT, one retry on 409) and inserts `((id))`; verify `Block reference by search`
 - [x] 4.4 Shortcuts help dialog lists an "Editing" group when `hermetic-editor` is present; verify the dialog in edit mode and its absence on built sites; rebuild `static/dist/app.js` and verify `make -C static verify`
 
+## 6. Formatting keys
+
+- [x] 6.1 `format.ts`: a pure toggle of inline markers for a selection or cursor (wrap, unwrap outside or inside the selection, insert or remove an empty pair, `*` runs telling italic from bold); verify unit tests for every `Formatting keys` scenario plus `~~` and `` ` ``
+- [x] 6.2 Wire Ctrl/Cmd+B, I, Shift+S, and E on the textarea (applied with the browser's undoable text insertion, falling back to `setRangeText`), list them in the shortcuts dialog, rebuild `static/dist/app.js`; verify the scenarios in Chromium and Firefox, including that Ctrl+Z reverts and the browser's own bindings do not fire, and that the full editing suite still passes
+
+  Results (2026-10-12): 7 unit tests for the toggle; the editing browser suite, now 43 checks, passes in Chromium and Firefox. It covers every formatting scenario, Ctrl+Z, saving, and the help dialog.
+
 ## 5. Integration
 
 - [x] 5.1 Run `make lint`, `make test`, `make test-perf`, and the browser suites (reader, live reload, search, and a new editing suite covering every browser-observable `browser-editing` scenario) in Chromium and Firefox; record results here

@@ -7,6 +7,7 @@ import { EDITING_ATTR, PAGES_CHANGED, readEnv, readPanes, whenParsed, withPanes 
 
 import { Conflict, type Refused, SaveQueue, type SaveState, SourceApi } from "./api";
 import { type Doc, type Node, type Payload, flatten, fromPayload, newNode } from "./model";
+import { MARKERS, applied, toggle } from "./format";
 import * as ops from "./ops";
 import { serialize } from "./serialize";
 
@@ -411,6 +412,12 @@ export class HermeticEditor extends HTMLElement {
     const start = area.selectionStart;
     const collapsed = start === area.selectionEnd;
     const mod = e.ctrlKey || e.metaKey;
+    const marker = mod && !e.altKey ? formatMarker(e.key.toLowerCase(), e.shiftKey) : null;
+    if (marker) {
+      e.preventDefault();
+      format(area, marker);
+      return;
+    }
     if (e.key === "Enter" && mod && !e.altKey && !e.shiftKey) {
       e.preventDefault();
       this.apply(ops.cycleTask(node, start));
@@ -517,6 +524,30 @@ export class HermeticEditor extends HTMLElement {
   private clearNotice(kind: string): void {
     document.querySelector(`.edit-notice.edit-${kind}`)?.remove();
   }
+}
+
+/** The marker a formatting key toggles: Ctrl/Cmd + B, I, E, or Shift+S. */
+function formatMarker(key: string, shift: boolean): string | null {
+  if (shift) return key === "s" ? MARKERS.strike : null;
+  return key === "b" ? MARKERS.bold : key === "i" ? MARKERS.italic : key === "e" ? MARKERS.code : null;
+}
+
+/**
+ * Toggles `marker` around the selection. The change goes through the browser's text
+ * insertion, so its own undo (Ctrl+Z) reverts it; where that is unavailable the text is
+ * replaced directly (without undo).
+ */
+function format(area: HTMLTextAreaElement, marker: string): void {
+  const edit = toggle(area.value, area.selectionStart, area.selectionEnd, marker);
+  const expected = applied(area.value, edit);
+  area.setSelectionRange(edit.start, edit.end);
+  const inserted =
+    edit.text === "" ? document.execCommand("delete") : document.execCommand("insertText", false, edit.text);
+  if (!inserted || area.value !== expected) {
+    area.value = expected;
+    area.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  area.setSelectionRange(edit.selStart, edit.selEnd);
 }
 
 function autosize(area: HTMLTextAreaElement): void {

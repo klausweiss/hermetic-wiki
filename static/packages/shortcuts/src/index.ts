@@ -31,6 +31,8 @@ const APPLE = /Mac|iPhone|iPad/.test(navigator.platform);
 /** Ctrl+K, or Cmd+K on Apple platforms, as the help dialog names it. */
 const MOD_K = APPLE ? "⌘ K" : "Ctrl + K";
 const MOD_ENTER = APPLE ? "⌘ Enter" : "Ctrl + Enter";
+/** The modifier for editing keys, as the help dialog writes it before a key. */
+const MOD = APPLE ? "⌘" : "Ctrl +";
 
 const HELP: readonly Shortcut[] = [
   { keys: "g h", what: "Home" },
@@ -50,6 +52,8 @@ const HELP: readonly Shortcut[] = [
   { keys: "Backspace at the start", what: "Join with the block above (or delete an empty one)", editing: true },
   { keys: MOD_ENTER, what: "Cycle TODO / DOING / DONE", editing: true },
   { keys: "[[ and ((", what: "Link a page / reference a block", editing: true },
+  { keys: `${MOD} B / ${MOD} I`, what: "Bold / italic (also on selected text)", editing: true },
+  { keys: `${MOD} Shift S / ${MOD} E`, what: "Strikethrough / inline code", editing: true },
   { keys: "Esc", what: "Stop editing", editing: true },
 ];
 

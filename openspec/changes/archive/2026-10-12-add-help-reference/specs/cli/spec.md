@@ -8,9 +8,9 @@
 - `commands`: every command and option, with its defaults.
 - `layout`: how a notes directory is read — `journals/` files named `YYYY-MM-DD.md` as journal days (and what happens to other names there), `pages/` at any depth as regular pages with subdirectories as namespaces, the root `index.md` as the page `index` and the home page (and what the home page shows without it), `assets/` and non-markdown files as attachments, which files are ignored, how page names map to file names (escaping), and that page names match case-insensitively.
 - `syntax`: blocks (bullets, nesting by indentation, multi-line blocks, text outside bullets), properties (`key:: value`), block ids (`id::`), task markers (`TODO`, `DOING`, `DONE`), page links (`[[name]]`, including namespaced names and dates), tags (`#name`, `#[[multi word]]`), markdown links to `.md` files, block references (`((id))`), and where references are not recognized (inline code, fenced code, `\` escapes).
-- `pages`: what each page shows and how it is collected — implicit pages for names that are referenced but have no file, linked references grouped by source (journals newest first, then pages alphabetically) with breadcrumbs, references inherited by child blocks, a page's tasks including tasks under blocks that reference it, related pages from co-mentions in one block, namespace children, the journal list, all-pages list, and open-tasks pages, and that problems are reported as warnings without failing the build.
+- `pages`: what each page shows and how it is collected — implicit pages for names that are referenced but have no file, linked references grouped by source (journals newest first, then pages alphabetically) with breadcrumbs, references inherited by child blocks, a page's tasks including tasks under blocks that reference it, related pages from co-mentions in one block, namespace children, the journal list, all-pages list, open-tasks, and search pages, how search matches, and that problems are reported as warnings without failing the build.
 
-`hermetic help <topic>` SHALL print only the section for that topic and exit with status 0. An unknown topic, or more than one argument, SHALL print an error naming the valid topics to standard error, print nothing to standard output, and exit with status 2. Every line of the reference SHALL be at most 80 characters, and the output SHALL contain no terminal control sequences. Every example the reference gives of note text and its effect SHALL hold when notes containing that text are built.
+`hermetic help <topic>` SHALL print only the section for that topic and exit with status 0. An unknown topic SHALL print an error naming the valid topics to standard error, print nothing to standard output, and exit with status 2; more than one topic is a wrong number of arguments. Every line of the reference SHALL be at most 80 characters, and the output SHALL contain no terminal control sequences. Every example the reference gives of note text and its effect SHALL hold when notes containing that text are built.
 
 #### Scenario: Full reference
 - **WHEN** the user runs `hermetic help`
@@ -22,7 +22,7 @@
 
 #### Scenario: Syntax topic
 - **WHEN** the user runs `hermetic help syntax`
-- **THEN** the output shows examples of `[[name]]`, `#tag`, `#[[multi word]]`, `((id))`, `key:: value`, `id::`, and `TODO`, and contains no other section
+- **THEN** the output shows examples of `[[name]]`, `#name`, `#[[multi word]]`, `((id))`, `key:: value`, `id::`, and `TODO`, and contains no other section
 
 #### Scenario: Unknown topic
 - **WHEN** the user runs `hermetic help frobnicate`

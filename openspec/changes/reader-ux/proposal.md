@@ -2,28 +2,34 @@
 
 ## Why
 
-Reading is the main way the notes pay off: opening a topic and seeing its history, keeping several pages side by side like Logseq's sidebar, and scrolling the journal as one continuous timeline. The plain HTML must look good on its own, and JavaScript should add these richer interactions without becoming a requirement.
+Reading is the main way the notes pay off: opening a topic and seeing its history, keeping several pages side by side like Logseq's sidebar, and reading the journal as one continuous timeline. The plain HTML must look good on its own, and a small script should add these richer interactions without ever becoming a requirement. The site also needs a home page the author controls, instead of always opening on the journal list.
 
 ## What Changes
 
-- Typography and layout: readable, calm design; always the embedded Inter / JetBrains Mono, for a consistent look on every machine; light and dark themes; works on phone widths.
-- Progressive enhancement via a vanilla JS script (no external dependencies, no frameworks, no build toolchain beyond `cargo build`):
-  - **Multi-pane**: open additional pages next to the current one (e.g. modifier-click on a link). Panes are fragments in one document, obtained by `fetch()`-ing the target page's HTML and extracting its main content — no iframes, no duplicated content files. Off-screen panes cost little (e.g. `content-visibility: auto`), so many open panes stay cheap.
-  - **Merged journal timeline**: the journal view loads consecutive days as you scroll by fetching day pages.
-  - Keyboard navigation.
-- These enhancements require `http://` (serving via `hermetic serve` or any static host); over `file://` the wiki degrades to plain single-page navigation, which remains fully functional.
+- **Home page**: an `index.md` at the root of the notes is the regular page `index` and the site's home page (`index.html`); it takes part in the graph like any page (links, linked references, related pages, tasks). Without one, `index.html` stays the journal list, with a subtle hint that adding `index.md` replaces it. The journal list itself always lives at `journals.html`, which the header's "Journals" link points to.
+- **Typography and layout**: readable, calm design using the embedded Inter / JetBrains Mono; light and dark themes following the system, with a manual toggle; works on phone widths.
+- **Progressive enhancement** through one bundled script, written in TypeScript and compiled with Bun. It has no runtime dependencies; the only development dependency is the TypeScript compiler. The compiled script is embedded in the `hermetic` binary like the other assets.
+  - **Sidebar (multi-pane)**: Shift+click on a page link opens it in a right-hand sidebar, Logseq-style. Opened pages stack vertically (newest on top), can be collapsed and closed, and are fetched as HTML from the site and inserted into the same document — no iframes, no duplicated content files. Off-screen panes cost little (`content-visibility: auto`). The open panes are kept in the URL, so reload, back/forward and copied links restore them.
+  - **Journal timeline**: on the journal list page, a "Timeline" view shows full journal days newest first, loading older days as you scroll. It is a separate view; the list remains the default.
+  - **Keyboard shortcuts** for navigation, closing panes, and the theme toggle.
+- These enhancements need `http://` (`hermetic serve` or any static host). Over `file://`, or without JavaScript, the wiki behaves exactly as before: plain single-page navigation that is fully functional. Pages never show controls that do nothing.
+- A separate `static/Makefile` builds and type-checks the frontend with Bun. The compiled script starts with a comment explaining that it is generated, how it was generated, and why it is committed.
 
 ## Capabilities
 
 ### New Capabilities
-- `reader-ui`: visual design, typography, theming, responsive layout, keyboard navigation.
-- `multi-pane`: opening, arranging, and closing multiple pages in one document via fetch-based fragments.
-- `journal-timeline`: continuous journal view assembled from per-day pages.
+- `reader-ui`: visual design, typography, theming and theme toggle, responsive layout, keyboard shortcuts, and the rule that enhancements never degrade the no-JS / `file://` experience.
+- `multi-pane`: opening, stacking, collapsing, closing, and restoring sidebar panes from the URL.
+- `journal-timeline`: the continuous journal view assembled from per-day pages.
 
 ### Modified Capabilities
-<!-- none -->
+- `source-layout`: an `index.md` at the notes root is the regular page `index`.
+- `reference-graph`: markdown links may point at the root `index.md`.
+- `static-site-output`: `index.html` becomes the home page (from `index.md`, or the journal list with a hint); the journal list moves to `journals.html`; the header links change accordingly; pages reference the bundled script while staying fully usable without it.
 
 ## Impact
 
-- Depends on `static-build` (HTML structure must expose a stable main-content element and link markup the script can rely on).
-- Adds embedded JS and CSS to the binary.
+- Depends on `static-build` (archived) and changes some of its requirements as listed above.
+- New source tree `static/ts/` with TypeScript sources, `static/package.json` (dev dependency: `typescript`), `bun.lock`, and `static/Makefile`.
+- The compiled script is committed so `cargo build` keeps working without Bun installed; a check target verifies it is up to date.
+- Rendering gains a home page and the journal list page; the HTML gains a few data attributes the script relies on.

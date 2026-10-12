@@ -58,6 +58,8 @@ pub struct RawRef {
     pub text: String,
     /// Byte range of the whole reference syntax within the scanned text.
     pub range: Range<usize>,
+    /// For markdown links: byte range of the destination token (including any `<>`).
+    pub dest: Option<Range<usize>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -453,11 +455,9 @@ fn scan_chunk(s: &str, base: usize, out: &mut Vec<RawRef>) {
             b'[' => match inline_link(s, i) {
                 Some(link) => {
                     if is_note_link(&link.dest) {
-                        out.push(raw(
-                            RawRefKind::MdLink,
-                            &link.dest,
-                            base + i..base + link.end,
-                        ));
+                        let mut r = raw(RawRefKind::MdLink, &link.dest, base + i..base + link.end);
+                        r.dest = Some(base + link.dest_range.start..base + link.dest_range.end);
+                        out.push(r);
                     }
                     // Keep scanning the link text for other references.
                     skip = Some((link.text_end, link.end));
@@ -475,6 +475,7 @@ fn raw(kind: RawRefKind, text: &str, range: Range<usize>) -> RawRef {
         kind,
         text: text.to_owned(),
         range,
+        dest: None,
     }
 }
 
@@ -545,6 +546,8 @@ struct InlineLink {
     /// Index of the `]` closing the link text.
     text_end: usize,
     dest: String,
+    /// Range of the destination token, including any `<>`.
+    dest_range: Range<usize>,
     /// Index after the closing `)`.
     end: usize,
 }
@@ -578,6 +581,7 @@ fn inline_link(s: &str, i: usize) -> Option<InlineLink> {
     let text_end = j;
     let mut k = skip_ws(b, j + 2);
     let dest;
+    let dest_start = k;
     if b.get(k) == Some(&b'<') {
         let start = k + 1;
         let close = s[start..].find(['>', '\n', '<'])? + start;
@@ -602,6 +606,7 @@ fn inline_link(s: &str, i: usize) -> Option<InlineLink> {
         }
         dest = &s[start..k];
     }
+    let dest_range = dest_start..k;
     k = skip_ws(b, k);
     if let Some(&q) = b.get(k)
         && matches!(q, b'"' | b'\'' | b'(')
@@ -619,6 +624,7 @@ fn inline_link(s: &str, i: usize) -> Option<InlineLink> {
     Some(InlineLink {
         text_end,
         dest: unescape(dest),
+        dest_range,
         end: k + 1,
     })
 }
@@ -935,6 +941,19 @@ mod tests {
                 .iter()
                 .all(|(k, _)| *k != RawRefKind::Page)
         );
+    }
+
+    #[test]
+    fn markdown_link_destination_ranges() {
+        for (text, dest) in [
+            ("see [x](a.md) now", "a.md"),
+            ("[x](<a b.md> \"t\")", "<a b.md>"),
+            ("[x](a.md#s)", "a.md#s"),
+        ] {
+            let r = &scan_refs(text)[0];
+            assert_eq!(&text[r.dest.clone().unwrap()], dest, "{text:?}");
+        }
+        assert_eq!(scan_refs("[[a]]")[0].dest, None);
     }
 
     #[test]

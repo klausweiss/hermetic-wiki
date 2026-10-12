@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 unicode-normalization = "0.1"
 
 [dev-dependencies]

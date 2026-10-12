@@ -231,6 +231,52 @@ impl Date {
     }
 }
 
+impl Date {
+    /// Days since 1970-01-01 (proleptic Gregorian calendar).
+    fn days_from_epoch(self) -> i64 {
+        let (m, d) = (i64::from(self.month), i64::from(self.day));
+        let y = i64::from(self.year) - i64::from(m <= 2);
+        let era = y.div_euclid(400);
+        let yoe = y - era * 400;
+        let doy = (153 * (m + if m > 2 { -3 } else { 9 }) + 2) / 5 + d - 1;
+        let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+        era * 146_097 + doe - 719_468
+    }
+
+    /// English name of the day of the week.
+    pub fn weekday(self) -> &'static str {
+        const NAMES: [&str; 7] = [
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+        ];
+        NAMES[self.days_from_epoch().rem_euclid(7) as usize]
+    }
+
+    /// English name of the month.
+    pub fn month_name(self) -> &'static str {
+        const NAMES: [&str; 12] = [
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
+        ];
+        NAMES[usize::from(self.month) - 1]
+    }
+}
+
 fn days_in_month(year: u16, month: u8) -> u8 {
     match month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
@@ -529,6 +575,11 @@ mod tests {
             PathBuf::from("journals/2026-10-12.md")
         );
         assert!(Date::parse("2026-09-30").unwrap() < d);
+        assert_eq!(d.weekday(), "Monday");
+        assert_eq!(d.month_name(), "October");
+        assert_eq!(Date::parse("2024-02-29").unwrap().weekday(), "Thursday");
+        assert_eq!(Date::parse("1970-01-01").unwrap().weekday(), "Thursday");
+        assert_eq!(Date::parse("2000-03-01").unwrap().weekday(), "Wednesday");
     }
 
     fn valid_name() -> impl Strategy<Value = String> {

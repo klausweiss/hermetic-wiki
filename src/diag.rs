@@ -17,6 +17,8 @@ pub enum DiagnosticKind {
     DanglingBlockRef,
     BrokenLink,
     LinkOutsideRoot,
+    AttachmentConflict,
+    SkippedSymlink,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

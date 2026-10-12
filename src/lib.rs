@@ -4,6 +4,7 @@ pub mod diag;
 pub mod graph;
 pub mod layout;
 pub mod parse;
+pub mod site;
 
 pub use diag::{Diagnostic, DiagnosticKind};
 pub use graph::Graph;

@@ -84,6 +84,8 @@ pub struct Ref {
     pub text: String,
     /// Byte range of the reference syntax within its location's text.
     pub range: Range<usize>,
+    /// For markdown links: byte range of the destination token within the same text.
+    pub dest: Option<Range<usize>>,
     pub location: RefLocation,
     pub target: RefTarget,
 }
@@ -764,6 +766,7 @@ impl Resolver<'_> {
             kind: raw.kind,
             text: raw.text,
             range: raw.range,
+            dest: raw.dest,
             location,
             target,
         })

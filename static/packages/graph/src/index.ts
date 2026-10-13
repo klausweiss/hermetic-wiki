@@ -3,7 +3,8 @@
 // reader zooms in, and highlighting of a node's neighbours. Without the script the SVG
 // shows the whole graph fitted to the page, and its nodes are plain links.
 //
-// It also adds a search over node names, opened with Ctrl+F (Cmd+F) on the graph page.
+// It also adds a search over node names, opened with Ctrl+F (Cmd+F) on the graph page:
+// the arrow keys move between the matches and Enter opens one.
 // Panning, zooming, and searching need no other page, so they also work over file://.
 
 import { type IconName, anchorHref, carrySidebar, icon, whenParsed } from "@hermetic/core";
@@ -233,17 +234,24 @@ export class HermeticGraph extends HTMLElement {
     if (e.key === "Escape") {
       e.preventDefault();
       this.closeSearch();
-    } else if (e.key === "Enter" && (APPLE ? e.metaKey : e.ctrlKey)) {
+    } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && this.found.length > 0) {
+      // Like the site search's results: the arrows move, wrapping around at either end.
       e.preventDefault();
-      const node = this.nodes[this.found[Math.max(this.current, 0)] ?? -1];
+      const n = this.found.length;
+      const down = e.key === "ArrowDown";
+      this.goToMatch(this.current < 0 ? (down ? 0 : n - 1) : (this.current + (down ? 1 : n - 1)) % n);
+    } else if (e.key === "Enter" && this.found.length > 0) {
+      e.preventDefault();
+      if (this.current < 0 && this.found.length > 1) {
+        // Several matches and none chosen: show the first rather than open a page unseen.
+        this.goToMatch(0);
+        return;
+      }
+      const node = this.nodes[this.found[Math.max(this.current, 0)]!];
       if (node) {
         // Like a click on the node: the sidebar's panes come along.
         location.href = carrySidebar(anchorHref(node.a), location.href);
       }
-    } else if (e.key === "Enter" && this.found.length > 0) {
-      e.preventDefault();
-      const n = this.found.length;
-      this.goToMatch(this.current < 0 && e.shiftKey ? n - 1 : (this.current + (e.shiftKey ? n - 1 : 1)) % n);
     }
   }
 

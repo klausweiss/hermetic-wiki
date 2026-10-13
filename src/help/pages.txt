@@ -48,8 +48,8 @@ PAGES AND REFERENCES
       to the other or mentions both (also in journals). Click a node to
       open its page. With JavaScript, drag to pan and scroll or pinch to
       zoom; more names appear as you zoom in. Ctrl+F (Cmd+F on macOS)
-      finds pages by name: Enter goes through the matches, Ctrl+Enter
-      opens one, Escape ends the search. Press Ctrl+F again for the
+      finds pages by name: the arrow keys move between the matches,
+      Enter opens one, Escape ends the search. Press Ctrl+F again for the
       browser's own find.
 
   Search

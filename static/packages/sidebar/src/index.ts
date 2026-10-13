@@ -1,5 +1,6 @@
 // <hermetic-sidebar>: the Logseq-style sidebar. Shift+click on a page link opens that
-// page here, stacked newest first; the panes are kept in the URL.
+// page here, stacked newest first; the panes, and whether the sidebar is hidden, are
+// kept in the URL.
 
 import {
   type Env,
@@ -9,26 +10,38 @@ import {
   SIDEBAR_CLOSE_TOP,
   SIDEBAR_TOGGLE,
   TARGET_ATTR,
+  carrySidebar,
   classify,
   fetchPage,
   readEnv,
+  readHidden,
   readPanes,
   whenParsed,
-  withPanes,
+  withSidebar,
 } from "@hermetic/core";
 
 /** Layout classes live on <html> so they can be set before the body exists. */
 const LAYOUT = document.documentElement.classList;
 const NARROW = "(max-width: 899.98px)";
 
+/** Narrow screens hide the sidebar unless asked otherwise, since it would cover the page. */
+function hiddenByDefault(): boolean {
+  return matchMedia(NARROW).matches;
+}
+
+/** Whether the sidebar starts hidden: as the URL says, else the default for the width. */
+function initiallyHidden(): boolean {
+  return readHidden(new URLSearchParams(location.search)) ?? hiddenByDefault();
+}
+
 /**
  * Sets the sidebar's layout classes before the page is first painted, from what the
- * element will show once it is set up: hidden on narrow screens, empty unless the URL
- * lists panes (which only open over http). Without this the page would first paint
- * at full width and then shift to make room for the sidebar.
+ * element will show once it is set up: hidden as the URL says or on narrow screens,
+ * empty unless the URL lists panes (which only open over http). Without this the page
+ * would first paint at full width and then shift to make room for the sidebar.
  */
 export function applyInitialLayout(): void {
-  const hidden = matchMedia(NARROW).matches;
+  const hidden = initiallyHidden();
   const interactive = location.protocol === "http:" || location.protocol === "https:";
   const empty = !interactive || readPanes(new URLSearchParams(location.search)).length === 0;
   LAYOUT.toggle("sidebar-open", !hidden);
@@ -56,8 +69,7 @@ export class HermeticSidebar extends HTMLElement {
   private observer!: IntersectionObserver;
   /** Top pane first. */
   private views: PaneView[] = [];
-  /** Narrow screens start with the sidebar hidden, since it would cover the page. */
-  private sidebarHidden = matchMedia(NARROW).matches;
+  private sidebarHidden = initiallyHidden();
 
   connectedCallback(): void {
     whenParsed(() => this.setup());
@@ -188,10 +200,13 @@ export class HermeticSidebar extends HTMLElement {
     if (e.shiftKey) {
       e.preventDefault();
       this.open(link.path, link.fragment);
-    } else if (!this.isEmpty) {
-      // A normal navigation, carrying the open panes to the next page.
-      e.preventDefault();
-      location.href = withPanes(a.href, this.panes);
+    } else {
+      // A normal navigation, carrying the sidebar's state to the next page.
+      const href = carrySidebar(a.href, location.href);
+      if (href !== a.href) {
+        e.preventDefault();
+        location.href = href;
+      }
     }
   }
 
@@ -286,6 +301,7 @@ export class HermeticSidebar extends HTMLElement {
   private setHidden(hidden: boolean): void {
     this.sidebarHidden = hidden;
     this.render();
+    this.persist();
   }
 
   private render(): void {
@@ -322,9 +338,17 @@ export class HermeticSidebar extends HTMLElement {
     }
   }
 
-  /** Mirrors the panes into the URL without adding a history entry. */
+  /**
+   * Mirrors the panes, and whether the sidebar is hidden when that differs from the
+   * default, into the URL without adding a history entry.
+   */
   private persist(): void {
-    history.replaceState(history.state, "", withPanes(location.href, this.panes));
+    if (!this.env?.interactive) {
+      // Over file:// the state stays out of the URL, like the panes it would carry.
+      return;
+    }
+    const hidden = this.sidebarHidden === hiddenByDefault() ? null : this.sidebarHidden;
+    history.replaceState(history.state, "", withSidebar(location.href, this.panes, hidden));
   }
 }
 

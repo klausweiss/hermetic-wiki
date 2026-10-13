@@ -3,7 +3,7 @@
 // a block to edit its markdown, use the outliner keys, and changes are saved to the
 // note file. The page is updated in place from each rebuild instead of reloading.
 
-import { EDITING_ATTR, OPEN_TODAY, PAGES_CHANGED, icon, readEnv, readPanes, whenParsed, withPanes } from "@hermetic/core";
+import { EDITING_ATTR, OPEN_TODAY, PAGES_CHANGED, carrySidebar, icon, readEnv, whenParsed } from "@hermetic/core";
 
 import { Conflict, type Refused, SaveQueue, type SaveState, SourceApi } from "./api";
 import { type Doc, type Node, type Payload, flatten, fromPayload, newNode } from "./model";
@@ -238,8 +238,7 @@ export class HermeticEditor extends HTMLElement {
     } catch {
       // Open it anyway; the page tells what is wrong.
     }
-    const panes = readPanes(new URLSearchParams(location.search));
-    location.href = withPanes(new URL(path, this.root).href, panes);
+    location.href = carrySidebar(new URL(path, this.root).href, location.href);
   }
 
   private showState(state: SaveState): void {

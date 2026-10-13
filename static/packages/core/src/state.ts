@@ -1,4 +1,4 @@
-// Sidebar panes <-> URL query string. Pure functions: no DOM access.
+// Sidebar state (panes, shown or hidden) <-> URL query string. Pure functions: no DOM access.
 
 import { isSafePagePath } from "./links";
 
@@ -44,4 +44,46 @@ export function withPanes(url: string, panes: readonly Pane[]): string {
   const u = new URL(url);
   u.search = writePanes(u.searchParams, panes).toString();
   return u.href;
+}
+
+/**
+ * Query parameter saying whether the sidebar is hidden or shown. Absent means the
+ * default for the screen width, so it is only written when the reader overrides that.
+ */
+export const SIDEBAR_PARAM = "sidebar";
+const HIDDEN = "hidden";
+const SHOWN = "shown";
+
+/** Whether the URL hides (true) or shows (false) the sidebar; null if it does not say. */
+export function readHidden(params: URLSearchParams): boolean | null {
+  const value = params.get(SIDEBAR_PARAM);
+  return value === HIDDEN ? true : value === SHOWN ? false : null;
+}
+
+/** Returns a copy of `params` saying `hidden`, or nothing about it when null. */
+export function writeHidden(params: URLSearchParams, hidden: boolean | null): URLSearchParams {
+  const out = new URLSearchParams(params);
+  out.delete(SIDEBAR_PARAM);
+  if (hidden !== null) {
+    out.set(SIDEBAR_PARAM, hidden ? HIDDEN : SHOWN);
+  }
+  return out;
+}
+
+/** `url` with its sidebar parameters (panes and visibility) replaced. */
+export function withSidebar(url: string, panes: readonly Pane[], hidden: boolean | null): string {
+  const u = new URL(url);
+  u.search = writeHidden(writePanes(u.searchParams, panes), hidden).toString();
+  return u.href;
+}
+
+/**
+ * `target` with the sidebar state of `from`, for navigating with the sidebar kept as
+ * it is. `target` is returned unchanged when `from` has no sidebar state.
+ */
+export function carrySidebar(target: string, from: string): string {
+  const params = new URL(from).searchParams;
+  const panes = readPanes(params);
+  const hidden = readHidden(params);
+  return panes.length === 0 && hidden === null ? target : withSidebar(target, panes, hidden);
 }

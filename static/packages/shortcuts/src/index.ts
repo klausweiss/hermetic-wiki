@@ -6,10 +6,9 @@ import {
   SEARCH_FOCUS,
   SIDEBAR_CLOSE_TOP,
   SIDEBAR_TOGGLE,
+  carrySidebar,
   readEnv,
-  readPanes,
   whenParsed,
-  withPanes,
 } from "@hermetic/core";
 
 const GO_TARGETS: Readonly<Record<string, string>> = {
@@ -108,9 +107,8 @@ export class HermeticShortcuts extends HTMLElement {
     }
     if (target) {
       e.preventDefault();
-      // Open sidebar panes are mirrored in the URL; carry them along.
-      const panes = readPanes(new URLSearchParams(location.search));
-      location.href = withPanes(new URL(target, readEnv().root).href, panes);
+      // The sidebar's state is mirrored in the URL; carry it along.
+      location.href = carrySidebar(new URL(target, readEnv().root).href, location.href);
       return;
     }
     switch (e.key) {

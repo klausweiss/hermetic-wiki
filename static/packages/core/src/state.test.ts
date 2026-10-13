@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { readPanes, withPanes, writePanes } from "./state";
+import { carrySidebar, readHidden, readPanes, withPanes, writeHidden, writePanes } from "./state";
 
 test("round trip keeps order and collapsed state", () => {
   const panes = [
@@ -35,4 +35,21 @@ test("withPanes keeps the fragment", () => {
   const url = withPanes("http://h/wiki/pages/a.html?view=x#b3", [{ path: "index.html", collapsed: false }]);
   expect(url).toBe("http://h/wiki/pages/a.html?view=x&p=index.html#b3");
   expect(withPanes("http://h/wiki/pages/a.html?p=index.html", [])).toBe("http://h/wiki/pages/a.html");
+});
+
+test("sidebar visibility round trip", () => {
+  expect(readHidden(writeHidden(new URLSearchParams(), true))).toBe(true);
+  expect(readHidden(writeHidden(new URLSearchParams(), false))).toBe(false);
+  expect(writeHidden(new URLSearchParams("sidebar=hidden&p=a.html"), null).toString()).toBe("p=a.html");
+  expect(readHidden(new URLSearchParams("sidebar=bogus"))).toBeNull();
+});
+
+test("carrySidebar keeps panes and visibility, or leaves the target alone", () => {
+  const from = "http://h/wiki/index.html?p=pages%2Fa.html&sidebar=hidden";
+  expect(carrySidebar("http://h/wiki/pages/b.html#x", from)).toBe(
+    "http://h/wiki/pages/b.html?p=pages%2Fa.html&sidebar=hidden#x",
+  );
+  expect(carrySidebar("http://h/wiki/pages/b.html?q=1", "http://h/wiki/index.html")).toBe(
+    "http://h/wiki/pages/b.html?q=1",
+  );
 });

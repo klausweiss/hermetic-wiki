@@ -457,7 +457,7 @@ dialog.search-dialog::backdrop { background: rgb(0 0 0 / 0.5); }
 .search-result {
   display: block; padding: 0.45rem 0.6rem; border-radius: 6px; color: var(--text);
 }
-.search-result:hover, .search-result[aria-selected="true"] { background: var(--surface); text-decoration: none; }
+.search-result:hover { background: var(--surface); text-decoration: none; }
 .search-result-head { display: flex; flex-wrap: wrap; gap: 0 0.5rem; align-items: baseline; }
 .search-result-title { font-weight: 600; font-size: 0.9rem; }
 .search-result-crumbs { font-size: 0.78rem; color: var(--muted); }
@@ -465,7 +465,11 @@ dialog.search-dialog::backdrop { background: rgb(0 0 0 / 0.5); }
 .search-result mark { background: none; color: var(--text); font-weight: 650; text-decoration: underline; text-decoration-color: var(--link); text-underline-offset: 2px; }
 .search-note, .search-summary { color: var(--muted); font-size: 0.85rem; margin: 0.3rem 0.6rem; }
 .search-all { display: block; padding: 0.35rem 0.6rem; font-size: 0.85rem; border-radius: 6px; }
-.search-all:hover, .search-all[aria-selected="true"] { background: var(--surface); text-decoration: none; }
+.search-all:hover { background: var(--surface); text-decoration: none; }
+/* The keyboard selection looks different from hover and wins when both apply. */
+.search-result[aria-selected="true"], .search-all[aria-selected="true"] {
+  background: color-mix(in srgb, var(--link) 12%, transparent); box-shadow: inset 2px 0 0 var(--link); text-decoration: none;
+}
 .search-list .search-result { padding: 0.6rem 0.75rem; margin: 0.2rem 0; }
 .search-unavailable[hidden] { display: none; }
 

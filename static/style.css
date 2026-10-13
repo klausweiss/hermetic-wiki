@@ -541,12 +541,12 @@ p.warning { border-left: 3px solid var(--todo); padding: 0.4rem 0.75rem; backgro
   opacity: 1; border-color: var(--border);
 }
 .page-menu-items {
-  position: absolute; top: calc(100% + 0.3rem); right: 0; z-index: 20; min-width: 11rem; padding: 0.25rem;
+  position: absolute; top: calc(100% + 0.3rem); right: 0; z-index: 20; min-width: 11rem; width: max-content; padding: 0.25rem;
   background: var(--bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
 }
 .page-menu-items[hidden] { display: none; }
 .page-menu-items button {
-  display: flex; align-items: center; gap: 0.5rem; width: 100%; text-align: left; border: none;
+  display: flex; align-items: center; gap: 0.5rem; width: 100%; text-align: left; white-space: nowrap; border: none;
   border-radius: 6px; padding: 0.35rem 0.5rem; color: var(--text); font-size: 0.9rem;
 }
 .page-menu-items button:hover, .page-menu-items button:focus-visible { background: var(--surface); }

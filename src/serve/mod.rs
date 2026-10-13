@@ -19,6 +19,7 @@ use std::time::{Duration, Instant, SystemTime};
 
 use crate::diag::Diagnostic;
 use crate::graph::Graph;
+use crate::layout::Date;
 use crate::site::{self, Content, SiteFiles};
 
 /// Which addresses the server listens on.
@@ -126,6 +127,7 @@ pub fn start(options: Options) -> Result<Running, ServeError> {
         _ => return Err(ServeError::NotADirectory(options.notes.clone())),
     };
     let title = options.title.unwrap_or_else(|| site::title_for(&notes));
+    remove_empty_journals(&notes);
     let initial_snapshot = watch::snapshot(&notes);
     let (build, pages, diagnostics) = build_site(&notes, &title).map_err(ServeError::Build)?;
 
@@ -210,6 +212,10 @@ fn fingerprint(path: &Path) -> (u64, Option<SystemTime>) {
 /// hold `state.rebuilding`.
 fn rebuild(state: &State) {
     let started = Instant::now();
+    if !remove_empty_journals(&state.notes).is_empty() {
+        // Their removal is part of this rebuild, not a change for the watcher to see.
+        *state.snapshot.lock().expect("snapshot lock") = watch::snapshot(&state.notes);
+    }
     let (build, pages, diagnostics) = match build_site(&state.notes, &state.title) {
         Ok(b) => b,
         Err(e) => {
@@ -241,6 +247,16 @@ fn rebuild(state: &State) {
     if !changed.is_empty() || !removed.is_empty() {
         broadcast(state, &event_json(&changed, &removed));
     }
+}
+
+/// Removes empty journal days that have stayed so for a while (see `serve-mode`) and
+/// reports each on standard error.
+fn remove_empty_journals(notes: &Path) -> Vec<PathBuf> {
+    let removed = edit::remove_empty_journals(notes, SystemTime::now(), edit::EMPTY_JOURNAL_GRACE);
+    for rel in &removed {
+        eprintln!("removed empty journal day {}", rel.display());
+    }
+    removed
 }
 
 /// Site paths whose content differs between two builds, and paths that disappeared.
@@ -341,7 +357,21 @@ fn handle(state: &State, mut stream: TcpStream) -> io::Result<()> {
         return events(state, stream);
     }
     let build = Arc::clone(&state.build.read().expect("build lock"));
-    let found = http::decoded_path(&request.target).and_then(|p| http::lookup(&build.files, &p));
+    let path = http::decoded_path(&request.target);
+    let found = path.as_deref().and_then(|p| http::lookup(&build.files, p));
+    let blank = match (&found, path.as_deref()) {
+        (None, Some(p)) if same_machine => blank_day(state, &build, p),
+        _ => None,
+    };
+    if let Some(html) = blank {
+        let body = http::inject_elements(html.as_bytes(), same_machine);
+        return stream.write_all(&http::response(
+            200,
+            "text/html; charset=utf-8",
+            &body,
+            head,
+        ));
+    }
     let Some((rel, content)) = found else {
         let page = http::error_page(404);
         return stream.write_all(&http::response(
@@ -373,6 +403,20 @@ fn handle(state: &State, mut stream: TcpStream) -> io::Result<()> {
         body
     };
     stream.write_all(&http::response(200, content_type, &body, head))
+}
+
+/// The page of a journal day at site path `path` that has no page in the build, so that
+/// it can be written in the browser (see `browser-editing`).
+fn blank_day(state: &State, build: &Build, path: &str) -> Option<String> {
+    let date = edit::resolve(&build.editable, path)?.date?;
+    let mut days: Vec<Date> = build
+        .editable
+        .values()
+        .filter(|page| page.file.is_some())
+        .filter_map(|page| page.date)
+        .collect();
+    days.sort();
+    Some(site::blank_day(&state.title, date, &days).html)
 }
 
 /// The edit API: `GET` returns a page's source payload, `PUT` saves it, `DELETE` moves
@@ -457,6 +501,17 @@ fn source(
     if base != edit::version(current.as_deref()) {
         let (status, json) = payload(current.as_deref());
         return (if status == 200 { 409 } else { status }, json);
+    }
+    // A journal day saved without content has no file (see `browser-editing`).
+    if page.date.is_some() && edit::is_empty_note(&text) {
+        if current.is_some() {
+            if let Err(e) = fs::remove_file(&target) {
+                return (500, format!("{e}\n").into_bytes());
+            }
+            *state.snapshot.lock().expect("snapshot lock") = watch::snapshot(&state.notes);
+            rebuild(state);
+        }
+        return payload(None);
     }
     let bytes = edit::file_bytes(&text, current.as_deref());
     match edit::write_atomic(&state.notes, &target, &bytes) {

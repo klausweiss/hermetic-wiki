@@ -10,6 +10,8 @@ mod render;
 
 /// hermetic's project page, the one external link hermetic writes itself (in the footer).
 pub use html::PROJECT_URL;
+/// The page of a journal day that is not in the site, for `hermetic serve`.
+pub use pages::blank_day;
 /// Percent-encodes one path segment the way generated links do.
 pub use paths::encode as encode_url_segment;
 /// Output path of a page's HTML file, relative to the site root.

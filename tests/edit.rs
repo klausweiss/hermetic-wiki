@@ -216,11 +216,11 @@ fn new_pages_and_days() {
         "- first note\n"
     );
     // A journal day nobody references (the "Today" control).
-    let r = put_source(server.addr, "journals/2026-10-13.html", "missing", "-\n");
+    let r = put_source(server.addr, "journals/2026-10-13.html", "missing", "- a\n");
     assert_eq!(r.status, 200, "{}", r.body);
     assert_eq!(
         fs::read_to_string(notes.path().join("journals/2026-10-13.md")).unwrap(),
-        "-\n"
+        "- a\n"
     );
     assert!(page(server.addr, "journals/2026-10-13.html").contains("2026-10-13"));
     // Creating again does not replace the file.
@@ -233,7 +233,7 @@ fn new_pages_and_days() {
     assert_eq!(r.status, 409);
     assert_eq!(
         fs::read_to_string(notes.path().join("journals/2026-10-13.md")).unwrap(),
-        "-\n"
+        "- a\n"
     );
     // No stray files anywhere.
     let mut all = Vec::new();
@@ -243,6 +243,48 @@ fn new_pages_and_days() {
         }
     }
     assert!(all.iter().all(|n| !n.starts_with('.')), "{all:?}");
+}
+
+#[test]
+fn journal_days_without_content_have_no_file() {
+    let notes = Notes::new(&[("journals/2026-10-12.md", "- standup [[empty]]\n")]);
+    let server = start(notes.path());
+    let day = notes.path().join("journals/2026-10-13.md");
+
+    // A day without a file is shown, ready to write in, without creating its file.
+    let html = page(server.addr, "journals/2026-10-13.html");
+    assert!(
+        html.contains("<h1>2026-10-13 <span class=\"weekday\">"),
+        "{html}"
+    );
+    assert!(html.contains(r#"<a rel="prev" href="2026-10-12.html">"#));
+    assert!(html.contains("<hermetic-editor></hermetic-editor>"));
+    assert!(!day.exists());
+    assert!(page(server.addr, "journals/2026-13-01.html").contains("404"));
+    assert!(page(server.addr, "journals/notes.html").contains("404"));
+
+    // Saving it empty creates nothing.
+    let r = put_source(server.addr, "journals/2026-10-13.html", "missing", "-\n");
+    assert_eq!(r.status, 200, "{}", r.body);
+    assert_eq!(field(&r.body, "version"), "missing");
+    assert!(!day.exists());
+
+    // Content creates the file; emptying it again removes the file.
+    let r = put_source(server.addr, "journals/2026-10-13.html", "missing", "- a\n");
+    assert_eq!(r.status, 200, "{}", r.body);
+    assert!(day.exists());
+    let version = field(&r.body, "version");
+    let r = put_source(server.addr, "journals/2026-10-13.html", &version, "-\n");
+    assert_eq!(r.status, 200, "{}", r.body);
+    assert_eq!(field(&r.body, "version"), "missing");
+    assert!(!day.exists());
+    assert!(!notes.path().join(".trash").exists());
+    assert!(!page(server.addr, "journals.html").contains("2026-10-13"));
+
+    // Other pages keep an empty file.
+    let r = put_source(server.addr, "pages/empty.html", "missing", "-\n");
+    assert_eq!(r.status, 200, "{}", r.body);
+    assert!(notes.path().join("pages/empty.md").exists());
 }
 
 #[test]

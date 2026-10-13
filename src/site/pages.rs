@@ -8,7 +8,7 @@ use super::html::{document, esc};
 use super::paths::{href, refs_continuation_path, tasks_continuation_path};
 use super::render::{Mode, Site, task_badge};
 use crate::graph::{BlockId, LinkedRef, PageId};
-use crate::layout::Date;
+use crate::layout::{self, Date};
 
 /// Linked references shown per file.
 pub const REFS_PER_FILE: usize = 100;
@@ -125,31 +125,59 @@ fn page_header(site: &Site, from: &Path, page: PageId) -> String {
 
 /// Links to the nearest earlier and later journal days that have a file.
 fn day_nav(site: &Site, from: &Path, date: Date) -> String {
-    let days = &site.journal_days;
-    let prev = days[..days.partition_point(|&(d, _)| d < date)]
-        .last()
-        .copied();
-    let next = days[days.partition_point(|&(d, _)| d <= date)..]
-        .first()
-        .copied();
+    let days: Vec<(Date, String)> = site
+        .journal_days
+        .iter()
+        .map(|&(d, p)| (d, site.page_href(from, p)))
+        .collect();
+    day_links(&days, date)
+}
+
+/// The day navigation from `date` among `days` (sorted, with each day's link).
+fn day_links(days: &[(Date, String)], date: Date) -> String {
+    let prev = days[..days.partition_point(|(d, _)| *d < date)].last();
+    let next = days[days.partition_point(|(d, _)| *d <= date)..].first();
     if prev.is_none() && next.is_none() {
         return String::new();
     }
     let mut out = String::from("<nav class=\"day-nav\">");
-    if let Some((d, p)) = prev {
-        out.push_str(&format!(
-            "<a rel=\"prev\" href=\"{}\">← {d}</a>",
-            esc(&site.page_href(from, p))
-        ));
+    if let Some((d, link)) = prev {
+        out.push_str(&format!("<a rel=\"prev\" href=\"{}\">← {d}</a>", esc(link)));
     }
-    if let Some((d, p)) = next {
-        out.push_str(&format!(
-            "<a rel=\"next\" href=\"{}\">{d} →</a>",
-            esc(&site.page_href(from, p))
-        ));
+    if let Some((d, link)) = next {
+        out.push_str(&format!("<a rel=\"next\" href=\"{}\">{d} →</a>", esc(link)));
     }
     out.push_str("</nav>\n");
     out
+}
+
+/// The page of a journal day that is not in the site (no file, no references), as a day
+/// referenced without a file would be shown. `days` are the journal days that have a
+/// file, sorted. `hermetic serve` shows it so the day can be written in the browser.
+pub fn blank_day(site_title: &str, date: Date, days: &[Date]) -> OutFile {
+    let path = journal_html(date);
+    let days: Vec<(Date, String)> = days
+        .iter()
+        .map(|&d| (d, href(&path, &journal_html(d), None)))
+        .collect();
+    let main = format!(
+        "<article class=\"page\">\n<header class=\"page-header\">\n<h1>{date} <span class=\"weekday\">{weekday}</span></h1>\n{nav}</header>\n<p class=\"empty\">There is no journal entry for this day.</p>\n<section class=\"linked-refs\">\n<h2>Linked references <span class=\"count\">0</span></h2>\n<p class=\"empty\">No other page references this one yet.</p>\n</section>\n</article>\n",
+        weekday = date.weekday(),
+        nav = day_links(&days, date),
+    );
+    OutFile {
+        html: document(
+            site_title,
+            &path,
+            &format!("{date} {}", date.weekday()),
+            &main,
+        ),
+        path,
+    }
+}
+
+fn journal_html(date: Date) -> PathBuf {
+    PathBuf::from(layout::JOURNALS_DIR).join(format!("{date}.html"))
 }
 
 fn page_body(site: &Site, from: &Path, page: PageId) -> String {

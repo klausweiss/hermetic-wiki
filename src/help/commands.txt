@@ -33,12 +33,14 @@ COMMANDS
       Shift+Tab indent and outdent, [[ and (( complete page and block
       references. Edits are saved to the note files automatically; a save
       is refused if the file changed on disk since the page loaded it.
-      "Today" opens (and creates) today's journal. "Delete page" moves a
-      page's file to .trash/ in the notes folder (move it back to restore
-      it). The trash is never emptied automatically; git ignores it
-      through the .trash/.gitignore written with it, unless that file
-      already exists. Other devices and other websites can never edit,
-      also with --host or --public.
+      "Today" opens today's journal. A journal day's file is created with
+      its first content and deleted once it is emptied again (nothing
+      but one empty block); files left empty otherwise go after an hour.
+      "Delete page" moves a page's file to .trash/ in the notes folder
+      (move it back to restore it). The trash is never emptied
+      automatically; git ignores it through the .trash/.gitignore
+      written with it, unless that file already exists. Other devices
+      and other websites can never edit, also with --host or --public.
 
       --port <n>        Use exactly this port; fail if it is taken.
       --host <address>  Listen on this address instead of 127.0.0.1.

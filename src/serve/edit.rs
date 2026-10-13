@@ -8,6 +8,7 @@ use std::io::{self, Write as _};
 use std::net::IpAddr;
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, SystemTime};
 
 use crate::graph::Graph;
 use crate::layout::{self, Date, JOURNALS_DIR, PAGES_DIR, ROOT_INDEX};
@@ -299,6 +300,57 @@ pub fn move_to_trash(root: &Path, path: &Path) -> Result<PathBuf, Unsafe> {
     fs::rename(path, &dest)?;
     prune_empty_dirs(root, path.parent());
     Ok(trashed)
+}
+
+/// How long an empty journal day is kept after its file last changed, so that a day just
+/// opened with "Today" stays while the author is about to write in it.
+pub const EMPTY_JOURNAL_GRACE: Duration = Duration::from_secs(60 * 60);
+
+/// Whether a note has no content: only blank lines, or one empty bullet (`-`).
+pub fn is_empty_note(text: &str) -> bool {
+    let mut lines = text.lines().map(str::trim).filter(|l| !l.is_empty());
+    matches!((lines.next(), lines.next()), (None, _) | (Some("-"), None))
+}
+
+/// Removes the empty journal days (`journals/YYYY-MM-DD.md` regular files, see
+/// [`is_empty_note`]) that have not changed for `grace` before `now`. They hold nothing,
+/// so they are removed rather than moved to the trash. Returns the removed paths
+/// relative to `root`.
+pub fn remove_empty_journals(root: &Path, now: SystemTime, grace: Duration) -> Vec<PathBuf> {
+    let Ok(entries) = fs::read_dir(root.join(JOURNALS_DIR)) else {
+        return Vec::new();
+    };
+    let mut removed = Vec::new();
+    for entry in entries.flatten() {
+        let rel = Path::new(JOURNALS_DIR).join(entry.file_name());
+        let is_day = rel
+            .file_name()
+            .and_then(|n| n.to_str())
+            .and_then(|n| n.strip_suffix(layout::EXTENSION))
+            .and_then(Date::parse)
+            .is_some();
+        // Symbolic links are left alone: what they point to is not the day's own file.
+        let Ok(meta) = fs::symlink_metadata(root.join(&rel)) else {
+            continue;
+        };
+        let old = meta
+            .modified()
+            .ok()
+            .and_then(|m| now.duration_since(m).ok())
+            .is_some_and(|age| age >= grace);
+        if !is_day || !meta.is_file() || !old {
+            continue;
+        }
+        let empty = fs::read(root.join(&rel))
+            .ok()
+            .and_then(|bytes| String::from_utf8(bytes).ok())
+            .is_some_and(|text| is_empty_note(&text));
+        if empty && fs::remove_file(root.join(&rel)).is_ok() {
+            removed.push(rel);
+        }
+    }
+    removed.sort();
+    removed
 }
 
 /// Lets git ignore the trash: writes `.gitignore` into it unless one exists (whatever
@@ -623,6 +675,60 @@ mod tests {
                 .flatten()
                 .all(|e| !e.file_name().to_string_lossy().ends_with(".tmp"))
         );
+        fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn empty_notes() {
+        for text in ["", "\n", "-\n", "- \n", "  -  \r\n\n", "\n-"] {
+            assert!(is_empty_note(text), "{text:?}");
+        }
+        for text in ["- a\n", "-\n-\n", "a\n", "- \n  - \n", "*\n", "title:: x\n"] {
+            assert!(!is_empty_note(text), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn empty_journals_removed() {
+        let base = std::env::temp_dir().join(format!("hermetic-empty-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let root = base.join("notes");
+        fs::create_dir_all(root.join("journals/sub")).unwrap();
+        fs::create_dir_all(root.join("pages")).unwrap();
+        let files = [
+            ("journals/2026-10-01.md", "-\n"),
+            ("journals/2026-10-02.md", ""),
+            ("journals/2026-10-03.md", "- standup\n"),
+            ("journals/notes.md", "-\n"),
+            ("journals/sub/2026-10-04.md", "-\n"),
+            ("pages/empty.md", "-\n"),
+        ];
+        for (rel, text) in files {
+            fs::write(root.join(rel), text).unwrap();
+        }
+        fs::write(base.join("outside.md"), "-\n").unwrap();
+        std::os::unix::fs::symlink(base.join("outside.md"), root.join("journals/2026-10-05.md"))
+            .unwrap();
+        let grace = EMPTY_JOURNAL_GRACE;
+
+        // Recently changed days stay.
+        assert!(remove_empty_journals(&root, SystemTime::now(), grace).is_empty());
+        assert!(root.join("journals/2026-10-01.md").exists());
+
+        let later = SystemTime::now() + grace + Duration::from_secs(1);
+        assert_eq!(
+            remove_empty_journals(&root, later, grace),
+            [
+                PathBuf::from("journals/2026-10-01.md"),
+                PathBuf::from("journals/2026-10-02.md"),
+            ]
+        );
+        for (rel, _) in &files[2..] {
+            assert!(root.join(rel).exists(), "{rel} kept");
+        }
+        assert!(fs::symlink_metadata(root.join("journals/2026-10-05.md")).is_ok());
+        assert!(base.join("outside.md").exists());
+        assert!(!root.join(TRASH_DIR).exists(), "nothing goes to the trash");
         fs::remove_dir_all(&base).unwrap();
     }
 }

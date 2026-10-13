@@ -44,6 +44,17 @@ export function serialize(doc: Doc): string {
   return out.join("\n") + (doc.finalNewline ? "\n" : "");
 }
 
+/** Whether a page's text has no content: only blank lines, or one empty bullet (`-`). */
+export function isEmpty(text: string): boolean {
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l !== "");
+  return lines.length === 0 || (lines.length === 1 && lines[0] === "-");
+}
+
+/** Whether two texts of a page say the same (all texts without content are alike). */
+export function sameText(a: string, b: string): boolean {
+  return a === b || (isEmpty(a) && isEmpty(b));
+}
+
 /** Whether a bullet indented by `prefix` nests under `parent` and after `prev`. */
 function fits(prefix: string, parent: string | null, prev: string | null): boolean {
   const col = width(prefix);

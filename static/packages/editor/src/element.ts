@@ -9,7 +9,7 @@ import { Conflict, type Refused, SaveQueue, type SaveState, SourceApi } from "./
 import { type Doc, type Node, type Payload, flatten, fromPayload, newNode } from "./model";
 import { MARKERS, applied, toggle } from "./format";
 import * as ops from "./ops";
-import { serialize } from "./serialize";
+import { sameText, serialize } from "./serialize";
 
 /** How long after the last keystroke a change is saved. */
 export const IDLE_SAVE_MS = 1000;
@@ -162,7 +162,7 @@ export class HermeticEditor extends HTMLElement {
 
   /** Whether changes are not yet stored in the file. */
   unsaved(): boolean {
-    return (this.doc !== null && serialize(this.doc) !== this.stored) || (this.queue?.dirty ?? false);
+    return (this.doc !== null && !sameText(serialize(this.doc), this.stored)) || (this.queue?.dirty ?? false);
   }
 
   // --- Header: "Today" and the save status ------------------------------------------
@@ -223,18 +223,11 @@ export class HermeticEditor extends HTMLElement {
   }
 
   private async openToday(path: string): Promise<void> {
-    holdLiveReload();
     try {
+      // Start writing only in a day without content; otherwise just show it. A day
+      // without a file gets one with the first save that has content.
       const p = await this.api.get(path);
-      // Start writing only in a day without content; otherwise just show it.
       if (p.blocks.every((b) => b.body.trim() === "")) startAfterLoad(path);
-      if (!p.exists) {
-        try {
-          await this.api.put(path, p.version, "-\n");
-        } catch (e) {
-          if (!(e instanceof Conflict)) throw e; // created meanwhile: just open it
-        }
-      }
     } catch {
       // Open it anyway; the page tells what is wrong.
     }
@@ -260,6 +253,9 @@ export class HermeticEditor extends HTMLElement {
     const before = this.doc ? flatten(this.doc).map((e) => e.node) : [];
     const activeIndex = this.active ? before.indexOf(this.active.node) : -1;
     this.doc = fromPayload(payload);
+    // A journal day emptied while being written in has no file and no blocks: keep the
+    // empty block being edited.
+    if (this.doc.roots.length === 0 && this.active) this.doc.roots.push(newNode());
     this.stored = payload.text;
     if (this.queue) this.queue.version = payload.version;
     const after = flatten(this.doc).map((e) => e.node);
@@ -663,7 +659,7 @@ export class HermeticEditor extends HTMLElement {
   saveNow(): void {
     clearTimeout(this.idle);
     if (!this.queue || !this.doc) return;
-    if (serialize(this.doc) === this.stored && !this.queue.dirty) {
+    if (sameText(serialize(this.doc), this.stored) && !this.queue.dirty) {
       this.showState("saved");
       return;
     }

@@ -1,0 +1,2 @@
+# Fixtures whose line endings are the point of the test: never normalise them.
+tests/fixtures/editing/crlf.md -text

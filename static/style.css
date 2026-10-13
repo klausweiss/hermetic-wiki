@@ -439,7 +439,7 @@ dialog.search-dialog {
   border: 1px solid color-mix(in srgb, var(--muted) 45%, transparent);
   box-shadow: 0 24px 64px rgb(0 0 0 / 0.32), 0 2px 8px rgb(0 0 0 / 0.12);
 }
-dialog.search-dialog::backdrop { background: rgb(0 0 0 / 0.3); }
+dialog.search-dialog::backdrop { background: rgb(0 0 0 / 0.5); }
 .search-panel, .search-panel form { display: flex; flex-direction: column; max-height: calc(76vh - 2px); }
 .search-field {
   display: flex; align-items: center; gap: 0.6rem; padding: 0.7rem 0.9rem;

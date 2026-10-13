@@ -229,3 +229,27 @@ fn fits_a_terminal() {
     assert!(!reference.contains('\x1b'));
     assert!(!reference.contains('\t'));
 }
+
+#[test]
+fn page_properties_and_aliases() {
+    let snippet = example("alias:: authentication, [[login]]\n\n- how we sign users in");
+    let notes = Notes::new(&[
+        ("pages/auth.md", snippet),
+        (
+            "journals/2026-10-12.md",
+            "- fixed [[login]] for #authentication",
+        ),
+    ]);
+    let (g, diags) = notes.load();
+    assert!(diags.is_empty(), "{diags:?}");
+    let auth = page(&g, "auth");
+    assert_eq!(g.page_props(auth)[0].key, "alias");
+    let b = block(&g, "fixed [[login]] for #authentication");
+    assert!(
+        g.block(b)
+            .refs
+            .iter()
+            .all(|r| r.target == RefTarget::Page(auth))
+    );
+    assert!(g.find_page("login").is_none());
+}

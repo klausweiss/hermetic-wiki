@@ -454,3 +454,220 @@ fn markdown_link_to_the_home_page() {
     assert!(diags[0].message.contains("README.md"));
     assert_eq!(g.backlinks(page(&g, "index")).len(), 2);
 }
+
+// Page properties and aliases.
+
+fn prop_pairs(g: &hermetic::Graph, name: &str) -> Vec<(String, String)> {
+    g.page_props(page(g, name))
+        .iter()
+        .map(|p| (p.key.clone(), p.value.clone()))
+        .collect()
+}
+
+#[test]
+fn page_properties_from_lines_at_the_top() {
+    let notes = Notes::new(&[(
+        "pages/auth.md",
+        "alias:: authentication\ntags:: security\n\n- first note",
+    )]);
+    let (g, _) = notes.load();
+    assert_eq!(
+        prop_pairs(&g, "auth"),
+        [
+            ("alias".to_owned(), "authentication".to_owned()),
+            ("tags".to_owned(), "security".to_owned())
+        ]
+    );
+}
+
+#[test]
+fn page_properties_from_a_properties_only_first_bullet() {
+    let notes = Notes::new(&[("pages/auth.md", "- alias:: authentication\n- first note")]);
+    let (g, _) = notes.load();
+    assert_eq!(
+        prop_pairs(&g, "auth"),
+        [("alias".to_owned(), "authentication".to_owned())]
+    );
+}
+
+#[test]
+fn no_page_properties_when_the_first_block_has_content() {
+    let notes = Notes::new(&[("pages/auth.md", "- decided to use JWT\n  status:: accepted")]);
+    let (g, _) = notes.load();
+    assert!(prop_pairs(&g, "auth").is_empty());
+    let b = block(&g, "decided to use JWT");
+    assert_eq!(g.block(b).prop("status"), Some("accepted"));
+}
+
+#[test]
+fn link_through_an_alias() {
+    let notes = Notes::new(&[
+        (
+            "pages/auth.md",
+            "alias:: authentication, [[login]]\n\n- notes",
+        ),
+        (
+            "journals/2026-10-12.md",
+            "- fixed [[authentication]] and #login\n  - TODO rotate keys",
+        ),
+    ]);
+    let (g, diags) = notes.load();
+    assert!(diags.is_empty(), "{diags:?}");
+    let auth = page(&g, "auth");
+    assert_eq!(g.page(auth).aliases, ["authentication", "login"]);
+    let b = block(&g, "fixed [[authentication]] and #login");
+    assert_eq!(
+        g.block(b).refs.iter().map(|r| r.target).collect::<Vec<_>>(),
+        [RefTarget::Page(auth); 2]
+    );
+    assert_eq!(g.direct_pages(b).into_iter().collect::<Vec<_>>(), [auth]);
+    let groups = g.linked_references(auth);
+    assert_eq!(groups.len(), 1);
+    assert_eq!(
+        contents(&g, groups[0].refs.iter().map(|r| r.block)),
+        ["fixed [[authentication]] and #login"]
+    );
+    assert_eq!(contents(&g, g.open_page_tasks(auth)), ["rotate keys"]);
+    assert!(g.find_page("authentication").is_none());
+    assert!(g.find_page("login").is_none());
+}
+
+#[test]
+fn aliases_are_case_insensitive() {
+    let notes = Notes::new(&[
+        ("pages/auth.md", "- alias:: Authentication"),
+        ("pages/notes.md", "- see [[authentication]]"),
+    ]);
+    let (g, _) = notes.load();
+    let b = block(&g, "see [[authentication]]");
+    assert_eq!(g.block(b).refs[0].target, RefTarget::Page(page(&g, "auth")));
+}
+
+#[test]
+fn aliased_references_count_as_co_mentions() {
+    let notes = Notes::new(&[
+        ("pages/auth.md", "- alias:: login"),
+        ("journals/2026-10-12.md", "- [[login]] uses [[redis]]"),
+    ]);
+    let (g, _) = notes.load();
+    let related: Vec<_> = g
+        .related(page(&g, "redis"))
+        .iter()
+        .map(|r| r.page)
+        .collect();
+    assert_eq!(names(&g, related), ["auth"]);
+}
+
+#[test]
+fn alias_property_is_not_a_reference() {
+    let notes = Notes::new(&[("pages/auth.md", "- alias:: [[login]], #sso")]);
+    let (g, _) = notes.load();
+    let auth = page(&g, "auth");
+    let first = g.page(auth).roots[0];
+    assert!(g.block(first).refs.is_empty());
+    assert!(g.linked_references(auth).is_empty());
+    assert!(g.find_page("login").is_none());
+}
+
+#[test]
+fn alias_of_an_existing_page() {
+    let notes = Notes::new(&[
+        ("pages/auth.md", "- alias:: redis"),
+        ("pages/redis.md", "- cache"),
+        ("pages/notes.md", "- [[redis]]"),
+    ]);
+    let (g, diags) = notes.load();
+    assert_eq!(kinds(&diags), [DiagnosticKind::InvalidAlias]);
+    assert!(diags[0].message.contains("pages/redis.md"), "{diags:?}");
+    assert!(g.page(page(&g, "auth")).aliases.is_empty());
+    let b = block(&g, "[[redis]]");
+    assert_eq!(
+        g.block(b).refs[0].target,
+        RefTarget::Page(page(&g, "redis"))
+    );
+}
+
+#[test]
+fn alias_claimed_twice() {
+    let notes = Notes::new(&[
+        ("pages/auth.md", "- alias:: sso"),
+        ("pages/login.md", "- alias:: SSO"),
+        ("pages/notes.md", "- [[sso]]"),
+    ]);
+    let (g, diags) = notes.load();
+    assert_eq!(kinds(&diags), [DiagnosticKind::InvalidAlias]);
+    let d = &diags[0];
+    assert_eq!(d.file, std::path::Path::new("pages/login.md"));
+    assert!(d.message.contains("pages/auth.md"), "{d:?}");
+    let b = block(&g, "[[sso]]");
+    assert_eq!(g.block(b).refs[0].target, RefTarget::Page(page(&g, "auth")));
+}
+
+#[test]
+fn date_alias() {
+    let notes = Notes::new(&[
+        ("pages/launch.md", "- alias:: 2026-10-01"),
+        ("pages/notes.md", "- [[2026-10-01]]"),
+    ]);
+    let (g, diags) = notes.load();
+    assert_eq!(kinds(&diags), [DiagnosticKind::InvalidAlias]);
+    let b = block(&g, "[[2026-10-01]]");
+    let RefTarget::Page(day) = g.block(b).refs[0].target else {
+        panic!("not a page")
+    };
+    assert!(matches!(g.page(day).kind, PageKind::Journal(_)));
+}
+
+#[test]
+fn invalid_and_self_aliases() {
+    let notes = Notes::new(&[("pages/auth.md", "- alias:: Auth, a//b, ../x")]);
+    let (g, diags) = notes.load();
+    assert_eq!(kinds(&diags), [DiagnosticKind::InvalidAlias; 2]);
+    assert!(g.page(page(&g, "auth")).aliases.is_empty());
+}
+
+#[test]
+fn alias_of_a_namespace() {
+    let notes = Notes::new(&[
+        ("pages/auth.md", "- alias:: Project X"),
+        ("pages/Project X/Billing.md", "- b"),
+    ]);
+    let (_, diags) = notes.load();
+    assert_eq!(kinds(&diags), [DiagnosticKind::InvalidAlias]);
+}
+
+#[test]
+fn alias_not_in_the_first_block() {
+    let notes = Notes::new(&[
+        ("pages/auth.md", "- intro\n- alias:: other"),
+        ("pages/notes.md", "- [[other]]"),
+    ]);
+    let (g, _) = notes.load();
+    assert!(g.page(page(&g, "other")).is_implicit());
+}
+
+#[test]
+fn markdown_link_to_an_alias_name() {
+    let notes = Notes::new(&[
+        ("pages/auth.md", "- alias:: login"),
+        ("pages/notes.md", "- [x](login.md)"),
+    ]);
+    let (g, diags) = notes.load();
+    assert_eq!(kinds(&diags), [DiagnosticKind::BrokenLink]);
+    let b = block(&g, "[x](login.md)");
+    assert_eq!(g.block(b).refs[0].target, RefTarget::Unresolved);
+}
+
+#[test]
+fn namespaced_alias() {
+    let notes = Notes::new(&[
+        ("pages/auth.md", "- alias:: Project X/Login"),
+        ("pages/notes.md", "- [[Project X/Login]]"),
+    ]);
+    let (g, diags) = notes.load();
+    assert!(diags.is_empty(), "{diags:?}");
+    let b = block(&g, "[[Project X/Login]]");
+    assert_eq!(g.block(b).refs[0].target, RefTarget::Page(page(&g, "auth")));
+    assert!(g.find_page("Project X/Login").is_none());
+    assert!(g.find_page("Project X").is_none());
+}

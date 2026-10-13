@@ -11,8 +11,9 @@
 //! the term, `doc_delta, tf * 2 + field, field_length`. `parent_delta` is the distance
 //! back to the document of the block's parent (0 for top-level blocks and pages), from
 //! which breadcrumbs are built.
-//! Documents are pages (field 0: the name) and blocks (field 1: the text), in scan
-//! order, so journal blocks come first and in date order. A shard holds the terms
+//! Documents are pages (field 0: the name, then one more document per alias) and
+//! blocks (field 1: the text), in scan order, so journal blocks come first and in date
+//! order. A shard holds the terms
 //! starting with the same two characters (hex-encoded in the file name).
 
 use std::collections::BTreeMap;
@@ -87,6 +88,20 @@ pub fn build(g: &Graph, site: &SiteInfo) -> BTreeMap<PathBuf, Vec<u8>> {
             &p.name,
         );
         let mut last = first;
+        // One more page document per alias, so that each is an exact name of its own.
+        for alias in &p.aliases {
+            last = add(
+                &mut docs,
+                Doc {
+                    page,
+                    anchor: String::new(),
+                    parent: None,
+                    preview: String::new(),
+                },
+                FIELD_NAME,
+                alias,
+            );
+        }
         // Depth first, so a parent's document always precedes its children's.
         let mut stack: Vec<(BlockId, Option<usize>)> =
             p.roots.iter().rev().map(|&b| (b, None)).collect();

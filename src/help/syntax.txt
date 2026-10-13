@@ -34,6 +34,23 @@ SYNTAX
         - TTL defaults were wrong
           id:: ttl-bug
 
+  Page properties and aliases
+      When the first block of a page has only properties (written at the
+      top of the file, with or without a bullet), they are properties of
+      the page. The alias property gives the page more names, separated by
+      commas, each written plainly or as [[name]]:
+
+        alias:: authentication, [[login]]
+
+        - how we sign users in
+
+      Links and tags to an alias, like [[login]] or #authentication, then
+      lead to this page and show up on it, keeping the text as written; no
+      page is made for the alias. An alias that is the name of a page with
+      a file, a namespace of such pages, a date, or an alias of another page
+      is reported and ignored. Names with commas cannot be aliases, and
+      markdown links to files are not affected.
+
   Tasks
       A block starting with TODO, DOING, or DONE (in capitals, followed by a
       space) is a task. TODO and DOING are open; DONE is closed.

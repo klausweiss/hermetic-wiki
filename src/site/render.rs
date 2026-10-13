@@ -193,6 +193,16 @@ impl<'g> Site<'g> {
             if prop.key == "id" {
                 continue;
             }
+            if prop.key == "alias" && b.holds_page_props() {
+                // Shown as written, without links: they would point back at this page.
+                let names = crate::parse::alias_names(&prop.value).join(", ");
+                out.push_str(&format!(
+                    "<div><dt>{}</dt><dd>{}</dd></div>",
+                    esc(&prop.key),
+                    esc(&names)
+                ));
+                continue;
+            }
             let refs = b
                 .refs
                 .iter()

@@ -115,6 +115,29 @@ impl ParsedBlock {
     }
 }
 
+/// Whether a block consists only of property lines, so that, as a page's first block, its
+/// properties are the page's properties.
+pub fn is_properties_only(content: &str, task: Option<TaskState>, props: &[Property]) -> bool {
+    content.is_empty() && task.is_none() && !props.is_empty()
+}
+
+/// The names in an `alias` property value: comma-separated, each written bare or as a
+/// single page link (`[[name]]`), trimmed, empty parts skipped.
+pub fn alias_names(value: &str) -> Vec<&str> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            part.strip_prefix("[[")
+                .and_then(|p| p.strip_suffix("]]"))
+                .filter(|name| !name.contains("[[") && !name.contains("]]"))
+                .map_or(part, str::trim)
+        })
+        .filter(|name| !name.is_empty())
+        .collect()
+}
+
 /// Whether `id` is acceptable as a block id: non-empty, without whitespace or parentheses.
 pub fn is_valid_block_id(id: &str) -> bool {
     !id.is_empty()
@@ -849,6 +872,26 @@ mod tests {
         assert_eq!(blocks[0].content, "");
         assert_eq!(blocks[0].prop("title"), Some("Auth"));
         assert_eq!(blocks[0].props[1].refs[0].text, "security");
+    }
+
+    #[test]
+    fn alias_names_split() {
+        assert_eq!(
+            alias_names("a, [[b c]] ,, [[ d ]],e"),
+            ["a", "b c", "d", "e"]
+        );
+        assert_eq!(alias_names("[[a]] [[b]]"), ["[[a]] [[b]]"]);
+        assert_eq!(alias_names(" , [[]]"), Vec::<&str>::new());
+    }
+
+    #[test]
+    fn properties_only() {
+        let blocks = parse_blocks("- alias:: a\n- TODO\n  x:: y\n- b\n  x:: y\n");
+        let only = |b: &ParsedBlock| is_properties_only(&b.content, b.task, &b.props);
+        assert_eq!(
+            blocks.iter().map(only).collect::<Vec<_>>(),
+            [true, false, false]
+        );
     }
 
     #[test]

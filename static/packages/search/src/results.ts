@@ -56,7 +56,7 @@ export async function resolve(source: IndexSource, meta: Meta, hits: Hit[]): Pro
     const page = c.pages[e[0]] ?? ["", ""];
     return { path: page[0], name: page[1], anchor: e[1], parent: e[2], preview: e[3] };
   };
-  return Promise.all(
+  const results = await Promise.all(
     hits.map(async (hit) => {
       const e = await entry(hit.doc);
       const breadcrumb: string[] = [];
@@ -82,6 +82,10 @@ export async function resolve(source: IndexSource, meta: Meta, hits: Hit[]): Pro
       };
     }),
   );
+  // A page has one document per name (its own and each alias); show it once, where it
+  // ranks best.
+  const pages = new Set<string>();
+  return results.filter((r) => r.kind !== "page" || (!pages.has(r.path) && pages.add(r.path)));
 }
 
 export interface Segment {

@@ -625,3 +625,38 @@ fn footer_names_the_commit() {
     };
     assert!(html.contains(&expected), "{html}");
 }
+
+#[test]
+fn alias_property_is_shown_without_links() {
+    let (_n, _h, out, _) = built(&[(
+        "pages/auth.md",
+        "alias:: authentication, [[login]]\n\n- notes",
+    )]);
+    let html = main_of(&out, "pages/auth.html");
+    assert!(
+        html.contains("<dt>alias</dt><dd>authentication, login</dd>"),
+        "{html}"
+    );
+    assert!(!html.contains("login.html"), "{html}");
+}
+
+#[test]
+fn link_through_an_alias_goes_to_the_page() {
+    let (_n, _h, out, diags) = built(&[
+        ("pages/auth.md", "- alias:: login"),
+        ("journals/2026-10-12.md", "- [[login]] and #login"),
+    ]);
+    assert!(diags.is_empty(), "{diags:?}");
+    let html = main_of(&out, "journals/2026-10-12.html");
+    assert!(
+        html.contains(r#"<a class="page-ref" href="../pages/auth.html">login</a>"#),
+        "{html}"
+    );
+    assert!(
+        html.contains(r#"<a class="tag" href="../pages/auth.html">#login</a>"#),
+        "{html}"
+    );
+    assert!(!out.join("pages/login.html").exists());
+    let auth = main_of(&out, "pages/auth.html");
+    assert!(auth.contains("2026-10-12"), "{auth}");
+}

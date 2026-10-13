@@ -13,6 +13,8 @@ pub enum DiagnosticKind {
     CollidingFiles,
     InvalidPageName,
     InvalidBlockId,
+    /// An `alias` page property name that cannot be used (and is ignored).
+    InvalidAlias,
     DuplicateBlockId,
     DanglingBlockRef,
     BrokenLink,

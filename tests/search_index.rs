@@ -154,3 +154,21 @@ fn typescript_test_index_is_current() {
         "static/packages/search/test-index is out of date: run UPDATE_SNAPSHOTS=1 cargo test --test search_index"
     );
 }
+
+#[test]
+fn aliases_are_page_names() {
+    let notes = Notes::new(&[("pages/auth.md", "alias:: authentication\n\n- notes")]);
+    let (_h, out, _) = build_site(notes.path());
+    let all = postings(&out, "authentication");
+    let alias: Vec<_> = all.iter().filter(|p| p[1] == 0).collect();
+    assert_eq!(alias.len(), 1, "one name-field posting: {all:?}");
+    assert_eq!(alias[0][0], 1, "right after the page's own document");
+    assert_eq!(alias[0][3], 1, "the alias alone is the name");
+    let docs = fs::read_to_string(out.join("search/d/0.json")).unwrap();
+    assert!(
+        docs.contains(r#""pages":[["pages/auth.html","auth"]]"#),
+        "{docs}"
+    );
+    // The page's own document and the alias's both belong to the page.
+    assert!(docs.contains(r#"[0,"",0,""],[0,"",0,""]"#), "{docs}");
+}

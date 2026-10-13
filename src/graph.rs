@@ -37,6 +37,8 @@ pub struct Page {
     pub ns_parent: Option<PageId>,
     /// Direct namespace children, ordered by key.
     pub ns_children: Vec<PageId>,
+    /// Accepted names from the page's `alias` property, normalized, in written order.
+    pub aliases: Vec<String>,
 }
 
 impl Page {
@@ -119,6 +121,12 @@ impl Block {
             .find(|p| p.key == key)
             .map(|p| p.value.as_str())
     }
+
+    /// Whether this block holds its page's properties: the page's first block, made
+    /// only of property lines.
+    pub fn holds_page_props(&self) -> bool {
+        self.index == 0 && parse::is_properties_only(&self.content, self.task, &self.props)
+    }
 }
 
 /// A linked reference: a block referencing the page, with its ancestors (root first).
@@ -171,6 +179,8 @@ pub struct Graph {
     blocks: Vec<Block>,
     by_key: HashMap<NameKey, PageId>,
     by_id: HashMap<String, BlockId>,
+    /// Alias names of pages; never the name of a page with a file.
+    aliases: HashMap<NameKey, PageId>,
     /// Per page: blocks that directly reference the page or one of its blocks.
     backlinks: Vec<Vec<BlockId>>,
     /// Per page: task blocks on the page or inheriting a reference to it.
@@ -210,6 +220,7 @@ impl Graph {
             g.add_blocks(*page, l, &mut raw_refs, &mut diags);
         }
         g.build_id_table(&mut diags);
+        g.build_aliases(&mut diags);
 
         let mut resolver = Resolver { diags: &mut diags };
         for (page, l) in &file_pages {
@@ -267,6 +278,15 @@ impl Graph {
     /// Finds a page by name, case-insensitively.
     pub fn find_page(&self, name: &str) -> Option<PageId> {
         self.by_key.get(&NameKey::new(name)).copied()
+    }
+
+    /// The page's properties: those of its first block when that block is made only of
+    /// property lines.
+    pub fn page_props(&self, page: PageId) -> &[Property] {
+        match self.page(page).roots.first().map(|&b| self.block(b)) {
+            Some(b) if b.holds_page_props() => &b.props,
+            _ => &[],
+        }
     }
 
     /// Finds a block by its `id::` property.
@@ -502,6 +522,7 @@ impl Graph {
             roots: Vec::new(),
             ns_parent: None,
             ns_children: Vec::new(),
+            aliases: Vec::new(),
         });
         id
     }
@@ -555,7 +576,13 @@ impl Graph {
                 .iter()
                 .map(|r| (r.clone(), RefLocation::Content))
                 .collect();
+            let page_props =
+                id.0 == base && parse::is_properties_only(&pb.content, pb.task, &pb.props);
             for (i, prop) in pb.props.iter().enumerate() {
+                if page_props && prop.key == "alias" {
+                    // Links among the aliases would only point back at this page.
+                    continue;
+                }
                 refs.extend(
                     prop.refs
                         .iter()
@@ -613,6 +640,77 @@ impl Graph {
                         locations.join(", ")
                     ),
                 ));
+            }
+        }
+    }
+
+    /// Collects the `alias` page properties of file pages, in scan order. Runs before
+    /// references are resolved, while every page in `by_key` has a file.
+    fn build_aliases(&mut self, diags: &mut Vec<Diagnostic>) {
+        let mut namespaces = HashSet::new();
+        for p in &self.pages {
+            for (slash, _) in p.name.match_indices('/') {
+                namespaces.insert(NameKey::new(&p.name[..slash]));
+            }
+        }
+        for i in 0..self.pages.len() {
+            let page = PageId(i as u32);
+            let Some(&first) = self.pages[i].roots.first() else {
+                continue;
+            };
+            let b = self.block(first);
+            let Some(value) = b.prop("alias").filter(|_| b.holds_page_props()) else {
+                continue;
+            };
+            let names: Vec<String> = parse::alias_names(value)
+                .into_iter()
+                .map(normalize_name)
+                .collect();
+            let file = self.pages[i].file.clone().unwrap_or_default();
+            let line = Some(b.line);
+            for name in names {
+                let key = NameKey::new(&name);
+                let problem = if let Err(e) = validate_name(&name) {
+                    Some(format!("invalid alias `{name}`: {e}"))
+                } else if key == self.pages[i].key {
+                    continue;
+                } else if Date::parse(&name).is_some() {
+                    Some(format!("alias `{name}` is a journal date"))
+                } else if let Some(&other) = self.by_key.get(&key) {
+                    let other = self.page(other);
+                    Some(format!(
+                        "alias `{name}` is the name of the page `{}` ({})",
+                        other.name,
+                        other.file.clone().unwrap_or_default().display()
+                    ))
+                } else if namespaces.contains(&key) {
+                    Some(format!("alias `{name}` is the namespace of other pages"))
+                } else {
+                    match self.aliases.get(&key) {
+                        Some(&other) if other == page => continue,
+                        Some(&other) => {
+                            let other = self.page(other);
+                            Some(format!(
+                                "alias `{name}` is already an alias of the page `{}` ({})",
+                                other.name,
+                                other.file.clone().unwrap_or_default().display()
+                            ))
+                        }
+                        None => None,
+                    }
+                };
+                match problem {
+                    Some(message) => diags.push(Diagnostic::new(
+                        DiagnosticKind::InvalidAlias,
+                        file.clone(),
+                        line,
+                        format!("{message}; ignored"),
+                    )),
+                    None => {
+                        self.aliases.insert(key, page);
+                        self.pages[i].aliases.push(name);
+                    }
+                }
             }
         }
     }
@@ -809,7 +907,12 @@ impl Resolver<'_> {
                     ));
                     return None;
                 }
-                RefTarget::Page(g.page_for_name(&name))
+                // Aliases never name a page with a file, so they come first: an implicit
+                // page with the same name exists only as a namespace prefix.
+                match g.aliases.get(&NameKey::new(&name)) {
+                    Some(&p) => RefTarget::Page(p),
+                    None => RefTarget::Page(g.page_for_name(&name)),
+                }
             }
             RawRefKind::Block => match g.find_block(&raw.text) {
                 Some(b) => RefTarget::Block(b),

@@ -66,6 +66,18 @@ test("exact page name first", async () => {
   expect(r.length > 3).toBeTrue();
 });
 
+test("a page matching its name and an alias is listed once", async () => {
+  const r = await results("kafka");
+  expect(r.filter((x) => x.path === "pages/kafka.html" && x.kind === "page")).toHaveLength(1);
+});
+
+test("searching an alias", async () => {
+  const r = await results("event log");
+  expect(r[0]?.kind).toBe("page");
+  expect(r[0]?.path).toBe("pages/kafka.html");
+  expect(r[0]?.name).toBe("kafka");
+});
+
 test("recency breaks ties", async () => {
   const r = await results("deploy freeze");
   expect(r.slice(0, 2).map((x) => x.path)).toEqual(["journals/2026-10-01.html", "journals/2025-01-10.html"]);

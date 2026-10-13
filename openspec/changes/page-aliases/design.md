@@ -26,7 +26,7 @@
 *Alternative:* move the properties onto `Page` and drop the block. That would break "no text is lost" and the editor's block ↔ source mapping. The block stays a normal block.
 
 ### Alias table separate from `by_key`
-Add `aliases: HashMap<NameKey, PageId>` to `Graph`, plus `Page::aliases: Vec<String>` (accepted names in written order, for search and display). Resolution of `RawRefKind::Page | Tag` checks `by_key` first, then `aliases`, then creates an implicit page.
+Add `aliases: HashMap<NameKey, PageId>` to `Graph`, plus `Page::aliases: Vec<String>` (accepted names in written order, for search and display). Resolution of `RawRefKind::Page | Tag` checks `aliases` first, then `by_key`, then creates an implicit page. Aliases never name a page with a file, so checking them first only matters for an implicit namespace-prefix page with the alias's name (from `[[login/x]]`): the link still goes to the aliased page, whichever reference is resolved first.
 Keeping aliases out of `by_key` means:
 - `find_page` (used for URLs and the home page),
 - markdown-link resolution,

@@ -257,6 +257,7 @@ fn not_editable() {
         "journals.html",
         "pages.html",
         "search.html",
+        "graph.html",
         "refs/pages/kafka/2.html",
         "pages/kafka.md",
         "../outside.html",

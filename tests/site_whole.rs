@@ -48,6 +48,7 @@ fn fixture_file_list() {
         "_hermetic/fonts/LICENSE-Inter.txt",
         "_hermetic/fonts/LICENSE-JetBrainsMono.txt",
         "_hermetic/style.css",
+        "graph.html",
         "index.html",
         "journals.html",
         "journals/2026-09-30.html",

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { absolutize, classify, isSafePagePath } from "./links";
+import { absolutize, anchorHref, classify, isSafePagePath } from "./links";
 
 const root = "http://localhost:8000/wiki/";
 
@@ -75,4 +75,20 @@ test("safe page paths", () => {
   ]) {
     expect(isSafePagePath(bad)).toBeFalse();
   }
+});
+
+test("anchorHref resolves the attribute, for HTML and SVG links alike", () => {
+  const anchor = (href: string | null, baseURI: string) => ({
+    getAttribute: (name: string) => (name === "href" ? href : null),
+    baseURI,
+  });
+  const base = "http://localhost:8000/wiki/graph.html";
+  expect(anchorHref(anchor("pages/Project%20X.html", base))).toBe(
+    "http://localhost:8000/wiki/pages/Project%20X.html",
+  );
+  expect(anchorHref(anchor("../index.html#b2", "http://localhost:8000/wiki/pages/a.html"))).toBe(
+    "http://localhost:8000/wiki/index.html#b2",
+  );
+  expect(anchorHref(anchor("https://example.com/", base))).toBe("https://example.com/");
+  expect(anchorHref(anchor(null, base))).toBe(base);
 });

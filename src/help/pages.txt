@@ -38,8 +38,15 @@ PAGES AND REFERENCES
   Site-wide pages
       Home page (index.md, or the journal list), journal list (newest
       first, grouped by month, also readable as one timeline), all pages
-      (implicit ones marked), open tasks, and search. Long lists of linked
-      references or tasks continue on further pages, 100 per page.
+      (implicit ones marked), open tasks, search, and the graph. Long lists
+      of linked references or tasks continue on further pages, 100 per page.
+
+  Graph
+      graph.html draws every page other than journal days as a node, bigger
+      the more pages link to it, and joins two pages when a block links one
+      to the other or mentions both (also in journals). Click a node to
+      open its page. With JavaScript, drag to pan and scroll or pinch to
+      zoom; more names appear as you zoom in.
 
   Search
       Over http:// (hermetic serve, or any static host), the header has a
@@ -52,7 +59,8 @@ PAGES AND REFERENCES
 
   Reading
       Shift+click a link to open the page in the sidebar next to the
-      current one (over http://). Press ? for keyboard shortcuts.
+      current one (over http://). Press g g for the graph, ? for all
+      keyboard shortcuts.
 
   Example
       Notes:

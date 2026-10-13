@@ -1,6 +1,8 @@
 //! Building the static HTML site from a notes directory.
 
 mod assets;
+mod graph_layout;
+mod graph_view;
 mod html;
 mod pages;
 mod paths;
@@ -152,6 +154,7 @@ pub fn render(
     }
     site_files.extend(pages::task_files(&site));
     site_files.push(pages::search_page(&site));
+    site_files.push(graph_view::graph_page(&site));
     for file in site_files {
         files.insert(file.path, Content::Bytes(file.html.into_bytes()));
     }

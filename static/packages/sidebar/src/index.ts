@@ -10,6 +10,7 @@ import {
   SIDEBAR_CLOSE_TOP,
   SIDEBAR_TOGGLE,
   TARGET_ATTR,
+  anchorHref,
   carrySidebar,
   classify,
   fetchPage,
@@ -189,11 +190,15 @@ export class HermeticSidebar extends HTMLElement {
     if (!this.env || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.altKey) {
       return;
     }
-    const a = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>("a[href]") : null;
-    if (!a || (a.target && a.target !== "_self") || a.hasAttribute("download")) {
+    // HTML or SVG links (the graph view's nodes); read through attributes, which mean
+    // the same for both.
+    const a = e.target instanceof Element ? e.target.closest("a[href]") : null;
+    const target = a?.getAttribute("target");
+    if (!a || (target && target !== "_self") || a.hasAttribute("download")) {
       return;
     }
-    const link = classify(a.href, location.href, this.env.root.href);
+    const url = anchorHref(a);
+    const link = classify(url, location.href, this.env.root.href);
     if (link.kind !== "page") {
       return;
     }
@@ -202,8 +207,8 @@ export class HermeticSidebar extends HTMLElement {
       this.open(link.path, link.fragment);
     } else {
       // A normal navigation, carrying the sidebar's state to the next page.
-      const href = carrySidebar(a.href, location.href);
-      if (href !== a.href) {
+      const href = carrySidebar(url, location.href);
+      if (href !== url) {
         e.preventDefault();
         location.href = href;
       }

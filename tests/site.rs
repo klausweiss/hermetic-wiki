@@ -466,7 +466,14 @@ fn output_inside_notes_root_is_not_read_as_notes() {
 #[test]
 fn site_wide_pages() {
     let (_n, _h, out, _) = built(&[("pages/a.md", "- x")]);
-    for f in ["index.html", "journals.html", "pages.html", "tasks.html"] {
+    for f in [
+        "index.html",
+        "journals.html",
+        "pages.html",
+        "tasks.html",
+        "search.html",
+        "graph.html",
+    ] {
         assert!(out.join(f).is_file(), "{f}");
     }
 }

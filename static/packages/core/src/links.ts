@@ -47,6 +47,20 @@ export function absolutize(value: string, pageUrl: string): string {
   }
 }
 
+/** The parts of an `<a>` element (HTML or SVG) that say where it links to. */
+export interface Anchor {
+  getAttribute(name: string): string | null;
+  baseURI: string;
+}
+
+/**
+ * The absolute URL a link points to. Works for SVG links too, whose `href` property is
+ * not a string, by resolving the attribute the way the browser does when it is followed.
+ */
+export function anchorHref(a: Anchor): string {
+  return absolutize(a.getAttribute("href") ?? "", a.baseURI);
+}
+
 /** Whether a root-relative path is safe to request: no scheme, no `..`, ends in `.html`. */
 export function isSafePagePath(path: string): boolean {
   if (path === "" || path.startsWith("/") || /^[a-z][a-z0-9+.-]*:/i.test(path)) {

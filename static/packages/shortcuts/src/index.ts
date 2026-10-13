@@ -16,6 +16,7 @@ const GO_TARGETS: Readonly<Record<string, string>> = {
   j: "journals.html",
   p: "pages.html",
   t: "tasks.html",
+  g: "graph.html",
 };
 
 interface Shortcut {
@@ -39,6 +40,7 @@ const HELP: readonly Shortcut[] = [
   { keys: "g j", what: "Journals" },
   { keys: "g p", what: "All pages" },
   { keys: "g t", what: "Open tasks" },
+  { keys: "g g", what: "Graph" },
   { keys: "g d", what: "Today's journal", editing: true },
   { keys: "/", what: "Search", search: true },
   { keys: MOD_K, what: "Search, even while typing", search: true },

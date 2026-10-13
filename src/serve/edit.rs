@@ -507,6 +507,7 @@ mod tests {
             "journals/2026-10-13.md",
             "journals.html",
             "tasks.html",
+            "graph.html",
             "pages/index.html",
             "pages/x.html",
             "journals/sub/2026-10-13.html",

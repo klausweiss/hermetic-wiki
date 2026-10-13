@@ -1,7 +1,7 @@
 //! The page/block graph: resolution of references, backlinks, inherited references,
 //! linked references, tasks, namespaces and co-mentions.
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 
@@ -149,6 +149,19 @@ impl Related<'_> {
     pub fn weight(&self) -> usize {
         self.blocks.len()
     }
+}
+
+/// The whole-wiki graph of the graph view: every non-journal page, and an edge between
+/// two of them for each block connecting them (a link from one to the other, or a
+/// co-mention).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Overview {
+    /// Nodes in page order.
+    pub nodes: Vec<PageId>,
+    /// Per node: the number of other pages with a block directly referencing it.
+    pub mentions: Vec<u32>,
+    /// `(node, node, weight)` by node index, smaller index first, sorted.
+    pub edges: Vec<(u32, u32, u32)>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -408,6 +421,59 @@ impl Graph {
                 .then_with(|| display_order(&self.page(a.page).name, &self.page(b.page).name))
         });
         out
+    }
+
+    /// The graph of all non-journal pages; see [`Overview`]. The page `index` is left
+    /// out when it has no file, as it then has no page of its own.
+    pub fn overview(&self) -> Overview {
+        let mut index = vec![u32::MAX; self.pages.len()];
+        let mut nodes = Vec::new();
+        for (id, page) in self.pages() {
+            if !page.is_journal() && !(page.is_implicit() && layout::is_home_name(&page.name)) {
+                index[id.0 as usize] = nodes.len() as u32;
+                nodes.push(id);
+            }
+        }
+        let mentions = nodes
+            .iter()
+            .map(|&p| {
+                let sources: HashSet<PageId> = self
+                    .backlinks(p)
+                    .iter()
+                    .map(|&b| self.block(b).page)
+                    .filter(|&s| s != p)
+                    .collect();
+                sources.len() as u32
+            })
+            .collect();
+        let mut weights: BTreeMap<(u32, u32), u32> = BTreeMap::new();
+        let mut pairs = BTreeSet::new();
+        for (id, block) in self.blocks() {
+            let here = index[block.page.0 as usize];
+            let refs: Vec<u32> = self
+                .direct_pages(id)
+                .into_iter()
+                .map(|p| index[p.0 as usize])
+                .filter(|&n| n != u32::MAX && n != here)
+                .collect();
+            pairs.clear();
+            for (i, &a) in refs.iter().enumerate() {
+                if here != u32::MAX {
+                    pairs.insert((here.min(a), here.max(a)));
+                }
+                for &b in &refs[i + 1..] {
+                    pairs.insert((a.min(b), a.max(b)));
+                }
+            }
+            for &pair in &pairs {
+                *weights.entry(pair).or_default() += 1;
+            }
+        }
+        Overview {
+            nodes,
+            mentions,
+            edges: weights.into_iter().map(|((a, b), w)| (a, b, w)).collect(),
+        }
     }
 
     // -- building -----------------------------------------------------------------

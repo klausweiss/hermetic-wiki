@@ -210,6 +210,66 @@ ul.tasks > li { margin: 0.3rem 0; }
 .children ul, ul.days, ul.all-pages { padding-left: 1.25rem; }
 .implicit { font-size: 0.75rem; color: var(--muted); margin-left: 0.4rem; }
 
+/* Graph view: drawn at its natural size, shrunk to fit; the script makes it a full canvas. */
+
+main:has(> article.graph-view) { max-width: none; }
+.graph-view > .page-header { max-width: calc(var(--measure) - 32px); margin-left: auto; margin-right: auto; }
+hermetic-graph { display: block; position: relative; }
+.graph {
+  display: block; margin: 0 auto; max-width: 100%; max-height: 80vh;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+}
+.graph a:hover { text-decoration: none; }
+.graph-edges path {
+  fill: none; stroke: var(--muted); stroke-opacity: 0.4; stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.graph-edges .w1 { stroke-width: 1; }
+.graph-edges .w2 { stroke-width: 2; }
+.graph-edges .w3 { stroke-width: 3; }
+.graph-nodes circle { fill: var(--link); stroke: var(--surface); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.graph-nodes .implicit circle { fill: var(--surface); stroke: var(--muted); stroke-dasharray: 3 2; }
+.graph-nodes a:hover circle, .graph-nodes a:focus-visible circle { fill: var(--text); }
+.graph-nodes a:focus-visible { outline: none; }
+.graph-nodes a:focus-visible circle { stroke: var(--link); stroke-width: 3; }
+/* --u is one screen pixel in graph units: the script keeps labels the same size on screen
+   at every zoom level. */
+.graph-nodes text {
+  font-size: calc(11px * var(--u, 1)); fill: var(--text); text-anchor: middle; dominant-baseline: hanging;
+  paint-order: stroke; stroke: var(--surface); stroke-width: calc(3px * var(--u, 1)); stroke-linejoin: round;
+}
+.graph-nodes .implicit text { fill: var(--muted); }
+/* Only the biggest nodes are labelled until the reader zooms in. */
+.graph-nodes a:not(.t0) text { display: none; }
+.graph-nodes a:hover text, .graph-nodes a:focus-visible text { display: inline; }
+.graph-empty { color: var(--muted); }
+
+/* With the script: a canvas to pan and zoom in, labels by zoom level (data-zoom), and the
+   hovered or focused node's neighbourhood emphasized (data-focus). */
+hermetic-graph[data-ready] .graph {
+  width: 100%; height: min(80vh, 60rem); max-height: none;
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
+}
+hermetic-graph[data-moving] .graph { cursor: grabbing; }
+hermetic-graph[data-zoom="1"] .graph-nodes .t1 text,
+hermetic-graph[data-zoom="2"] .graph-nodes :is(.t1, .t2) text,
+hermetic-graph[data-zoom="3"] .graph-nodes a text { display: inline; }
+/* While moving, only the biggest labels are drawn, to keep panning smooth. */
+hermetic-graph[data-moving] .graph-nodes a:not(.t0) text { display: none; }
+.graph[data-focus] .graph-edges path { stroke-opacity: 0.12; }
+.graph[data-focus] .graph-nodes a:not(.hl) { opacity: 0.25; }
+.graph[data-focus] .graph-nodes a.hl text { display: inline; }
+.graph-highlight { fill: none; stroke: var(--link); stroke-width: 2; stroke-opacity: 0.8; vector-effect: non-scaling-stroke; }
+.graph-controls {
+  position: absolute; top: 0.5rem; right: 0.5rem;
+  display: flex; flex-direction: column; gap: 0.25rem;
+}
+.graph-controls button {
+  display: grid; place-items: center; width: 2rem; height: 2rem; padding: 0; background: var(--bg);
+}
+.graph-controls button:hover { background: var(--surface); }
+.graph-controls .icon { width: 16px; height: 16px; }
+
 @media (max-width: 600px) {
   html { font-size: 16px; }
   .page-header h1 { font-size: 1.5rem; }

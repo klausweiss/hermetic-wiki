@@ -28,12 +28,12 @@ Alternatives: (a) emit JSON and simulate in the browser on a canvas, like Logseq
 - Edges: for every block `b` located on page `L`, let `S = direct_pages(b)` restricted to non-journal pages. The block contributes the pairs `{L, q}` for `q ∈ S \ {L}` when `L` is not a journal (links), plus all pairs within `S \ {L}` (co-mentions, matching `reference-graph`'s rule that the containing page does not count). Pairs are deduplicated per block and then counted, so the weight is the number of distinct blocks. Use a `BTreeMap<(PageId, PageId), u32>` keyed by `(min, max)` to keep the order deterministic.
 - Mentions (node size): the number of distinct pages of `backlinks(p)`, excluding `p`. Radius `r = R_MIN + K·sqrt(mentions)`, clamped to `R_MAX`.
 
-### Layout algorithm (`src/site/layout_graph.rs`, pure)
-- Force-directed (Fruchterman–Reingold style): spring attraction along edges (scaled by `ln(1 + weight)`), pairwise repulsion approximated with a Barnes–Hut quadtree (θ ≈ 0.9), and a weak linear gravity toward the origin so disconnected components and orphans stay nearby without overlapping the main cluster. A fixed number of iterations (about 300) with linear cooling of the maximum step. No convergence test, so the running time is predictable.
-- A short final pass pushes overlapping circles apart, using their radii.
-- Seeds: each node's starting point comes from FNV-1a over its `NameKey` bytes (never `std`'s randomly-keyed hasher), mapped onto a disc whose radius grows with `sqrt(n)`. A page keeps its starting point across builds, which limits reshuffling when unrelated pages change.
-- Determinism: single-threaded, plain `f64` arithmetic in fixed iteration order, and coordinates written rounded to one decimal. Byte-identical output is required only for the same binary, which this satisfies.
-- Cost: O(iterations · (n log n + e)). That's about 300 · (5,000·13 + 20,000) ≈ 25M steps, which should be well under the 300 ms target. Checked by an ignored release-mode test, like the existing `test-perf` checks.
+### Layout algorithm (`src/site/graph_layout.rs`, pure)
+- Force-directed, ForceAtlas2-style. Edges attract linearly in their length, scaled by `1 + ln(weight)`. Every pair of nodes repels with magnitude k²·qᵢ·qⱼ/d, approximated with a Barnes–Hut quadtree (θ = 1.2). The charge q grows with the node's radius, so hubs get room. A linear gravity toward the origin keeps disconnected components and orphans nearby. There are 150 iterations with linear cooling of the maximum step, and no convergence test, so the running time is predictable. A quadratic (Fruchterman–Reingold) spring was tried first. It crushed graphs with many long-range edges into a jammed ball that the overlap pass could not untangle, and it was 2.2 s at 5,000 nodes.
+- A final pass pushes overlapping circles apart, using their radii.
+- Seeds: each node's starting point comes from FNV-1a (finished with a splitmix64 round) over its `NameKey` bytes, never `std`'s randomly-keyed hasher. It is mapped onto a disc whose radius grows with `sqrt(n)`. A page keeps its starting point across builds, which limits reshuffling when unrelated pages change.
+- Determinism: plain `f64` arithmetic in a fixed order, with coordinates written rounded to one decimal. From 1,000 nodes up, repulsion is computed on up to 8 threads. Each body's force depends only on the previous iteration's positions and is computed by exactly one thread, so the result is identical whatever the thread count. Byte-identical output is required only for the same binary, which this satisfies.
+- Cost: O(iterations · (n log n + e)). Measured at about 210 ms on 8 CPUs and 270 ms on 4 for 5,000 nodes and 21,600 edges, and about 500 ms on a single core (see tasks 2.2). Checked by an ignored release-mode test, like the existing `test-perf` checks. A dev-only ignored test, `layout_preview`, renders a wiki-like graph to SVG for tuning by eye.
 
 ### SVG structure
 ```html
@@ -75,9 +75,9 @@ Add `g: "graph.html"` to `GO_TARGETS` and a line to the help dialog. The chord l
 ## Risks / Trade-offs
 
 - [The layout reshuffles when the graph changes, since force layouts are chaotic] → Seeds come from page names, so unchanged pages start where they did before. Accepted otherwise. A live simulation is out of scope.
-- [`graph.html` is large for big wikis: about 5,000 nodes × ~130 B plus 20,000 edges × ~20 B ≈ 1 MB] → Compact edge paths and neighbour lists. The bounded-size exception is in the spec. Measured in the release perf test.
-- [SVG paint cost while panning with thousands of `<a>`/`<text>` elements] → Transform a single group (`will-change: transform`). While a gesture is active, hide labels below `t0` with a `data-moving` attribute. Check with the 5,000-page bench corpus in Chromium and Firefox.
-- [The serve rebuild budget] → The layout is under 300 ms at 5,000 pages (tested). If it becomes a problem, positions could be cached keyed on the edge set. Not done now.
+- [`graph.html` is large for big wikis: measured at 1.55 MB (290 KB gzipped) for 5,000 pages and 16,800 edges, about 215 B per node (the name appears twice, as tooltip and label) plus about 28 B per edge] → Compact edge paths and neighbour lists. The bounded-size exception is in the spec.
+- [SVG paint cost while panning with thousands of `<a>`/`<text>` elements] → Transform a single group, and while a gesture is active hide labels below `t0` (`data-moving`). Measured (tasks 6.1): 60 fps at 300 pages in both browsers. At 5,000 pages Chromium stays at 60 fps, but headless Firefox pans at about 20 fps; `will-change: transform` did not help. If real Firefox is also slow on very large wikis, the next step would be drawing to a canvas while moving.
+- [The serve rebuild budget] → The layout takes under 300 ms at 5,000 pages on 4 or more CPUs, and about 500 ms on one (tested). If it becomes a problem, positions could be cached keyed on the edge set. Not done now.
 - [Wheel capture can trap page scrolling] → The graph's height is capped (`min(80vh, …)`) so the page header and footer stay reachable. Zoom applies only while the pointer is over the graph.
 
 ## Open Questions

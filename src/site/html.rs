@@ -69,7 +69,7 @@ pub fn document(site_title: &str, path: &Path, title: &str, main: &str) -> Strin
          <body>\n\
          <header class=\"site-header\">\n\
          <a class=\"site-title\" href=\"{index}\">{site}</a>\n\
-         <nav class=\"site-nav\"><a href=\"{journals}\">Journals</a><a href=\"{pages}\">All pages</a><a href=\"{tasks}\">Open tasks</a><hermetic-search></hermetic-search><hermetic-theme-toggle></hermetic-theme-toggle></nav>\n\
+         <nav class=\"site-nav\"><a href=\"{journals}\">Journals</a><a href=\"{pages}\">All pages</a><a href=\"{tasks}\">Open tasks</a><a href=\"{graph}\">Graph</a><hermetic-search></hermetic-search><hermetic-theme-toggle></hermetic-theme-toggle></nav>\n\
          </header>\n\
          <main>\n{main}</main>\n\
          <hermetic-sidebar></hermetic-sidebar>\n\
@@ -85,6 +85,7 @@ pub fn document(site_title: &str, path: &Path, title: &str, main: &str) -> Strin
         journals = to("journals.html"),
         pages = to("pages.html"),
         tasks = to("tasks.html"),
+        graph = to("graph.html"),
     )
 }
 
@@ -113,6 +114,7 @@ mod tests {
         let page = document("notes", Path::new("pages/a.html"), "a", "x");
         assert!(page.contains(r#"href="../_hermetic/style.css""#));
         assert!(page.contains(r#"<a href="../tasks.html">Open tasks</a>"#));
+        assert!(page.contains(r#"<a href="../graph.html">Graph</a>"#));
 
         let nested = document(
             "notes",
@@ -122,6 +124,7 @@ mod tests {
         );
         assert!(nested.contains(r#"<a class="site-title" href="../../index.html">notes</a>"#));
         assert!(nested.contains(r#"<a href="../../journals.html">Journals</a>"#));
+        assert!(nested.contains(r#"<a href="../../graph.html">Graph</a>"#));
         assert!(nested.contains("<title>A &amp; B · notes</title>"));
         assert!(nested.contains(r#"<meta name="hermetic-root" content="../..">"#));
         assert!(nested.contains(r#"<script src="../../_hermetic/app.js"></script>"#));

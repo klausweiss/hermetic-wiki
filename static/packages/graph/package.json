@@ -1,0 +1,8 @@
+{
+  "name": "@hermetic/graph",
+  "private": true,
+  "type": "module",
+  "description": "<hermetic-graph>: pan, zoom, labels, and neighbour highlighting for the graph view.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@hermetic/core": "workspace:*" }
+}

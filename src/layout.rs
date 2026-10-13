@@ -192,9 +192,15 @@ pub fn page_file_path(name: &str) -> PathBuf {
     path
 }
 
-/// Relative path (`journals/YYYY-MM-DD.md`) of the file that stores a journal day.
+/// Relative path (`journals/YYYY_MM_DD.md`) of the file a new journal day is written to.
 pub fn journal_file_path(date: Date) -> PathBuf {
-    PathBuf::from(JOURNALS_DIR).join(format!("{date}{EXTENSION}"))
+    let stem = date.to_string().replace('-', "_");
+    PathBuf::from(JOURNALS_DIR).join(format!("{stem}{EXTENSION}"))
+}
+
+/// Relative path (`journals/YYYY-MM-DD.html`) of a journal day's HTML page.
+pub fn journal_html_path(date: Date) -> PathBuf {
+    PathBuf::from(JOURNALS_DIR).join(format!("{date}.html"))
 }
 
 /// Page name of a regular page stored at `rel` (relative to the root, under `pages/`).
@@ -249,7 +255,7 @@ impl Date {
     }
 
     /// Parses the stem of a journal file name: `YYYY-MM-DD`, or `YYYY_MM_DD` as some
-    /// other tools name them. New files are always written with dashes.
+    /// other tools name them. New files are always written with underscores.
     pub fn parse_file_stem(stem: &str) -> Option<Date> {
         let b = stem.as_bytes();
         if b.len() == 10 && b[4] == b'_' && b[7] == b'_' {
@@ -614,7 +620,11 @@ mod tests {
         }
         assert_eq!(
             journal_file_path(d),
-            PathBuf::from("journals/2026-10-12.md")
+            PathBuf::from("journals/2026_10_12.md")
+        );
+        assert_eq!(
+            journal_html_path(d),
+            PathBuf::from("journals/2026-10-12.html")
         );
         assert!(Date::parse("2026-09-30").unwrap() < d);
         assert_eq!(d.weekday(), "Monday");

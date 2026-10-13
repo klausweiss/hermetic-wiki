@@ -9,9 +9,9 @@ use crate::layout;
 pub fn output_path(g: &Graph, page: PageId) -> PathBuf {
     let p = g.page(page);
     match (&p.file, p.kind) {
-        // Journal days are always at `journals/YYYY-MM-DD.html`, even from a `YYYY_MM_DD.md`
-        // file, so a day's address does not depend on how its file is named.
-        (_, PageKind::Journal(date)) => md_to_html(&layout::journal_file_path(date)),
+        // Journal days are always at `journals/YYYY-MM-DD.html`, whether the file is named
+        // `YYYY-MM-DD.md` or `YYYY_MM_DD.md`, so a day's address does not depend on it.
+        (_, PageKind::Journal(date)) => layout::journal_html_path(date),
         (Some(file), _) => md_to_html(file),
         // Without `index.md`, the page `index` is the default home page.
         (None, PageKind::Regular) if layout::is_home_name(&p.name) => PathBuf::from("index.html"),

@@ -591,7 +591,7 @@ mod tests {
         let map = EditMap::new();
         let day = resolve(&map, "journals/2026-10-13.html").unwrap();
         assert_eq!(day.name, "2026-10-13");
-        assert_eq!(source_path(&day), PathBuf::from("journals/2026-10-13.md"));
+        assert_eq!(source_path(&day), PathBuf::from("journals/2026_10_13.md"));
         let home = resolve(&map, "index.html").unwrap();
         assert_eq!(source_path(&home), PathBuf::from("index.md"));
         let page = resolve(&map, "pages/Project X/Auth.html").unwrap();

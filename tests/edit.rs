@@ -193,10 +193,11 @@ fn underscore_journal_file_is_saved_in_place() {
     );
     assert!(!notes.path().join("journals/2026-07-07.md").exists());
 
-    // A new day is still written with dashes.
+    // A new day is written with underscores.
     let r = put_source(server.addr, "journals/2026-07-09.html", "missing", "- fresh\n");
     assert_eq!(r.status, 200, "{}", r.body);
-    assert!(notes.path().join("journals/2026-07-09.md").exists());
+    assert!(notes.path().join("journals/2026_07_09.md").exists());
+    assert!(!notes.path().join("journals/2026-07-09.md").exists());
 }
 
 #[test]
@@ -242,7 +243,7 @@ fn new_pages_and_days() {
     let r = put_source(server.addr, "journals/2026-10-13.html", "missing", "- a\n");
     assert_eq!(r.status, 200, "{}", r.body);
     assert_eq!(
-        fs::read_to_string(notes.path().join("journals/2026-10-13.md")).unwrap(),
+        fs::read_to_string(notes.path().join("journals/2026_10_13.md")).unwrap(),
         "- a\n"
     );
     assert!(page(server.addr, "journals/2026-10-13.html").contains("2026-10-13"));
@@ -255,7 +256,7 @@ fn new_pages_and_days() {
     );
     assert_eq!(r.status, 409);
     assert_eq!(
-        fs::read_to_string(notes.path().join("journals/2026-10-13.md")).unwrap(),
+        fs::read_to_string(notes.path().join("journals/2026_10_13.md")).unwrap(),
         "- a\n"
     );
     // No stray files anywhere.
@@ -272,7 +273,7 @@ fn new_pages_and_days() {
 fn pages_without_content_have_no_file() {
     let notes = Notes::new(&[("journals/2026-10-12.md", "- standup [[empty]]\n")]);
     let server = start(notes.path());
-    let day = notes.path().join("journals/2026-10-13.md");
+    let day = notes.path().join("journals/2026_10_13.md");
 
     // A day without a file is shown, ready to write in, without creating its file.
     let html = page(server.addr, "journals/2026-10-13.html");

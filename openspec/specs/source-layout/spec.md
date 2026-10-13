@@ -34,7 +34,7 @@ The system SHALL treat a given directory as the notes root with no configuration
 - **THEN** `pages/index.md` is the page `index (in pages)`, not the home page, and a diagnostic names it
 
 ### Requirement: Journal page naming
-A journal file SHALL be named `YYYY-MM-DD.md` or `YYYY_MM_DD.md` with a valid calendar date, and its page name SHALL be that date in the `YYYY-MM-DD` form. Its HTML page SHALL be at `journals/YYYY-MM-DD.html` either way, and files the system creates for journal days SHALL always use the dashed form. A file in `journals/` whose name is not a valid date SHALL be reported as a diagnostic and treated as a regular page named after its file stem.
+A journal file SHALL be named `YYYY-MM-DD.md` or `YYYY_MM_DD.md` with a valid calendar date, and its page name SHALL be that date in the `YYYY-MM-DD` form. Its HTML page SHALL be at `journals/YYYY-MM-DD.html` either way, and files the system creates for journal days SHALL always use the underscore form. A file in `journals/` whose name is not a valid date SHALL be reported as a diagnostic and treated as a regular page named after its file stem.
 
 #### Scenario: Valid journal file
 - **WHEN** the root contains `journals/2024-02-29.md`

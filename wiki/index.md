@@ -1,4 +1,4 @@
-- A static site generator for project-specific wiki.
+- [[hermetic]] is a static site generator for project-specific wiki.
 - ## Design goals
   - no config required, single binary that just works
   - opinionated, not many knobs to turns, intended to work for my use-case

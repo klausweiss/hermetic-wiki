@@ -1,13 +1,16 @@
-// <hermetic-search> (the header box) and <hermetic-search-results> (search.html).
-// Both render nothing until defined, and only over http(s): fetching the index needs it.
+// <hermetic-search> (the header's search button and dialog) and <hermetic-search-results>
+// (search.html). Both render nothing until defined, and only over http(s): fetching the
+// index needs it.
 
-import { PAGES_CHANGED, SEARCH_FOCUS, readEnv, whenParsed } from "@hermetic/core";
+import { PAGES_CHANGED, SEARCH_FOCUS, SEARCH_TOGGLE, icon, readEnv, whenParsed } from "@hermetic/core";
 
 import { search } from "./query";
 import { type Result, highlight, href, resolve } from "./results";
 import { FetchSource } from "./source";
 
-/** Results shown under the header box, and on the results page. */
+const APPLE = /Mac|iPhone|iPad/.test(navigator.platform);
+
+/** Results shown in the search dialog, and on the results page. */
 export const BOX_RESULTS = 8;
 export const PAGE_RESULTS = 200;
 const DEBOUNCE_MS = 80;
@@ -88,6 +91,9 @@ function note(results: Result[], query: string): string | null {
 /** The search box in the header, with results as you type. */
 export class HermeticSearch extends HTMLElement {
   private input: HTMLInputElement | null = null;
+  private dialog!: HTMLDialogElement;
+  /** What had focus before the dialog opened, focused again when it closes. */
+  private returnFocus: HTMLElement | null = null;
   private list!: HTMLElement;
   private root!: URL;
   private selected = -1;
@@ -103,14 +109,33 @@ export class HermeticSearch extends HTMLElement {
     if (this.input || !env.interactive) return;
     this.root = env.root;
 
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "search-button";
+    const label = `Search (/ or ${APPLE ? "⌘ K" : "Ctrl + K"})`;
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    button.setAttribute("aria-haspopup", "dialog");
+    button.append(icon("search"));
+    button.addEventListener("click", () => this.open());
+
+    // A modal dialog: in the top layer wherever it sits, the rest of the page inert while
+    // it is open, and Escape closes it.
+    const dialog = document.createElement("dialog");
+    dialog.className = "search-dialog";
+    dialog.setAttribute("aria-label", "Search the notes");
+    const panel = document.createElement("div");
+    panel.className = "search-panel";
     const form = document.createElement("form");
     form.role = "search";
     form.method = "get";
     form.action = new URL("search.html", env.root).href;
+    const field = document.createElement("div");
+    field.className = "search-field";
     const input = document.createElement("input");
     input.type = "search";
     input.name = "q";
-    input.placeholder = "Search";
+    input.placeholder = "Search the notes";
     input.autocomplete = "off";
     input.setAttribute("aria-label", "Search the notes");
     input.setAttribute("aria-controls", "hermetic-search-list");
@@ -118,13 +143,17 @@ export class HermeticSearch extends HTMLElement {
     input.value = new URL(location.href).pathname.endsWith("/search.html")
       ? (new URL(location.href).searchParams.get("q") ?? "")
       : "";
+    field.append(icon("search"), input);
     this.list = document.createElement("div");
     this.list.id = "hermetic-search-list";
     this.list.className = "search-dropdown";
     this.list.setAttribute("role", "listbox");
     this.list.hidden = true;
-    form.append(input, this.list);
-    this.append(form);
+    form.append(field, this.list);
+    panel.append(form);
+    dialog.append(panel);
+    this.append(button, dialog);
+    this.dialog = dialog;
     this.input = input;
 
     input.addEventListener("input", () => {
@@ -132,9 +161,6 @@ export class HermeticSearch extends HTMLElement {
       this.timer = window.setTimeout(() => void this.update(), DEBOUNCE_MS);
     });
     input.addEventListener("keydown", (e) => this.onKey(e));
-    input.addEventListener("focus", () => {
-      if (input.value.trim() && this.list.childElementCount > 0) this.list.hidden = false;
-    });
     form.addEventListener("submit", (e) => {
       const option = this.options()[this.selected];
       if (option) {
@@ -144,20 +170,30 @@ export class HermeticSearch extends HTMLElement {
         e.preventDefault();
       }
     });
-    document.addEventListener("click", (e) => {
-      if (!this.contains(e.target as Node)) this.close();
+    // The dialog itself has no padding: a click on it, not on the panel, is on the backdrop.
+    dialog.addEventListener("click", (e) => {
+      if (e.target === dialog) this.closeDialog();
     });
-    document.addEventListener(SEARCH_FOCUS, () => {
-      input.focus();
-      input.select();
+    // Opening a result closes the dialog, also when Shift+click opens it in the sidebar.
+    this.list.addEventListener("click", (e) => {
+      if (e.target instanceof Element && e.target.closest("a")) this.closeDialog();
     });
+    dialog.addEventListener("close", () => {
+      this.close();
+      const back = this.returnFocus;
+      this.returnFocus = null;
+      if (back?.isConnected) back.focus();
+    });
+    document.addEventListener(SEARCH_FOCUS, () => this.open());
+    document.addEventListener(SEARCH_TOGGLE, () => (dialog.open ? this.closeDialog() : this.open()));
     document.addEventListener(INDEX_CHANGED, () => {
       if (!this.list.hidden) void this.update();
     });
   }
 
+  /** The results and, after them, the link to all results: what the arrow keys move through. */
   private options(): HTMLAnchorElement[] {
-    return [...this.list.querySelectorAll<HTMLAnchorElement>("a.search-result")];
+    return [...this.list.querySelectorAll<HTMLAnchorElement>("a.search-result, a.search-all")];
   }
 
   private async update(): Promise<void> {
@@ -194,6 +230,9 @@ export class HermeticSearch extends HTMLElement {
       all.className = "search-all";
       all.href = `${new URL("search.html", this.root).href}?q=${encodeURIComponent(query)}`;
       all.textContent = "All results →";
+      all.setAttribute("role", "option");
+      all.id = "hermetic-search-option-all";
+      all.tabIndex = -1;
       this.list.append(all);
     }
     this.select(-1);
@@ -222,10 +261,26 @@ export class HermeticSearch extends HTMLElement {
       e.preventDefault();
       this.select(this.selected - 1);
     } else if (e.key === "Escape") {
+      // A search field would spend the first Escape on clearing itself; close instead,
+      // keeping the query for the next time search opens.
       e.preventDefault();
-      if (this.list.hidden) this.input?.blur();
-      this.close();
+      this.closeDialog();
     }
+  }
+
+  private open(): void {
+    if (!this.input) return;
+    if (!this.dialog.open) {
+      this.returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      this.dialog.showModal();
+      if (this.input.value.trim() && this.list.childElementCount > 0) this.list.hidden = false;
+    }
+    this.input.focus();
+    this.input.select();
+  }
+
+  private closeDialog(): void {
+    if (this.dialog.open) this.dialog.close();
   }
 
   private close(): void {

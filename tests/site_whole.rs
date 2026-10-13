@@ -181,7 +181,8 @@ fn is_external(url: &str) -> bool {
 
 #[test]
 fn no_external_resources() {
-    // Author-written external links are allowed; they are the only expected exception.
+    // Author-written external links are allowed, and the footer's link to hermetic's
+    // project page; they are the only expected exceptions.
     let notes = Notes::new(&[
         (
             "pages/a.md",
@@ -213,9 +214,8 @@ fn no_external_resources() {
         }
         for url in urls(&text) {
             if is_external(&url) {
-                assert_eq!(
-                    url,
-                    "https://example.com",
+                assert!(
+                    url == "https://example.com" || url == hermetic::site::PROJECT_URL,
                     "{} links to {url}",
                     path.display()
                 );

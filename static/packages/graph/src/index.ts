@@ -164,8 +164,9 @@ export class HermeticGraph extends HTMLElement {
     if (!mod || e.altKey || e.shiftKey || e.key.toLowerCase() !== "f" || e.defaultPrevented) {
       return;
     }
-    // Pressed again in the search box: the browser's own find.
-    if (document.activeElement === this.searchInput) {
+    // Pressed again in the search box: the browser's own find. Behind another modal
+    // dialog (site search, the shortcut list), the graph is out of reach: leave it too.
+    if (document.activeElement === this.searchInput || document.querySelector("dialog:modal")) {
       return;
     }
     e.preventDefault();

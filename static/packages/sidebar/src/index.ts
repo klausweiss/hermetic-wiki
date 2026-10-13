@@ -146,6 +146,12 @@ export class HermeticSidebar extends HTMLElement {
     this.list = document.createElement("div");
     this.list.className = "panes";
     aside.append(bar, this.placeholder, this.list);
+    // The site footer is written inside this element so that, without the script, it
+    // follows the page's content; with it, it sits at the bottom of the sidebar.
+    const footer = this.querySelector(":scope > .site-footer");
+    if (footer) {
+      aside.append(footer);
+    }
 
     this.toggle = button("", "Show or hide the sidebar (\\)", () => this.toggleHidden());
     this.toggle.classList.add("corner-button", "sidebar-toggle");

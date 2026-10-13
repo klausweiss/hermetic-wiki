@@ -39,6 +39,8 @@
 :root {
   --bg: #fbfbfa;
   --surface: #f2f2ef;
+  /* Surfaces raised above the page: dialogs. */
+  --elevated: #ffffff;
   --text: #1f2328;
   --muted: #6a6f76;
   --border: #e1e1dc;
@@ -61,6 +63,7 @@
   :root:not([data-theme="light"]) {
     --bg: #17181a;
     --surface: #202124;
+    --elevated: #26282b;
     --text: #e6e6e3;
     --muted: #9a9ea5;
     --border: #2f3134;
@@ -76,6 +79,7 @@
 :root[data-theme="dark"] {
   --bg: #17181a;
   --surface: #202124;
+  --elevated: #26282b;
   --text: #e6e6e3;
   --muted: #9a9ea5;
   --border: #2f3134;
@@ -128,7 +132,7 @@ blockquote { margin: 0.5rem 0; padding-left: 1rem; border-left: 3px solid var(--
   border-bottom: 1px solid var(--border);
 }
 .site-title { font-weight: 650; color: var(--text); }
-.site-nav { display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.9rem; }
+.site-nav { display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.9rem; flex: 1; }
 .site-nav a { color: var(--muted); }
 
 main { max-width: var(--measure); margin: 0 auto; padding: 1.5rem 16px 4rem; }
@@ -370,6 +374,17 @@ hermetic-timeline.show-timeline > h2, hermetic-timeline.show-timeline > ul.days 
 }
 .sidebar-bar span { margin-right: auto; font-weight: 600; }
 .panes { overflow-y: auto; flex: 1; padding: 0 1rem 2rem; }
+
+/* The site footer: after the page's content without the script (its parent,
+   <hermetic-sidebar>, is then an ordinary inline element), at the sidebar's bottom with it. */
+.site-footer {
+  display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; align-items: baseline;
+  max-width: var(--measure); margin: 0 auto; padding: 1rem 16px 2rem;
+  border-top: 1px solid var(--border); font-size: 0.72rem; color: var(--muted);
+}
+.site-footer a { color: var(--link); }
+.site-footer code { font-size: 1em; background: none; padding: 0; }
+.sidebar .site-footer { max-width: none; width: 100%; margin: 0; padding: 0.6rem 1rem; flex: none; }
 .sidebar-placeholder { margin: 1.5rem 1rem; color: var(--muted); font-size: 0.85rem; }
 .sidebar-placeholder[hidden], .sidebar-bar button[hidden] { display: none; }
 .pane {
@@ -405,21 +420,38 @@ dialog.shortcuts dl { display: grid; grid-template-columns: auto 1fr; gap: 0.3re
 dialog.shortcuts dt { font-family: "JetBrains Mono", monospace; font-size: 0.85rem; }
 dialog.shortcuts dd { margin: 0; }
 
-/* Search (shown only when the script runs over http) */
+/* Search (shown only when the script runs over http): a header button opening a dialog
+   in the upper part of the window, with the field and the results as you type. */
 
-hermetic-search { position: relative; }
-hermetic-search input {
-  font: inherit; font-size: 0.85rem; width: 12rem; max-width: 40vw;
-  padding: 0.15rem 0.55rem; color: var(--text); background: var(--bg);
-  border: 1px solid var(--border); border-radius: 6px;
+hermetic-search { display: inline-flex; align-self: center; margin-left: auto; }
+/* The theme toggle's button is fixed in the corner; its element takes no room in the nav. */
+.site-nav hermetic-theme-toggle { display: contents; }
+.search-button {
+  display: inline-grid; place-items: center; width: 1.9rem; height: 1.9rem; padding: 0;
+  border-color: transparent; color: var(--muted);
 }
-hermetic-search input:focus { outline: 2px solid var(--link); outline-offset: -1px; }
-.search-dropdown {
-  position: absolute; top: calc(100% + 0.35rem); left: 0; z-index: 20;
-  width: min(34rem, calc(100vw - 32px)); max-height: 70vh; overflow-y: auto;
-  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12); padding: 0.3rem;
+.search-button:hover, .search-button:focus-visible { border-color: var(--border); color: var(--text); }
+.search-button .icon { width: 16px; height: 16px; }
+dialog.search-dialog {
+  width: min(40rem, calc(100vw - 16px)); max-width: none; max-height: 76vh;
+  margin: 12vh auto auto; padding: 0; overflow: hidden;
+  color: var(--text); background: var(--elevated); border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--muted) 45%, transparent);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.32), 0 2px 8px rgb(0 0 0 / 0.12);
 }
+dialog.search-dialog::backdrop { background: rgb(0 0 0 / 0.3); }
+.search-panel, .search-panel form { display: flex; flex-direction: column; max-height: calc(76vh - 2px); }
+.search-field {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+.search-field .icon { width: 18px; height: 18px; color: var(--muted); flex: none; }
+.search-field input {
+  flex: 1; min-width: 0; font: inherit; font-size: 1.05rem; color: var(--text);
+  background: none; border: none; outline: none; padding: 0;
+}
+.search-dropdown { overflow-y: auto; padding: 0.3rem; }
+.search-dropdown[hidden] { display: none; }
 .search-result {
   display: block; padding: 0.45rem 0.6rem; border-radius: 6px; color: var(--text);
 }
@@ -430,20 +462,25 @@ hermetic-search input:focus { outline: 2px solid var(--link); outline-offset: -1
 .search-result-preview { display: block; font-size: 0.85rem; color: var(--muted); overflow-wrap: anywhere; }
 .search-result mark { background: none; color: var(--text); font-weight: 650; text-decoration: underline; text-decoration-color: var(--link); text-underline-offset: 2px; }
 .search-note, .search-summary { color: var(--muted); font-size: 0.85rem; margin: 0.3rem 0.6rem; }
-.search-all { display: block; padding: 0.35rem 0.6rem; font-size: 0.85rem; }
+.search-all { display: block; padding: 0.35rem 0.6rem; font-size: 0.85rem; border-radius: 6px; }
+.search-all:hover, .search-all[aria-selected="true"] { background: var(--surface); text-decoration: none; }
 .search-list .search-result { padding: 0.6rem 0.75rem; margin: 0.2rem 0; }
 .search-unavailable[hidden] { display: none; }
 
 @media (max-width: 600px) {
-  hermetic-search { flex-basis: 100%; }
-  hermetic-search input { width: 100%; max-width: none; }
-  .search-dropdown { width: calc(100vw - 32px); }
+  dialog.search-dialog { margin-top: 0.5rem; max-height: 85vh; }
+  .search-panel, .search-panel form { max-height: calc(85vh - 2px); }
 }
 
 /* Editing (hermetic serve, same machine only): every control below is added by the script. */
 .site-nav .today { color: var(--text); font-weight: 600; }
-.edit-status { color: var(--muted); font-size: 0.8rem; align-self: center; min-width: 4.5rem; }
-.edit-status[data-state="unsaved"] { color: var(--text); }
+/* The save status: a small label in the window's bottom-left corner, out of the header. */
+.edit-status {
+  position: fixed; left: 0.6rem; bottom: 0.5rem; z-index: 5; pointer-events: none;
+  padding: 0.05rem 0.4rem; border-radius: 4px; background: var(--bg);
+  color: var(--muted); font-size: 0.7rem;
+}
+.edit-status[data-state="unsaved"] { color: var(--todo); }
 html[data-hermetic-editing] section.content li.block > .block-body { cursor: text; }
 .block-editor {
   display: block; width: 100%; box-sizing: border-box; resize: none; overflow: hidden;

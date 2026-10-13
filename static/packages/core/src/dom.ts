@@ -25,8 +25,11 @@ export const SIDEBAR_TOGGLE = "hermetic-sidebar-toggle";
  */
 export const PAGES_CHANGED = "hermetic-pages-changed";
 
-/** Dispatched on `document` (by the `/` shortcut) to focus the search box. */
+/** Dispatched on `document` (by the `/` shortcut) to open search with its field focused. */
 export const SEARCH_FOCUS = "hermetic-search-focus";
+
+/** Dispatched on `document` (by `Ctrl+K`) to open search, or close it when it is open. */
+export const SEARCH_TOGGLE = "hermetic-search-toggle";
 
 /**
  * Set on `<html>` by <hermetic-editor> while the page is open for editing. Then

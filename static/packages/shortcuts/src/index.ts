@@ -4,6 +4,7 @@
 import {
   OPEN_TODAY,
   SEARCH_FOCUS,
+  SEARCH_TOGGLE,
   SIDEBAR_CLOSE_TOP,
   SIDEBAR_TOGGLE,
   carrySidebar,
@@ -45,8 +46,8 @@ const HELP: readonly Shortcut[] = [
   { keys: "g t", what: "Open tasks" },
   { keys: "g g", what: "Graph" },
   { keys: "g d", what: "Today's journal", editing: true },
-  { keys: "/", what: "Search", search: true },
-  { keys: MOD_K, what: "Search, even while typing", search: true },
+  { keys: "/", what: "Open search", search: true },
+  { keys: MOD_K, what: "Open or close search, even while typing", search: true },
   { keys: MOD_F, what: "Search the graph (again: the browser's find)", graph: true },
   { keys: "Shift + click", what: "Open a page in the sidebar", sidebar: true },
   { keys: "Esc", what: "Close the top sidebar pane", sidebar: true },
@@ -85,8 +86,9 @@ export class HermeticShortcuts extends HTMLElement {
   }
 
   private onKey(e: KeyboardEvent): void {
-    // Ctrl+K / Cmd+K works even in a text field, and replaces the browser's own binding
-    // (Firefox's web search) only when there is a search box to focus.
+    // Ctrl+K / Cmd+K opens or closes search, even from a text field (such as the search
+    // field itself), and replaces the browser's own binding (Firefox's web search) only
+    // where there is search to open.
     if (
       !e.defaultPrevented &&
       (e.ctrlKey || e.metaKey) &&
@@ -96,7 +98,7 @@ export class HermeticShortcuts extends HTMLElement {
       hasSearch()
     ) {
       e.preventDefault();
-      document.dispatchEvent(new Event(SEARCH_FOCUS));
+      document.dispatchEvent(new Event(SEARCH_TOGGLE));
       return;
     }
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) {
@@ -174,9 +176,9 @@ export class HermeticShortcuts extends HTMLElement {
   }
 }
 
-/** The search box renders only where it can work (over http). */
+/** The search button renders only where search can work (over http). */
 function hasSearch(): boolean {
-  return document.querySelector("hermetic-search input") !== null;
+  return document.querySelector("hermetic-search .search-button") !== null;
 }
 
 function isTyping(target: EventTarget | null): boolean {

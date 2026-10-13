@@ -8,6 +8,8 @@ mod pages;
 mod paths;
 mod render;
 
+/// hermetic's project page, the one external link hermetic writes itself (in the footer).
+pub use html::PROJECT_URL;
 /// Percent-encodes one path segment the way generated links do.
 pub use paths::encode as encode_url_segment;
 /// Output path of a page's HTML file, relative to the site root.

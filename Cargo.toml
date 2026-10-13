@@ -2,6 +2,8 @@
 name = "hermetic"
 version = "0.1.0"
 edition = "2024"
+# Records hermetic's commit for the site footer.
+build = "src/build.rs"
 
 [dependencies]
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }

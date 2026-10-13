@@ -52,9 +52,21 @@ pub fn root_path(path: &Path) -> String {
 ///
 /// The script is loaded synchronously in `<head>` so it can apply the reader's theme
 /// before the first paint. It defines the `hermetic-*` elements emitted here; without
-/// it they are inert and render nothing.
-pub fn document(site_title: &str, path: &Path, title: &str, main: &str) -> String {
+/// it they are inert and render nothing. `open_tasks` is shown as a badge on the
+/// "Open tasks" link when non-zero.
+pub fn document(
+    site_title: &str,
+    open_tasks: usize,
+    path: &Path,
+    title: &str,
+    main: &str,
+) -> String {
     let to = |target: &str| esc(&href(path, Path::new(target), None));
+    let tasks_badge = if open_tasks == 0 {
+        String::new()
+    } else {
+        format!(" <span class=\"count\">{open_tasks}</span>")
+    };
     format!(
         "<!doctype html>\n\
          <html lang=\"en\">\n\
@@ -69,7 +81,7 @@ pub fn document(site_title: &str, path: &Path, title: &str, main: &str) -> Strin
          <body>\n\
          <header class=\"site-header\">\n\
          <a class=\"site-title\" href=\"{index}\">{site}</a>\n\
-         <nav class=\"site-nav\"><a href=\"{journals}\">Journals</a><a href=\"{tasks}\">Open tasks</a><a href=\"{graph}\">Graph</a><hermetic-search></hermetic-search><hermetic-theme-toggle></hermetic-theme-toggle></nav>\n\
+         <nav class=\"site-nav\"><a href=\"{journals}\">Journals</a><a href=\"{tasks}\">Open tasks{tasks_badge}</a><a href=\"{graph}\">Graph</a><hermetic-search></hermetic-search><hermetic-theme-toggle></hermetic-theme-toggle></nav>\n\
          </header>\n\
          <main>\n{main}</main>\n\
          <hermetic-sidebar>{footer}</hermetic-sidebar>\n\
@@ -127,7 +139,7 @@ mod tests {
 
     #[test]
     fn shell_links_are_relative() {
-        let root = document("notes", Path::new("index.html"), "Journals", "x");
+        let root = document("notes", 0, Path::new("index.html"), "Journals", "x");
         assert!(root.contains(r#"href="_hermetic/style.css""#));
         let nav = |html: &str| {
             let start = html.find("<nav").unwrap();
@@ -139,13 +151,14 @@ mod tests {
             if COMMIT.is_empty() { String::new() } else { format!(" <code>{COMMIT}</code>") }
         )));
 
-        let page = document("notes", Path::new("pages/a.html"), "a", "x");
+        let page = document("notes", 0, Path::new("pages/a.html"), "a", "x");
         assert!(page.contains(r#"href="../_hermetic/style.css""#));
         assert!(page.contains(r#"<a href="../tasks.html">Open tasks</a>"#));
         assert!(page.contains(r#"<a href="../graph.html">Graph</a>"#));
 
         let nested = document(
             "notes",
+            0,
             Path::new("pages/Project X/Auth Flow.html"),
             "A & B",
             "x",
@@ -163,6 +176,11 @@ mod tests {
         assert!(nested.contains(r#"<script src="../../_hermetic/app.js"></script>"#));
         assert!(root.contains(r#"<meta name="hermetic-root" content=".">"#));
         assert!(root.contains(r#"<script src="_hermetic/app.js"></script>"#));
+
+        let busy = document("notes", 3, Path::new("pages/a.html"), "a", "x");
+        assert!(
+            busy.contains(r#"<a href="../tasks.html">Open tasks <span class="count">3</span></a>"#)
+        );
 
         assert_eq!(page.matches("<main>").count(), 1);
         assert_eq!(page.matches("<script").count(), 1);

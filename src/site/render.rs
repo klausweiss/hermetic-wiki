@@ -19,6 +19,8 @@ pub struct Site<'g> {
     out: Vec<PathBuf>,
     /// File-backed journal days, ascending.
     pub journal_days: Vec<(Date, PageId)>,
+    /// Number of open tasks in the graph, shown in the site navigation.
+    pub open_tasks: usize,
 }
 
 /// Whether block references are expanded into their target's content.
@@ -43,6 +45,7 @@ impl<'g> Site<'g> {
             title: title.into(),
             out,
             journal_days,
+            open_tasks: g.open_tasks().len(),
         }
     }
 

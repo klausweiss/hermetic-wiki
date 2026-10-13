@@ -372,7 +372,9 @@ hermetic-timeline.show-timeline > h2, hermetic-timeline.show-timeline > ul.days 
   display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem calc(2 * var(--corner-size) + var(--corner-gap) + var(--corner-inset) + 0.5rem) 0.6rem 1rem;
   border-bottom: 1px solid var(--border); font-size: 0.85rem; color: var(--muted);
 }
-.sidebar-bar span { margin-right: auto; font-weight: 600; }
+/* The title is as tall as the "Close all" button, so the bar keeps its height (and its
+   border its distance from the corner buttons) while no pane is open and that is hidden. */
+.sidebar-bar span { margin-right: auto; font-weight: 600; padding: 0.1rem 0; border-block: 1px solid transparent; }
 .panes { overflow-y: auto; flex: 1; padding: 0 1rem 2rem; }
 
 /* The site footer: after the page's content without the script (its parent,

@@ -246,7 +246,7 @@ fn new_pages_and_days() {
 }
 
 #[test]
-fn journal_days_without_content_have_no_file() {
+fn pages_without_content_have_no_file() {
     let notes = Notes::new(&[("journals/2026-10-12.md", "- standup [[empty]]\n")]);
     let server = start(notes.path());
     let day = notes.path().join("journals/2026-10-13.md");
@@ -281,10 +281,31 @@ fn journal_days_without_content_have_no_file() {
     assert!(!notes.path().join(".trash").exists());
     assert!(!page(server.addr, "journals.html").contains("2026-10-13"));
 
-    // Other pages keep an empty file.
+    // So do other pages, also one that nothing references, which can be written again.
+    let file = notes.path().join("pages/Project X/Auth.md");
+    let r = put_source(server.addr, "pages/Project X/Auth.html", "missing", "- a\n");
+    assert_eq!(r.status, 200, "{}", r.body);
+    assert!(file.exists());
+    let version = field(&r.body, "version");
+    let r = put_source(server.addr, "pages/Project X/Auth.html", &version, "-\n");
+    assert_eq!(r.status, 200, "{}", r.body);
+    assert_eq!(field(&r.body, "version"), "missing");
+    assert!(!notes.path().join("pages/Project X").exists());
+    assert!(page(server.addr, "pages/Project X/Auth.html").contains("404"));
+    let r = put_source(server.addr, "pages/Project X/Auth.html", "missing", "- b\n");
+    assert_eq!(r.status, 200, "{}", r.body);
+    assert_eq!(fs::read_to_string(&file).unwrap(), "- b\n");
+
+    // A referenced page stays as a page without a file.
     let r = put_source(server.addr, "pages/empty.html", "missing", "-\n");
     assert_eq!(r.status, 200, "{}", r.body);
-    assert!(notes.path().join("pages/empty.md").exists());
+    assert!(!notes.path().join("pages/empty.md").exists());
+    assert!(page(server.addr, "pages/empty.html").contains("standup"));
+
+    // The home page keeps its file: "Write a home page" creates it with an empty block.
+    let r = put_source(server.addr, "index.html", "missing", "-\n");
+    assert_eq!(r.status, 200, "{}", r.body);
+    assert!(notes.path().join("index.md").exists());
 }
 
 #[test]

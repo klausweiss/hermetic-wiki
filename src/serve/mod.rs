@@ -19,7 +19,7 @@ use std::time::{Duration, Instant, SystemTime};
 
 use crate::diag::Diagnostic;
 use crate::graph::Graph;
-use crate::layout::Date;
+use crate::layout::{self, Date};
 use crate::site::{self, Content, SiteFiles};
 
 /// Which addresses the server listens on.
@@ -129,7 +129,7 @@ pub fn start(options: Options) -> Result<Running, ServeError> {
         _ => return Err(ServeError::NotADirectory(options.notes.clone())),
     };
     let title = options.title.unwrap_or_else(|| site::title_for(&notes));
-    remove_empty_journals(&notes);
+    remove_empty_notes(&notes);
     let initial_snapshot = watch::snapshot(&notes);
     let (build, pages, diagnostics) = build_site(&notes, &title).map_err(ServeError::Build)?;
 
@@ -215,7 +215,7 @@ fn fingerprint(path: &Path) -> (u64, Option<SystemTime>) {
 /// hold `state.rebuilding`.
 fn rebuild(state: &State) {
     let started = Instant::now();
-    if !remove_empty_journals(&state.notes).is_empty() {
+    if !remove_empty_notes(&state.notes).is_empty() {
         // Their removal is part of this rebuild, not a change for the watcher to see.
         *state.snapshot.lock().expect("snapshot lock") = watch::snapshot(&state.notes);
     }
@@ -252,12 +252,12 @@ fn rebuild(state: &State) {
     }
 }
 
-/// Removes empty journal days that have stayed so for a while (see `serve-mode`) and
-/// reports each on standard error.
-fn remove_empty_journals(notes: &Path) -> Vec<PathBuf> {
-    let removed = edit::remove_empty_journals(notes, SystemTime::now(), edit::EMPTY_JOURNAL_GRACE);
+/// Removes empty notes that have stayed so for a while (see `serve-mode`) and reports
+/// each on standard error.
+fn remove_empty_notes(notes: &Path) -> Vec<PathBuf> {
+    let removed = edit::remove_empty_notes(notes, SystemTime::now(), edit::EMPTY_NOTE_GRACE);
     for rel in &removed {
-        eprintln!("removed empty journal day {}", rel.display());
+        eprintln!("removed empty note {}", rel.display());
     }
     removed
 }
@@ -505,10 +505,11 @@ fn source(
         let (status, json) = payload(current.as_deref());
         return (if status == 200 { 409 } else { status }, json);
     }
-    // A journal day saved without content has no file (see `browser-editing`).
-    if page.date.is_some() && edit::is_empty_note(&text) {
+    // A page saved without content has no file (see `browser-editing`), except the home
+    // page, which "Write a home page" creates with an empty block.
+    if !layout::is_home_name(&page.name) && edit::is_empty_note(&text) {
         if current.is_some() {
-            if let Err(e) = fs::remove_file(&target) {
+            if let Err(e) = edit::remove_note(&state.notes, &target) {
                 return (500, format!("{e}\n").into_bytes());
             }
             *state.snapshot.lock().expect("snapshot lock") = watch::snapshot(&state.notes);

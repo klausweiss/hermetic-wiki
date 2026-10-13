@@ -191,8 +191,8 @@ When editing is available, every page SHALL show a "Today" control in the header
 - **WHEN** the notes root has no `index.md` and the author chooses "Write a home page" on `index.html` and types `welcome`
 - **THEN** the root `index.md` contains `- welcome`, `index.html` shows it, and no `pages/index.md` exists
 
-### Requirement: Journal days without content
-A journal day SHALL have a file only while it has content. A save of a journal day whose text is empty — only blank lines, or a single bullet without text (`-`) — SHALL delete the day's file (not move it to the trash) when it has one, and SHALL NOT create one otherwise; its response SHALL describe the page without a file. The editor SHALL keep editing the empty block, and the next save with content SHALL create the file again. The editor SHALL treat a page without content and a page without a file as the same, so neither counts as unsaved. Other pages SHALL keep an empty file.
+### Requirement: Pages without content
+A page SHALL have a file only while it has content. A save of a page whose text is empty — only blank lines, or a single bullet without text (`-`) — SHALL delete the page's file (not move it to the trash) when it has one, together with directories under `pages/` that this leaves empty, and SHALL NOT create one otherwise; its response SHALL describe the page without a file. The editor SHALL keep editing the empty block, and the next save with content SHALL create the file again, also for a page that nothing references and that is therefore no longer in the site. The editor SHALL treat a page without content and a page without a file as the same, so neither counts as unsaved. The home page is the exception: a save SHALL keep its `index.md` even when empty, since "Write a home page" creates it with one empty block.
 
 #### Scenario: Emptying a day
 - **WHEN** `journals/2026-10-13.md` contains `- standup` and the author deletes the text of that block
@@ -201,6 +201,10 @@ A journal day SHALL have a file only while it has content. A save of a journal d
 #### Scenario: Writing again
 - **WHEN** the author then types `retro` into the block
 - **THEN** `journals/2026-10-13.md` contains `- retro`
+
+#### Scenario: Emptying an unreferenced page
+- **WHEN** `pages/Project X/Auth.md`, the only file in `pages/Project X/` and referenced by no page, contains `- a` and the author deletes the text of that block, then types `b`
+- **THEN** after the first save neither `pages/Project X/Auth.md` nor `pages/Project X/` exists, and after the second `pages/Project X/Auth.md` contains `- b`
 
 ### Requirement: Page and block autocomplete
 Typing `[[` in a block being edited SHALL show a list of pages matching the text typed after it, ranked by the search engine's page-name matching. The list SHALL also offer a new page with exactly the typed name when no page has that name. Choosing an entry SHALL complete the link as `[[name]]`. Typing `((` SHALL show a list of blocks matching the typed text, ranked by the search engine. Choosing one SHALL insert `((id))` with the block's id, first giving the chosen block a generated id if it has none. Arrow keys SHALL move through the list, Enter or Tab SHALL choose, and Escape SHALL close it and keep the typed text.
@@ -255,7 +259,7 @@ The server SHALL offer one page's source at `/_hermetic/source?path=<site path>`
 
 `DELETE` SHALL delete the page's file as "Deleting pages" requires, accepted only when the request names the version it is based on and that version is the file's current one (otherwise 409 with the current version and text); a page without a file SHALL get 404. Its response SHALL be sent after the site has been rebuilt without the page.
 
-The server SHALL answer 404 for a site path that is not an editable page, 400 for a body that is not UTF-8 text, and 413 for a body larger than 8 MiB.
+A site path SHALL be an editable page when it is a page of the site, the home page `index.html`, a journal day `journals/YYYY-MM-DD.html` with a valid date, or `pages/<p>.html` where `pages/<p>.md` is exactly the file the `source-layout` name encoding gives for a valid page name other than the home page. The server SHALL answer 404 for a site path that is not an editable page, 400 for a body that is not UTF-8 text, and 413 for a body larger than 8 MiB.
 
 #### Scenario: Read a page
 - **WHEN** the editor requests `GET /_hermetic/source?path=pages/auth.html`

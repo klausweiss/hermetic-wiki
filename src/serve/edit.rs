@@ -62,8 +62,9 @@ pub fn editable_pages(g: &Graph) -> EditMap {
 }
 
 /// The editable page at a site path: a page of the build, the home page (`index.html`,
-/// even before `index.md` exists), or a journal day that has no page yet
-/// (`journals/YYYY-MM-DD.html` with a valid date).
+/// even before `index.md` exists), a journal day that has no page yet
+/// (`journals/YYYY-MM-DD.html` with a valid date), or a page that has none
+/// (`pages/<encoded name>.html`, e.g. one whose empty file was just removed).
 pub fn resolve(map: &EditMap, path: &str) -> Option<Editable> {
     if let Some(page) = map.get(path) {
         return Some(page.clone());
@@ -76,14 +77,30 @@ pub fn resolve(map: &EditMap, path: &str) -> Option<Editable> {
             file: None,
         });
     }
-    let day = path
-        .strip_prefix(JOURNALS_DIR)?
-        .strip_prefix('/')?
-        .strip_suffix(".html")?;
-    let date = Date::parse(day)?;
+    let stem = path.strip_suffix(".html")?;
+    if let Some(day) = stem
+        .strip_prefix(JOURNALS_DIR)
+        .and_then(|s| s.strip_prefix('/'))
+    {
+        let date = Date::parse(day)?;
+        return Some(Editable {
+            name: day.to_owned(),
+            date: Some(date),
+            file: None,
+        });
+    }
+    // Only a path that is exactly where the page's name would put it.
+    let file = PathBuf::from(format!("{stem}{}", layout::EXTENSION));
+    let name = layout::page_name_from_path(&file)?;
+    if layout::validate_name(&name).is_err()
+        || layout::is_home_name(&name)
+        || layout::page_file_path(&name).to_str() != file.to_str()
+    {
+        return None;
+    }
     Some(Editable {
-        name: day.to_owned(),
-        date: Some(date),
+        name,
+        date: None,
         file: None,
     })
 }
@@ -302,9 +319,9 @@ pub fn move_to_trash(root: &Path, path: &Path) -> Result<PathBuf, Unsafe> {
     Ok(trashed)
 }
 
-/// How long an empty journal day is kept after its file last changed, so that a day just
-/// opened with "Today" stays while the author is about to write in it.
-pub const EMPTY_JOURNAL_GRACE: Duration = Duration::from_secs(60 * 60);
+/// How long an empty note is kept after its file last changed, so that a page just
+/// opened with "Today" or a new link stays while the author is about to write in it.
+pub const EMPTY_NOTE_GRACE: Duration = Duration::from_secs(60 * 60);
 
 /// Whether a note has no content: only blank lines, or one empty bullet (`-`).
 pub fn is_empty_note(text: &str) -> bool {
@@ -312,25 +329,20 @@ pub fn is_empty_note(text: &str) -> bool {
     matches!((lines.next(), lines.next()), (None, _) | (Some("-"), None))
 }
 
-/// Removes the empty journal days (`journals/YYYY-MM-DD.md` regular files, see
-/// [`is_empty_note`]) that have not changed for `grace` before `now`. They hold nothing,
-/// so they are removed rather than moved to the trash. Returns the removed paths
-/// relative to `root`.
-pub fn remove_empty_journals(root: &Path, now: SystemTime, grace: Duration) -> Vec<PathBuf> {
-    let Ok(entries) = fs::read_dir(root.join(JOURNALS_DIR)) else {
-        return Vec::new();
-    };
+/// Removes the empty notes (page files under `journals/` and `pages/` and the root
+/// `index.md`, see [`is_empty_note`]) that have not changed for `grace` before `now`,
+/// then the directories under `pages/` this left empty. They hold nothing, so they are
+/// removed rather than moved to the trash. Returns the removed paths relative to `root`.
+pub fn remove_empty_notes(root: &Path, now: SystemTime, grace: Duration) -> Vec<PathBuf> {
     let mut removed = Vec::new();
-    for entry in entries.flatten() {
-        let rel = Path::new(JOURNALS_DIR).join(entry.file_name());
-        let is_day = rel
-            .file_name()
-            .and_then(|n| n.to_str())
-            .and_then(|n| n.strip_suffix(layout::EXTENSION))
-            .and_then(Date::parse)
-            .is_some();
-        // Symbolic links are left alone: what they point to is not the day's own file.
-        let Ok(meta) = fs::symlink_metadata(root.join(&rel)) else {
+    for source in layout::scan(root, &mut Vec::new()) {
+        let path = root.join(&source.rel);
+        // Symbolic links (the file or a directory on its way) are left alone: what they
+        // point to is not the note's own file.
+        if fs::canonicalize(&path).ok().as_deref() != Some(path.as_path()) {
+            continue;
+        }
+        let Ok(meta) = fs::symlink_metadata(&path) else {
             continue;
         };
         let old = meta
@@ -338,19 +350,27 @@ pub fn remove_empty_journals(root: &Path, now: SystemTime, grace: Duration) -> V
             .ok()
             .and_then(|m| now.duration_since(m).ok())
             .is_some_and(|age| age >= grace);
-        if !is_day || !meta.is_file() || !old {
+        if !meta.is_file() || !old {
             continue;
         }
-        let empty = fs::read(root.join(&rel))
+        let empty = fs::read(&path)
             .ok()
             .and_then(|bytes| String::from_utf8(bytes).ok())
             .is_some_and(|text| is_empty_note(&text));
-        if empty && fs::remove_file(root.join(&rel)).is_ok() {
-            removed.push(rel);
+        if empty && remove_note(root, &path).is_ok() {
+            removed.push(source.rel);
         }
     }
     removed.sort();
     removed
+}
+
+/// Deletes the note file at `path` (a checked target, see [`checked_target`]) without
+/// moving it to the trash, then removes directories under `pages/` that this left empty.
+pub fn remove_note(root: &Path, path: &Path) -> io::Result<()> {
+    fs::remove_file(path)?;
+    prune_empty_dirs(root, path.parent());
+    Ok(())
 }
 
 /// Lets git ignore the trash: writes `.gitignore` into it unless one exists (whatever
@@ -567,13 +587,16 @@ mod tests {
     }
 
     #[test]
-    fn journal_days_without_pages() {
+    fn pages_without_files() {
         let map = EditMap::new();
         let day = resolve(&map, "journals/2026-10-13.html").unwrap();
         assert_eq!(day.name, "2026-10-13");
         assert_eq!(source_path(&day), PathBuf::from("journals/2026-10-13.md"));
         let home = resolve(&map, "index.html").unwrap();
         assert_eq!(source_path(&home), PathBuf::from("index.md"));
+        let page = resolve(&map, "pages/Project X/Auth.html").unwrap();
+        assert_eq!(page.name, "Project X/Auth");
+        assert_eq!(source_path(&page), PathBuf::from("pages/Project X/Auth.md"));
         for path in [
             "journals/2026-13-01.html",
             "journals/2026-10-13.md",
@@ -581,7 +604,11 @@ mod tests {
             "tasks.html",
             "graph.html",
             "pages/index.html",
-            "pages/x.html",
+            "pages/x.md",
+            "pages/ x.html",
+            "pages/a//b.html",
+            "pages/../x.html",
+            "pages.html",
             "journals/sub/2026-10-13.html",
         ] {
             assert_eq!(resolve(&map, path), None, "{path}");
@@ -689,45 +716,63 @@ mod tests {
     }
 
     #[test]
-    fn empty_journals_removed() {
+    fn empty_notes_removed() {
         let base = std::env::temp_dir().join(format!("hermetic-empty-{}", std::process::id()));
         let _ = fs::remove_dir_all(&base);
         let root = base.join("notes");
         fs::create_dir_all(root.join("journals/sub")).unwrap();
-        fs::create_dir_all(root.join("pages")).unwrap();
+        fs::create_dir_all(root.join("pages/a/b")).unwrap();
+        fs::create_dir_all(root.join("pages/kept")).unwrap();
+        let root = fs::canonicalize(&root).unwrap();
         let files = [
             ("journals/2026-10-01.md", "-\n"),
             ("journals/2026-10-02.md", ""),
-            ("journals/2026-10-03.md", "- standup\n"),
             ("journals/notes.md", "-\n"),
-            ("journals/sub/2026-10-04.md", "-\n"),
-            ("pages/empty.md", "-\n"),
+            ("journals/sub/2026-10-04.md", "\n"),
+            ("pages/journal.md", "-\n"),
+            ("pages/a/b/c.md", "- \n"),
+            ("index.md", "\n"),
+            ("journals/2026-10-03.md", "- standup\n"),
+            ("pages/kept/x.md", "-\n-\n"),
+            ("pages/props.md", "title:: x\n"),
+            ("pages/.hidden.md", "-\n"),
+            ("pages/notes.txt", "-\n"),
         ];
         for (rel, text) in files {
             fs::write(root.join(rel), text).unwrap();
         }
-        fs::write(base.join("outside.md"), "-\n").unwrap();
-        std::os::unix::fs::symlink(base.join("outside.md"), root.join("journals/2026-10-05.md"))
-            .unwrap();
-        let grace = EMPTY_JOURNAL_GRACE;
+        fs::create_dir_all(base.join("outside")).unwrap();
+        fs::write(base.join("outside/linked.md"), "-\n").unwrap();
+        std::os::unix::fs::symlink(
+            base.join("outside/linked.md"),
+            root.join("journals/2026-10-05.md"),
+        )
+        .unwrap();
+        std::os::unix::fs::symlink(base.join("outside"), root.join("pages/linked")).unwrap();
+        let grace = EMPTY_NOTE_GRACE;
 
-        // Recently changed days stay.
-        assert!(remove_empty_journals(&root, SystemTime::now(), grace).is_empty());
+        // Recently changed notes stay.
+        assert!(remove_empty_notes(&root, SystemTime::now(), grace).is_empty());
         assert!(root.join("journals/2026-10-01.md").exists());
 
         let later = SystemTime::now() + grace + Duration::from_secs(1);
-        assert_eq!(
-            remove_empty_journals(&root, later, grace),
-            [
-                PathBuf::from("journals/2026-10-01.md"),
-                PathBuf::from("journals/2026-10-02.md"),
-            ]
-        );
-        for (rel, _) in &files[2..] {
+        let removed: Vec<_> = files[..7]
+            .iter()
+            .map(|(rel, _)| PathBuf::from(rel))
+            .collect();
+        let mut expected = removed.clone();
+        expected.sort();
+        assert_eq!(remove_empty_notes(&root, later, grace), expected);
+        for rel in &removed {
+            assert!(!root.join(rel).exists(), "{} removed", rel.display());
+        }
+        for (rel, _) in &files[7..] {
             assert!(root.join(rel).exists(), "{rel} kept");
         }
+        assert!(!root.join("pages/a").exists(), "emptied directories pruned");
+        assert!(root.join("pages").is_dir() && root.join("journals/sub").is_dir());
         assert!(fs::symlink_metadata(root.join("journals/2026-10-05.md")).is_ok());
-        assert!(base.join("outside.md").exists());
+        assert!(base.join("outside/linked.md").exists());
         assert!(!root.join(TRASH_DIR).exists(), "nothing goes to the trash");
         fs::remove_dir_all(&base).unwrap();
     }

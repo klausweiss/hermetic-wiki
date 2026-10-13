@@ -65,6 +65,34 @@ fn valid_journal_file() {
 }
 
 #[test]
+fn underscore_journal_file() {
+    let notes = Notes::new(&[
+        ("journals/2026_07_07.md", "- old style"),
+        ("journals/2026-07-08.md", "- [next](2026_07_07.md)"),
+    ]);
+    let (g, diags) = notes.load();
+    assert!(diags.is_empty(), "{diags:?}");
+    let j = g.page(page(&g, "2026-07-07"));
+    assert_eq!(j.date(), Date::parse("2026-07-07"));
+    assert_eq!(j.file, Some(PathBuf::from("journals/2026_07_07.md")));
+    assert!(!j.is_implicit());
+}
+
+#[test]
+fn dashed_and_underscore_journal_files_collide() {
+    let notes = Notes::new(&[
+        ("journals/2026_07_07.md", "- b"),
+        ("journals/2026-07-07.md", "- a"),
+    ]);
+    let (g, diags) = notes.load();
+    assert_eq!(kinds(&diags), [DiagnosticKind::CollidingFiles]);
+    assert_eq!(
+        g.page(page(&g, "2026-07-07")).file,
+        Some(PathBuf::from("journals/2026-07-07.md"))
+    );
+}
+
+#[test]
 fn invalid_journal_file_names() {
     let notes = Notes::new(&[
         ("journals/2026-13-40.md", "- a"),

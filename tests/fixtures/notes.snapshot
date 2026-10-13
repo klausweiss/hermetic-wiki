@@ -76,7 +76,7 @@ open task: "pick a storage engine"
 open task: "write the ADR for [auth](../pages/Project%20X/Auth%20Flow.md)"
 open task: "follow up on ((no-such-block)) and [old notes](../pages/old.md)"
 open task: "keep this page current"
-diagnostic InvalidJournalName: journals/2026-13-01.md: journal file name is not a valid YYYY-MM-DD date; treated as a regular page
+diagnostic InvalidJournalName: journals/2026-13-01.md: journal file name is not a valid YYYY-MM-DD (or YYYY_MM_DD) date; treated as a regular page
 diagnostic InvalidUtf8: pages/broken.md: file is not valid UTF-8; skipped
 diagnostic DanglingBlockRef: journals/2026-10-12.md:6: no block has id `no-such-block`
 diagnostic BrokenLink: journals/2026-10-12.md:6: link `../pages/old.md` points to a missing file

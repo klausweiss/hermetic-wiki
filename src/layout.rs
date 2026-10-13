@@ -247,6 +247,16 @@ impl Date {
         }
         Some(Date { year, month, day })
     }
+
+    /// Parses the stem of a journal file name: `YYYY-MM-DD`, or `YYYY_MM_DD` as some
+    /// other tools name them. New files are always written with dashes.
+    pub fn parse_file_stem(stem: &str) -> Option<Date> {
+        let b = stem.as_bytes();
+        if b.len() == 10 && b[4] == b'_' && b[7] == b'_' {
+            return Date::parse(&stem.replace('_', "-"));
+        }
+        Date::parse(stem)
+    }
 }
 
 impl Date {
@@ -348,7 +358,7 @@ pub fn scan(root: &Path, diags: &mut Vec<Diagnostic>) -> Vec<SourceFile> {
             .and_then(|n| n.strip_suffix(EXTENSION))
             .unwrap_or_default()
             .to_owned();
-        match Date::parse(&stem) {
+        match Date::parse_file_stem(&stem) {
             Some(date) => journals.push(SourceFile {
                 rel,
                 name: date.to_string(),
@@ -359,7 +369,7 @@ pub fn scan(root: &Path, diags: &mut Vec<Diagnostic>) -> Vec<SourceFile> {
                     DiagnosticKind::InvalidJournalName,
                     rel.clone(),
                     None,
-                    "journal file name is not a valid YYYY-MM-DD date; treated as a regular page",
+                    "journal file name is not a valid YYYY-MM-DD (or YYYY_MM_DD) date; treated as a regular page",
                 ));
                 pages.push(SourceFile {
                     rel,
@@ -596,6 +606,12 @@ mod tests {
         }
         let d = Date::parse("2026-10-12").unwrap();
         assert_eq!(d.to_string(), "2026-10-12");
+        assert_eq!(Date::parse("2026_10_12"), None);
+        assert_eq!(Date::parse_file_stem("2026_10_12"), Some(d));
+        assert_eq!(Date::parse_file_stem("2026-10-12"), Some(d));
+        for bad in ["2026_10-12", "2026-10_12", "2026_13_01", "2026_1_012"] {
+            assert_eq!(Date::parse_file_stem(bad), None, "{bad}");
+        }
         assert_eq!(
             journal_file_path(d),
             PathBuf::from("journals/2026-10-12.md")

@@ -1023,7 +1023,7 @@ fn resolve_link_path(file: &Path, dest: &str) -> LinkPath {
                 .last()
                 .and_then(|f| f.strip_suffix(".md"))
                 .unwrap_or_default();
-            LinkPath::Page(match Date::parse(stem) {
+            LinkPath::Page(match Date::parse_file_stem(stem) {
                 Some(date) => date.to_string(),
                 None => normalize_name(&layout::decode_segment(stem)),
             })

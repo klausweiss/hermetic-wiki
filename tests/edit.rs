@@ -177,6 +177,29 @@ fn save_and_stale_version() {
 }
 
 #[test]
+fn underscore_journal_file_is_saved_in_place() {
+    let notes = Notes::new(&[("journals/2026_07_07.md", "- old\n")]);
+    let server = start(notes.path());
+    // The day is at its usual address, backed by its existing file.
+    let r = get_source(server.addr, "journals/2026-07-07.html");
+    assert_eq!(r.status, 200);
+    assert!(r.body.contains(r#""file":"journals/2026_07_07.md""#), "{}", r.body);
+    let version = field(&r.body, "version");
+    let r = put_source(server.addr, "journals/2026-07-07.html", &version, "- new\n");
+    assert_eq!(r.status, 200, "{}", r.body);
+    assert_eq!(
+        fs::read_to_string(notes.path().join("journals/2026_07_07.md")).unwrap(),
+        "- new\n"
+    );
+    assert!(!notes.path().join("journals/2026-07-07.md").exists());
+
+    // A new day is still written with dashes.
+    let r = put_source(server.addr, "journals/2026-07-09.html", "missing", "- fresh\n");
+    assert_eq!(r.status, 200, "{}", r.body);
+    assert!(notes.path().join("journals/2026-07-09.md").exists());
+}
+
+#[test]
 fn line_endings_are_kept() {
     let notes = Notes::new(&[("pages/w.md", "- a\r\n- b\r\n")]);
     let server = start(notes.path());

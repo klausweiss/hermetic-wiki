@@ -4,7 +4,9 @@ NOTES LAYOUT
 
   journals/YYYY-MM-DD.md
       One journal page per day, named by its date (journals/2026-10-12.md is
-      the page 2026-10-12). Days are listed newest first in the journal list
+      the page 2026-10-12). Files named with underscores (2026_10_12.md)
+      are read as journal days too, but new days are always written with
+      dashes. Days are listed newest first in the journal list
       and can be read as one continuous timeline. A file in journals/ whose
       name is not a valid date (journals/notes.md, journals/2026-13-40.md)
       is reported as a warning and becomes a regular page named after the

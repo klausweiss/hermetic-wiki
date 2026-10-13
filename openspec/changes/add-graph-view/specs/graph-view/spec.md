@@ -124,6 +124,37 @@ A click on a node SHALL open its page in the main area. Nodes SHALL be reachable
 - **WHEN** the user tabs to the node of `redis` and presses Enter
 - **THEN** `pages/redis.html` opens
 
+### Requirement: Search in the graph
+When the script runs, the graph SHALL offer a search box, opened with a control next to the zoom controls or with `Ctrl+F` (`Cmd+F` on macOS) on the graph page. Pressing `Ctrl+F` again while the search box has focus SHALL open the browser's own find instead. A node SHALL match when every word of the query appears in its page name, ignoring case and diacritics as site search does. While the query is not empty, matching nodes SHALL be emphasized with their labels shown, the rest de-emphasized, and the number of matches shown. `Enter` SHALL move to the next match and `Shift+Enter` to the previous one, centring it, zooming in until its label is readable, and highlighting its neighbours; `Ctrl+Enter` (`Cmd+Enter` on macOS) SHALL open the current match's page. `Escape` SHALL clear the query, close the search box, and return to the view from before the search. Searching SHALL work over `file://` as well. On other pages, `Ctrl+F` SHALL keep the browser's behavior.
+
+#### Scenario: Matching nodes
+- **WHEN** the graph has the pages `Project X/Auth Flow`, `auth`, and `redis`, and the user types `auth` into the graph search
+- **THEN** `Project X/Auth Flow` and `auth` are emphasized with their labels shown, `redis` is dimmed, and the box reports 2 matches
+
+#### Scenario: Several words and accents
+- **WHEN** the user types `flow AUTH` or `zurich`
+- **THEN** `Project X/Auth Flow` matches the first query and `Zürich` the second
+
+#### Scenario: Going through matches
+- **WHEN** a query has two matches and the user presses `Enter` twice
+- **THEN** each press centres the next match with its label readable, and the second press shows the second match
+
+#### Scenario: Open a match
+- **WHEN** a match is current and the user presses `Ctrl+Enter`
+- **THEN** that match's page opens
+
+#### Scenario: Escape
+- **WHEN** the user has searched and moved to a match, then presses `Escape`
+- **THEN** the search box closes, no node is dimmed, and the graph shows the view it had before the search
+
+#### Scenario: Browser find stays reachable
+- **WHEN** the graph search box has focus and the user presses `Ctrl+F`
+- **THEN** the browser's own find opens
+
+#### Scenario: Other pages
+- **WHEN** the user presses `Ctrl+F` on a journal page
+- **THEN** the browser's own find opens
+
 ### Requirement: Graph themes
 The graph SHALL use the site's theme colours, so that it follows the light and dark themes like the rest of the page, with and without the script.
 

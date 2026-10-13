@@ -270,6 +270,28 @@ hermetic-graph[data-moving] .graph-nodes a:not(.t0) text { display: none; }
 .graph-controls button:hover { background: var(--surface); }
 .graph-controls .icon { width: 16px; height: 16px; }
 
+/* Search in the graph (data-search while there is a query): matches stand out with their
+   labels, the current one is ringed, everything else fades. */
+.graph[data-search] .graph-edges path { stroke-opacity: 0.12; }
+.graph[data-search] .graph-nodes a:not(.match, .hl) { opacity: 0.2; }
+.graph[data-search][data-focus] .graph-nodes a.match { opacity: 1; }
+.graph[data-search] .graph-nodes a.match text { display: inline; }
+.graph-nodes a.match circle { stroke: var(--text); stroke-width: 2; }
+.graph-nodes a.current circle { fill: var(--text); stroke: var(--link); stroke-width: 3; }
+.graph-search {
+  position: absolute; top: 0.5rem; left: 0.5rem; max-width: calc(100% - 4rem);
+  display: flex; align-items: center; gap: 0.4rem; padding: 0.2rem 0.5rem;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.08);
+}
+.graph-search[hidden] { display: none; }
+.graph-search .icon { width: 15px; height: 15px; color: var(--muted); flex: none; }
+.graph-search input {
+  font: inherit; font-size: 0.9rem; color: var(--text); background: none; border: none; outline: none;
+  width: 15rem; min-width: 0; flex: 1;
+}
+.graph-search output { font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+
 @media (max-width: 600px) {
   html { font-size: 16px; }
   .page-header h1 { font-size: 1.5rem; }

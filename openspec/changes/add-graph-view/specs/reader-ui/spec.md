@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Keyboard shortcuts
-When the script runs, it SHALL provide these shortcuts, ignored while typing in a text field: `g` then `h` opens the home page, `g` then `j` the journal list, `g` then `p` all pages, `g` then `t` open tasks, `g` then `g` the graph view; `g` then `d` today's journal, where editing is available (see `browser-editing`); `/` focuses the search box when it is shown; `Escape` closes the topmost sidebar pane; `\` shows or hides the sidebar; `?` shows a list of the shortcuts. In addition, `Ctrl+K` (`Cmd+K` on macOS) SHALL focus the search box when it is shown, also while typing in a text field.
+When the script runs, it SHALL provide these shortcuts, ignored while typing in a text field: `g` then `h` opens the home page, `g` then `j` the journal list, `g` then `p` all pages, `g` then `t` open tasks, `g` then `g` the graph view; `g` then `d` today's journal, where editing is available (see `browser-editing`); `/` focuses the search box when it is shown; `Escape` closes the topmost sidebar pane; `\` shows or hides the sidebar; `?` shows a list of the shortcuts. In addition, `Ctrl+K` (`Cmd+K` on macOS) SHALL focus the search box when it is shown, also while typing in a text field. On the graph page, `Ctrl+F` (`Cmd+F` on macOS) SHALL open the graph search (see `graph-view`).
 
 #### Scenario: Go to journals
 - **WHEN** the user presses `g` then `j` on any page
@@ -24,6 +24,10 @@ When the script runs, it SHALL provide these shortcuts, ignored while typing in 
 #### Scenario: Focus search while typing
 - **WHEN** the page is served over `http://`, focus is in a text field, and the user presses `Ctrl+K` (`Cmd+K` on macOS)
 - **THEN** the search box receives focus and the browser's own binding for the key does not run
+
+#### Scenario: Graph search in the shortcut list
+- **WHEN** the user presses `?` on the graph page
+- **THEN** the list includes `Ctrl+F` (`⌘ F` on macOS) for searching the graph, and on other pages it does not
 
 #### Scenario: Go to today
 - **WHEN** editing is available and the user presses `g` then `d`

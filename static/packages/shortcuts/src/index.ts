@@ -24,6 +24,8 @@ interface Shortcut {
   what: string;
   sidebar?: true;
   search?: true;
+  /** Listed only on the graph page. */
+  graph?: true;
   /** Listed only where editing is available (hermetic serve, same machine). */
   editing?: true;
 }
@@ -32,6 +34,7 @@ const APPLE = /Mac|iPhone|iPad/.test(navigator.platform);
 /** Ctrl+K, or Cmd+K on Apple platforms, as the help dialog names it. */
 const MOD_K = APPLE ? "⌘ K" : "Ctrl + K";
 const MOD_ENTER = APPLE ? "⌘ Enter" : "Ctrl + Enter";
+const MOD_F = APPLE ? "⌘ F" : "Ctrl + F";
 /** The modifier for editing keys, as the help dialog writes it before a key. */
 const MOD = APPLE ? "⌘" : "Ctrl +";
 
@@ -44,6 +47,7 @@ const HELP: readonly Shortcut[] = [
   { keys: "g d", what: "Today's journal", editing: true },
   { keys: "/", what: "Search", search: true },
   { keys: MOD_K, what: "Search, even while typing", search: true },
+  { keys: MOD_F, what: "Search the graph (again: the browser's find)", graph: true },
   { keys: "Shift + click", what: "Open a page in the sidebar", sidebar: true },
   { keys: "Esc", what: "Close the top sidebar pane", sidebar: true },
   { keys: "\\", what: "Show or hide the sidebar", sidebar: true },
@@ -144,13 +148,14 @@ export class HermeticShortcuts extends HTMLElement {
   private helpDialog(): HTMLDialogElement {
     const withSidebar = readEnv().interactive && document.querySelector("hermetic-sidebar") !== null;
     const withEditing = readEnv().interactive && document.querySelector("hermetic-editor") !== null;
+    const withGraph = document.querySelector("main hermetic-graph[data-ready]") !== null;
     const dialog = document.createElement("dialog");
     dialog.className = "shortcuts";
     const title = document.createElement("h2");
     title.textContent = "Keyboard shortcuts";
     const list = document.createElement("dl");
     for (const s of HELP) {
-      if ((s.sidebar && !withSidebar) || (s.search && !hasSearch()) || (s.editing && !withEditing)) {
+      if ((s.sidebar && !withSidebar) || (s.search && !hasSearch()) || (s.editing && !withEditing) || (s.graph && !withGraph)) {
         continue;
       }
       const dt = document.createElement("dt");

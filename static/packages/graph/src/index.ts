@@ -3,11 +3,14 @@
 // reader zooms in, and highlighting of a node's neighbours. Without the script the SVG
 // shows the whole graph fitted to the page, and its nodes are plain links.
 //
-// Panning and zooming need no other page, so they also work over file://.
+// It also adds a search over node names, opened with Ctrl+F (Cmd+F) on the graph page.
+// Panning, zooming, and searching need no other page, so they also work over file://.
 
-import { icon, whenParsed } from "@hermetic/core";
+import { type IconName, anchorHref, carrySidebar, icon, whenParsed } from "@hermetic/core";
+import { foldText } from "@hermetic/search/normalize";
 
-import { FIT, type View, centreOn, labelLevel, maxZoom, pan, transform, zoomAt } from "./view";
+import { matches, queryWords } from "./match";
+import { FIT, SPACING, type View, centreOn, labelLevel, maxZoom, pan, transform, zoomAt } from "./view";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 /** Zoom factor of the zoom buttons. */
@@ -16,6 +19,9 @@ const STEP = 1.5;
 const DRAG_PX = 4;
 /** How long after the last wheel event the graph counts as still moving. */
 const WHEEL_IDLE_MS = 150;
+/** Screen distance between connected nodes at which every label shows (`labelLevel` 3). */
+const ALL_LABELS_PX = 70;
+const APPLE = /Mac|iPhone|iPad/.test(navigator.platform);
 
 interface GraphNode {
   a: SVGAElement;
@@ -24,6 +30,8 @@ interface GraphNode {
   y: number;
   /** Indices of the connected nodes. */
   near: number[];
+  /** The page name, folded for search. */
+  folded: string;
 }
 
 interface Point {
@@ -49,6 +57,16 @@ export class HermeticGraph extends HTMLElement {
   private focused: number | null = null;
   private frame = 0;
   private wheelTimer = 0;
+  private searchBox!: HTMLElement;
+  private searchInput!: HTMLInputElement;
+  private searchCount!: HTMLOutputElement;
+  private searchButton!: HTMLButtonElement;
+  /** Indices of the nodes matching the query, in document order. */
+  private found: number[] = [];
+  /** Position in `found` of the current match, or -1. */
+  private current = -1;
+  /** The view when the search box was opened, restored on Escape. */
+  private beforeSearch: View | null = null;
 
   connectedCallback(): void {
     whenParsed(() => this.setup());
@@ -70,13 +88,18 @@ export class HermeticGraph extends HTMLElement {
         x: Number(circle?.getAttribute("cx")),
         y: Number(circle?.getAttribute("cy")),
         near: (a.dataset.n ?? "").split(" ").filter(Boolean).map(Number),
+        folded: foldText(a.querySelector("title")?.textContent ?? ""),
       };
     }
     this.highlight = document.createElementNS(SVG_NS, "path");
     this.highlight.classList.add("graph-highlight");
     world.insertBefore(this.highlight, world.querySelector(".graph-nodes"));
-    this.append(this.controls());
+    this.append(this.controls(), this.search());
     this.dataset.ready = "";
+    // Ctrl+F searches the graph only where the graph is the page, not in a sidebar pane.
+    if (this.closest("main")) {
+      document.addEventListener("keydown", (e) => this.onDocumentKey(e));
+    }
 
     svg.addEventListener("wheel", (e) => this.onWheel(e), { passive: false });
     svg.addEventListener("pointerdown", (e) => this.onPointerDown(e));
@@ -97,8 +120,8 @@ export class HermeticGraph extends HTMLElement {
     const box = document.createElement("div");
     box.className = "graph-controls";
     box.setAttribute("role", "group");
-    box.setAttribute("aria-label", "Graph zoom");
-    const button = (label: string, name: "zoom-in" | "zoom-out" | "scan", act: () => void) => {
+    box.setAttribute("aria-label", "Graph controls");
+    const button = (label: string, name: IconName, act: () => void) => {
       const b = document.createElement("button");
       b.type = "button";
       b.setAttribute("aria-label", label);
@@ -110,7 +133,133 @@ export class HermeticGraph extends HTMLElement {
     button("Zoom in", "zoom-in", () => this.zoomCentre(STEP));
     button("Zoom out", "zoom-out", () => this.zoomCentre(1 / STEP));
     button("Fit graph", "scan", () => this.setView(FIT));
+    button(`Search the graph (${APPLE ? "⌘ F" : "Ctrl + F"})`, "search", () => this.openSearch());
+    this.searchButton = box.lastElementChild as HTMLButtonElement;
     return box;
+  }
+
+  private search(): HTMLElement {
+    const box = document.createElement("div");
+    box.className = "graph-search";
+    box.setAttribute("role", "search");
+    box.hidden = true;
+    const input = document.createElement("input");
+    input.type = "search";
+    input.placeholder = "Find pages in the graph";
+    input.setAttribute("aria-label", "Find pages in the graph");
+    input.setAttribute("aria-keyshortcuts", APPLE ? "Meta+F" : "Control+F");
+    input.addEventListener("input", () => this.runSearch());
+    input.addEventListener("keydown", (e) => this.onSearchKey(e));
+    const count = document.createElement("output");
+    count.setAttribute("aria-live", "polite");
+    box.append(icon("search"), input, count);
+    this.searchBox = box;
+    this.searchInput = input;
+    this.searchCount = count;
+    return box;
+  }
+
+  private onDocumentKey(e: KeyboardEvent): void {
+    const mod = APPLE ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
+    if (!mod || e.altKey || e.shiftKey || e.key.toLowerCase() !== "f" || e.defaultPrevented) {
+      return;
+    }
+    // Pressed again in the search box: the browser's own find.
+    if (document.activeElement === this.searchInput) {
+      return;
+    }
+    e.preventDefault();
+    this.openSearch();
+  }
+
+  private openSearch(): void {
+    if (this.searchBox.hidden) {
+      this.beforeSearch = this.view;
+      this.searchBox.hidden = false;
+    }
+    this.searchInput.focus();
+    this.searchInput.select();
+  }
+
+  private closeSearch(): void {
+    this.searchInput.value = "";
+    this.runSearch();
+    this.searchBox.hidden = true;
+    if (this.beforeSearch) {
+      this.setView(this.beforeSearch);
+      this.beforeSearch = null;
+    }
+    this.searchButton.focus();
+  }
+
+  private runSearch(): void {
+    for (const i of this.found) {
+      this.nodes[i]?.a.classList.remove("match", "current");
+    }
+    this.unhighlight();
+    const words = queryWords(this.searchInput.value);
+    this.found = [];
+    this.nodes.forEach((node, i) => {
+      if (matches(node.folded, words)) {
+        this.found.push(i);
+        node.a.classList.add("match");
+      }
+    });
+    this.current = -1;
+    if (words.length > 0) {
+      this.svg.dataset.search = "";
+    } else {
+      delete this.svg.dataset.search;
+    }
+    this.showCount();
+  }
+
+  private showCount(): void {
+    const n = this.found.length;
+    this.searchCount.value =
+      this.searchInput.value.trim() === ""
+        ? ""
+        : n === 0
+          ? "No pages"
+          : this.current >= 0
+            ? `${this.current + 1} of ${n}`
+            : n === 1
+              ? "1 page"
+              : `${n} pages`;
+  }
+
+  private onSearchKey(e: KeyboardEvent): void {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      this.closeSearch();
+    } else if (e.key === "Enter" && (APPLE ? e.metaKey : e.ctrlKey)) {
+      e.preventDefault();
+      const node = this.nodes[this.found[Math.max(this.current, 0)] ?? -1];
+      if (node) {
+        // Like a click on the node: the sidebar's panes come along.
+        location.href = carrySidebar(anchorHref(node.a), location.href);
+      }
+    } else if (e.key === "Enter" && this.found.length > 0) {
+      e.preventDefault();
+      const n = this.found.length;
+      this.goToMatch(this.current < 0 && e.shiftKey ? n - 1 : (this.current + (e.shiftKey ? n - 1 : 1)) % n);
+    }
+  }
+
+  /** Centres the match at `index` in `found`, zoomed in far enough to read every label. */
+  private goToMatch(index: number): void {
+    const previous = this.nodes[this.found[this.current] ?? -1];
+    previous?.a.classList.remove("current");
+    this.current = index;
+    const i = this.found[index]!;
+    const node = this.nodes[i]!;
+    node.a.classList.add("current");
+    this.highlightNode(i);
+    const k = Math.min(Math.max(this.view.k, ALL_LABELS_PX / (SPACING * this.scale)), maxZoom(this.scale));
+    const r = this.svg.getBoundingClientRect();
+    const c = this.toSvg(r.left + r.width / 2, r.top + r.height / 2);
+    this.setView(centreOn({ ...this.view, k }, node.x, node.y, c.x, c.y));
+    this.showCount();
   }
 
   /** Re-reads how big the fitted graph is on screen. */

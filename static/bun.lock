@@ -35,6 +35,7 @@
       "name": "@hermetic/graph",
       "dependencies": {
         "@hermetic/core": "workspace:*",
+        "@hermetic/search": "workspace:*",
       },
     },
     "packages/live-reload": {

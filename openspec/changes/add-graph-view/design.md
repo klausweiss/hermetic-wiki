@@ -14,7 +14,7 @@ Constraints from existing specs: pages must work without JavaScript and from `fi
 
 **Non-Goals:**
 - A per-page "local graph" (worth doing later on top of the same layout code).
-- Live simulation, dragging individual nodes, or filters (journal toggle, search-in-graph, hiding orphans).
+- Live simulation, dragging individual nodes, or filters (journal toggle, hiding orphans). Search in the graph was added after the first version; see "Search in the graph" below.
 - Namespace parent/child edges.
 - Keeping zoom/pan in the URL.
 
@@ -65,6 +65,12 @@ Alternatives: (a) emit JSON and simulate in the browser on a canvas, like Logseq
 - Controls (+, −, fit) are added by the script only, as required by `reader-ui` progressive enhancement, and use the existing `icon()` helper. If a needed icon is missing, it is added to `core/src/icons.ts`.
 - Highlight: on `pointerenter` or `focusin` of a node `a`, the script sets `data-focus` on the SVG and `.hl` on the node and its neighbours, and fills the overlay path. CSS dims everything else.
 - The element works the same inside a sidebar pane. Panes adopt the article and the custom element upgrades there, so no special case is needed.
+
+### Search in the graph
+- Part of `<hermetic-graph>`: a script-added search control and box in `.graph-controls`. Matching uses `foldText` from `@hermetic/search`, so case and diacritics fold exactly as in site search. Each node's folded name is computed once at setup, and a node matches when every folded word of the query is a substring of it. The pure matching function sits in its own module with unit tests.
+- Display: `data-search` on the SVG, with `.match` on matching nodes. CSS dims non-matches and shows match labels, reusing the highlight styles. The current match gets the existing neighbour highlight.
+- Moving to a match: centre it (`centreOn`) and zoom to at least the level where all labels show (`labelLevel` 3), within the zoom limit. The view from before the search is saved when the box opens and restored on `Escape`.
+- `Ctrl+F` is taken over by a `keydown` listener on `document` that only the graph element installs, so other pages never see it. When the search input already has focus, the key is left alone and the browser's find opens (the Discourse pattern). `shortcuts` lists `Ctrl+F` in the `?` dialog only when a `hermetic-graph` element is on the page.
 
 ### Links: SVG anchors through the existing click handling
 The sidebar's click handler (`sidebar/src/index.ts:192`) finds the anchor with `closest("a[href]")` and reads `a.href`. On an `SVGAElement` that is an `SVGAnimatedString`. A small helper in `core/src/links.ts` (`anchorHref(a: Element): string`) will resolve `getAttribute("href")` against `document.baseURI` for both kinds of anchor. The sidebar uses it for Shift+click panes and for carrying the sidebar state on plain clicks. Graph node clicks then reuse all of the multi-pane behavior unchanged.

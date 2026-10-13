@@ -1,0 +1,51 @@
+name: Pages
+
+on:
+  push:
+    branches:
+      - master
+
+# Only the latest push matters; a newer one replaces whatever an older run would publish.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+# Write access is needed to push the gh-pages branch, which is the only thing this pushes.
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build site
+        run: cargo run -- build wiki/ site --title "hermetic.wiki"
+
+      # Without it, Jekyll would drop `_hermetic/`, which holds the script and styles.
+      - name: Disable Jekyll
+        run: touch site/.nojekyll
+
+      # The branch is replaced by a single fresh commit each time, so it holds only the
+      # latest build and never shares history with master.
+      - name: Push to gh-pages
+        working-directory: site
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Build ${GITHUB_SHA::7}"
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages

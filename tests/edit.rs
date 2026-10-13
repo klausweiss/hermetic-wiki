@@ -468,10 +468,11 @@ fn delete_source(addr: SocketAddr, path: &str, version: &str) -> Response {
     )
 }
 
-/// Files under `.trash/`, relative to it.
+/// Files under `.trash/`, relative to it, except its `.gitignore`.
 fn trashed(notes: &Path) -> Vec<String> {
     common::tree(&notes.join(".trash"))
         .keys()
+        .filter(|p| p.as_os_str() != ".gitignore")
         .map(|p| p.to_string_lossy().into_owned())
         .collect()
 }
@@ -509,6 +510,30 @@ fn delete_a_page() {
     assert_eq!(
         fs::read_to_string(notes.path().join("journals/2026-10-12.md")).unwrap(),
         "- day\n"
+    );
+    // Git ignores the trash.
+    let ignore = fs::read_to_string(notes.path().join(".trash/.gitignore")).unwrap();
+    assert!(ignore.lines().any(|l| l == "*"), "{ignore}");
+}
+
+#[test]
+fn delete_keeps_an_existing_trash_gitignore() {
+    let notes = Notes::new(&[
+        ("pages/a.md", "- a\n"),
+        ("pages/b.md", "- b\n"),
+        (".trash/.gitignore", ""),
+    ]);
+    let server = start(notes.path());
+    for name in ["a", "b"] {
+        let path = format!("pages/{name}.html");
+        let v = field(&get_source(server.addr, &path).body, "version");
+        assert_eq!(delete_source(server.addr, &path, &v).status, 200);
+    }
+    assert_eq!(trashed(notes.path()).len(), 2);
+    // Empty, as the author left it.
+    assert_eq!(
+        fs::read_to_string(notes.path().join(".trash/.gitignore")).unwrap(),
+        ""
     );
 }
 

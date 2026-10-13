@@ -35,8 +35,10 @@ COMMANDS
       is refused if the file changed on disk since the page loaded it.
       "Today" opens (and creates) today's journal. "Delete page" moves a
       page's file to .trash/ in the notes folder (move it back to restore
-      it). Other devices and other websites can never edit, also with
-      --host or --public.
+      it). The trash is never emptied automatically; git ignores it
+      through the .trash/.gitignore written with it, unless that file
+      already exists. Other devices and other websites can never edit,
+      also with --host or --public.
 
       --port <n>        Use exactly this port; fail if it is taken.
       --host <address>  Listen on this address instead of 127.0.0.1.

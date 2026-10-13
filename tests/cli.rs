@@ -200,6 +200,8 @@ fn single_topics() {
         "saved to the note files",
         "can never edit",
         ".trash/",
+        "never emptied",
+        ".trash/.gitignore",
     ] {
         assert!(commands.contains(phrase), "{phrase}");
     }

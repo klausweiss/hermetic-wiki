@@ -295,10 +295,30 @@ pub fn move_to_trash(root: &Path, path: &Path) -> Result<PathBuf, Unsafe> {
     if !fs::canonicalize(dir)?.starts_with(root) {
         return Err(Unsafe::Outside);
     }
+    ignore_trash(&trash);
     fs::rename(path, &dest)?;
     prune_empty_dirs(root, path.parent());
     Ok(trashed)
 }
+
+/// Lets git ignore the trash: writes `.gitignore` into it unless one exists (whatever
+/// its content, even empty, it is the author's). Best effort: a failure does not stop
+/// the deletion.
+fn ignore_trash(trash: &Path) {
+    let file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(trash.join(".gitignore"));
+    if let Ok(mut file) = file {
+        let _ = file.write_all(TRASH_GITIGNORE.as_bytes());
+    }
+}
+
+const TRASH_GITIGNORE: &str = "\
+# Pages deleted in the browser by `hermetic serve`; never emptied automatically.
+# To track the trash in git, empty this file instead of deleting it.
+*
+";
 
 /// Removes now-empty directories from `dir` upwards, inside `pages/` only (never
 /// `pages/` itself).

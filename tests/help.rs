@@ -221,6 +221,19 @@ fn worked_example() {
 }
 
 #[test]
+fn web_links() {
+    let (notes, _g) = load("- the book is at https://doc.rust-lang.org/book/.");
+    let (_holder, out, _) = build_site(notes.path());
+    let html = std::fs::read_to_string(out.join("journals/2026-10-12.html")).unwrap();
+    assert!(
+        html.contains(
+            r#"<a href="https://doc.rust-lang.org/book/">https://doc.rust-lang.org/book/</a>."#
+        ),
+        "{html}"
+    );
+}
+
+#[test]
 fn fits_a_terminal() {
     let reference = help::reference();
     for line in reference.lines() {

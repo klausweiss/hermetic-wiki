@@ -24,3 +24,20 @@ A bare URL starting with `http://` or `https://` in block content or a property 
 #### Scenario: URL in a property value
 - **WHEN** a block has the property `source:: https://example.com/report`
 - **THEN** the property's value links to `https://example.com/report`
+
+## MODIFIED Requirements
+
+### Requirement: Works offline and without JavaScript
+Every generated page SHALL be fully usable when opened directly from disk (`file://`) with JavaScript disabled: all content, navigation, linked references, related pages, and tasks SHALL be present in the HTML. Pages SHALL NOT load any resource from outside the output directory, and all links between generated files SHALL be relative. Pages MAY load hermetic's own bundled script from `_hermetic/`; nothing on a page SHALL depend on it to be shown or reached.
+
+#### Scenario: Opened from disk
+- **WHEN** a generated page is opened via `file://` in a browser with JavaScript disabled
+- **THEN** its content, linked references, and navigation links work, and stylesheets and fonts load
+
+#### Scenario: No external resources
+- **WHEN** any generated HTML or CSS file is inspected
+- **THEN** it references no URL with a scheme or a protocol-relative URL, except links written by the author in note content, the site footer's link to hermetic's project page, and `data:` URLs, which carry their content inline
+
+#### Scenario: Only hermetic's own script
+- **WHEN** any generated HTML file is inspected
+- **THEN** its only `<script>` element loads `_hermetic/app.js` via a relative URL, and it has no inline scripts

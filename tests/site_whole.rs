@@ -169,10 +169,12 @@ fn urls(text: &str) -> Vec<String> {
     out
 }
 
+/// Whether `url` points outside the site; `data:` URLs carry their content inline.
 fn is_external(url: &str) -> bool {
     url.starts_with("//")
         || url.split_once(':').is_some_and(|(scheme, _)| {
             !scheme.is_empty()
+                && scheme != "data"
                 && scheme
                     .chars()
                     .all(|c| c.is_ascii_alphanumeric() || "+.-".contains(c))

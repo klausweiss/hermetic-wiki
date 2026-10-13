@@ -4,7 +4,7 @@ use std::fmt::Write;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 
-use pulldown_cmark::{Options, Parser, html};
+use pulldown_cmark::{Event, LinkType, Options, Parser, Tag, TagEnd, html};
 
 use super::html::{esc, strip_tags};
 use super::paths::{href, output_path};
@@ -307,8 +307,120 @@ fn markdown(src: &str) -> String {
         | Options::ENABLE_TASKLISTS
         | Options::ENABLE_FOOTNOTES;
     let mut out = String::new();
-    html::push_html(&mut out, Parser::new_ext(src, options));
+    html::push_html(
+        &mut out,
+        autolink(Parser::new_ext(src, options)).into_iter(),
+    );
     out
+}
+
+/// Turns bare URLs in text into links, leaving text inside links, images,
+/// code blocks, and inline `<a>` HTML alone. Neighbouring text events are
+/// joined first, as the parser splits text at `_` and `*`.
+fn autolink<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<Event<'a>> {
+    let mut out = Vec::new();
+    let mut text = String::new();
+    let mut inside = 0usize;
+    for event in events {
+        if let Event::Text(t) = &event
+            && inside == 0
+        {
+            text.push_str(t);
+            continue;
+        }
+        push_linked(&mut out, std::mem::take(&mut text));
+        match &event {
+            Event::Start(Tag::Link { .. } | Tag::Image { .. } | Tag::CodeBlock(_)) => inside += 1,
+            Event::End(TagEnd::Link | TagEnd::Image | TagEnd::CodeBlock) => {
+                inside = inside.saturating_sub(1)
+            }
+            Event::InlineHtml(h) if html_tag_is(h, "<a") => inside += 1,
+            Event::InlineHtml(h) if html_tag_is(h, "</a") => inside = inside.saturating_sub(1),
+            _ => {}
+        }
+        out.push(event);
+    }
+    push_linked(&mut out, text);
+    out
+}
+
+/// Whether the inline HTML `h` starts with the tag `prefix` (e.g. `<a`), ignoring case.
+fn html_tag_is(h: &str, prefix: &str) -> bool {
+    h.get(..prefix.len())
+        .is_some_and(|p| p.eq_ignore_ascii_case(prefix))
+        && h[prefix.len()..].starts_with(|c: char| c.is_ascii_whitespace() || c == '>')
+}
+
+fn push_linked<'a>(out: &mut Vec<Event<'a>>, text: String) {
+    if text.is_empty() {
+        return;
+    }
+    let mut pos = 0;
+    for url in find_urls(&text) {
+        if pos < url.start {
+            out.push(Event::Text(text[pos..url.start].to_owned().into()));
+        }
+        let dest = &text[url.clone()];
+        out.push(Event::Start(Tag::Link {
+            link_type: LinkType::Autolink,
+            dest_url: dest.to_owned().into(),
+            title: "".into(),
+            id: "".into(),
+        }));
+        out.push(Event::Text(dest.to_owned().into()));
+        out.push(Event::End(TagEnd::Link));
+        pos = url.end;
+    }
+    if pos == 0 {
+        out.push(Event::Text(text.into()));
+    } else if pos < text.len() {
+        out.push(Event::Text(text[pos..].to_owned().into()));
+    }
+}
+
+/// Byte ranges of bare `http://` and `https://` URLs in `text`, ending where
+/// GitHub's autolinks end.
+fn find_urls(text: &str) -> Vec<Range<usize>> {
+    let mut urls = Vec::new();
+    let mut i = 0;
+    while let Some(offset) = text[i..].find("http") {
+        let start = i + offset;
+        let rest = &text[start..];
+        let scheme = if rest.starts_with("https://") {
+            "https://".len()
+        } else if rest.starts_with("http://") {
+            "http://".len()
+        } else {
+            i = start + "http".len();
+            continue;
+        };
+        if text[..start].ends_with(char::is_alphanumeric) {
+            i = start + scheme;
+            continue;
+        }
+        let candidate = rest
+            .find(|c: char| c.is_whitespace() || matches!(c, '<' | '\u{E000}' | '\u{E001}'))
+            .map_or(rest, |end| &rest[..end]);
+        let len = trimmed_url_len(candidate);
+        if len > scheme {
+            urls.push(start..start + len);
+        }
+        i = start + len.max(scheme);
+    }
+    urls
+}
+
+/// Length of `url` without trailing punctuation and unbalanced closing parentheses.
+fn trimmed_url_len(url: &str) -> usize {
+    let mut url = url;
+    loop {
+        match url.chars().next_back() {
+            Some('.' | ',' | ':' | ';' | '!' | '?' | '*' | '_' | '~' | '\'' | '"') => {}
+            Some(')') if url.matches(')').count() > url.matches('(').count() => {}
+            _ => return url.len(),
+        }
+        url = &url[..url.len() - 1];
+    }
 }
 
 /// `<p>x</p>` → `x` when the HTML is exactly one paragraph.
@@ -348,5 +460,72 @@ mod tests {
         assert!(html.contains("<del>gone</del>"));
         assert!(html.contains("footnote"));
         assert!(html.contains("type=\"checkbox\""));
+    }
+
+    fn urls(text: &str) -> Vec<&str> {
+        find_urls(text).into_iter().map(|r| &text[r]).collect()
+    }
+
+    #[test]
+    fn url_ends() {
+        assert_eq!(
+            urls("see http://127.0.0.1:8000/index.html."),
+            ["http://127.0.0.1:8000/index.html"]
+        );
+        assert_eq!(
+            urls("(docs: https://en.wikipedia.org/wiki/Rust_(programming_language))"),
+            ["https://en.wikipedia.org/wiki/Rust_(programming_language)"]
+        );
+        assert_eq!(urls("(https://a.com/x)"), ["https://a.com/x"]);
+        assert_eq!(urls("\"https://a.com/?q=1\"!"), ["https://a.com/?q=1"]);
+        assert_eq!(
+            urls("https://a.com/a, https://b.com/b<br>"),
+            ["https://a.com/a", "https://b.com/b"]
+        );
+    }
+
+    #[test]
+    fn url_boundaries() {
+        assert!(urls("xhttps://a.com").is_empty());
+        assert!(urls("https:// and http://").is_empty());
+        assert!(urls("http:/a.com httpx://a.com").is_empty());
+        assert_eq!(urls("https://a.com\u{E000}0\u{E001}"), ["https://a.com"]);
+        assert_eq!(urls("ź https://zażółć.pl/ź"), ["https://zażółć.pl/ź"]);
+    }
+
+    #[test]
+    fn bare_urls_become_links() {
+        assert_eq!(
+            markdown("see http://127.0.0.1:8000/index.html."),
+            "<p>see <a href=\"http://127.0.0.1:8000/index.html\">http://127.0.0.1:8000/index.html</a>.</p>\n"
+        );
+        assert_eq!(
+            markdown("https://a.com/snake_case_name and *em*"),
+            "<p><a href=\"https://a.com/snake_case_name\">https://a.com/snake_case_name</a> and <em>em</em></p>\n"
+        );
+        assert_eq!(
+            markdown("https://a.com/?a=1&b=<2>"),
+            "<p><a href=\"https://a.com/?a=1&amp;b=\">https://a.com/?a=1&amp;b=</a>&lt;2&gt;</p>\n"
+        );
+    }
+
+    #[test]
+    fn urls_already_linked_or_in_code_stay() {
+        for src in [
+            "`curl https://example.com`",
+            "[site](https://example.com)",
+            "[https://example.com](https://example.com)",
+            "<https://example.com>",
+            "![https://example.com](a.png)",
+            "<a href=\"https://example.com\">https://example.com</a>",
+            "```\nhttps://example.com\n```",
+        ] {
+            let html = markdown(src);
+            assert!(html.matches("<a ").count() <= 1, "{src}: {html}");
+            let plain = Parser::new(src);
+            let mut expected = String::new();
+            html::push_html(&mut expected, plain);
+            assert_eq!(html, expected, "{src}");
+        }
     }
 }

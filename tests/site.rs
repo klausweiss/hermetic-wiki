@@ -106,6 +106,33 @@ fn nested_blocks_and_properties() {
 }
 
 #[test]
+fn bare_urls_link_next_to_page_links() {
+    let (_n, _h, out, _) = built(&[
+        ("pages/a.md", "- [[redis]]: https://redis.io."),
+        ("pages/redis.md", "- x"),
+    ]);
+    let html = main_of(&out, "pages/a.html");
+    assert!(
+        html.contains(r#"<a class="page-ref" href="redis.html">redis</a>: <a href="https://redis.io">https://redis.io</a>."#),
+        "{html}"
+    );
+    assert!(!html.contains("target="), "{html}");
+}
+
+#[test]
+fn bare_url_in_property_value() {
+    let (_n, _h, out, _) = built(&[(
+        "pages/a.md",
+        "- report\n  source:: https://example.com/report",
+    )]);
+    let html = main_of(&out, "pages/a.html");
+    assert!(
+        html.contains(r#"<dt>source</dt><dd><a href="https://example.com/report">https://example.com/report</a></dd>"#),
+        "{html}"
+    );
+}
+
+#[test]
 fn anchors() {
     let (_n, _h, out, _) = built(&[("pages/a.md", "- one\n- two\n  id:: ttl-bug\n- three")]);
     let html = main_of(&out, "pages/a.html");

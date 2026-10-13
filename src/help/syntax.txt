@@ -89,6 +89,13 @@ SYNTAX
                         inline and also links its page. An unknown id is
                         reported and shown as broken.
 
+  Web links
+      A URL starting with http:// or https:// becomes a link as written; a
+      trailing . , : ; ! ? or an unmatched ) is not part of it. Links that
+      leave the notes are marked with a small icon:
+
+        - the book is at https://doc.rust-lang.org/book/.
+
   Where references are not recognized
       Inside `inline code`, inside fenced code blocks, and after a backslash:
 

@@ -3,12 +3,14 @@
 // a block to edit its markdown, use the outliner keys, and changes are saved to the
 // note file. The page is updated in place from each rebuild instead of reloading.
 
-import { EDITING_ATTR, OPEN_TODAY, PAGES_CHANGED, carrySidebar, icon, readEnv, whenParsed } from "@hermetic/core";
+import { EDITING_ATTR, EDIT_PROPERTIES, OPEN_TODAY, PAGES_CHANGED, carrySidebar, icon, readEnv, whenParsed } from "@hermetic/core";
 
 import { Conflict, type Refused, SaveQueue, type SaveState, SourceApi } from "./api";
 import { type Doc, type Node, type Payload, flatten, fromPayload, newNode } from "./model";
 import { MARKERS, applied, toggle } from "./format";
 import * as ops from "./ops";
+import { pageProps, setPageProps } from "./props";
+import { editProperties } from "./propsdialog";
 import { sameText, serialize } from "./serialize";
 
 /** How long after the last keystroke a change is saved. */
@@ -115,6 +117,7 @@ export class HermeticEditor extends HTMLElement {
       if ((e.target as Element).closest(".task-marker[role=button]")) e.preventDefault();
     });
     document.documentElement.setAttribute(EDITING_ATTR, "");
+    document.addEventListener(EDIT_PROPERTIES, () => this.editProperties());
 
     this.queue = new SaveQueue(this.api, path, payload.version, {
       text: () => serialize(this.doc!),
@@ -367,19 +370,16 @@ export class HermeticEditor extends HTMLElement {
     return ul;
   }
 
-  // --- Deleting the page ----------------------------------------------------------------
+  // --- The page menu ----------------------------------------------------------------------
 
   /**
-   * The page's actions menu: a small menu button in the page header ("Delete page" is
-   * its one action, so the menu is shown only while the page has a file).
+   * The page's actions menu: a small menu button in the page header with "Page
+   * properties" and, while the page has a file, "Delete page".
    */
   private showPageMenu(payload: Payload): void {
     const header = document.querySelector("main > article.page > header.page-header");
-    let menu = header?.querySelector<HTMLElement>(".page-menu") ?? null;
-    if (!header || !payload.exists) {
-      menu?.remove();
-      return;
-    }
+    if (!header) return;
+    let menu = header.querySelector<HTMLElement>(".page-menu");
     if (!menu) {
       menu = document.createElement("div");
       menu.className = "page-menu";
@@ -395,12 +395,20 @@ export class HermeticEditor extends HTMLElement {
       items.className = "page-menu-items";
       items.setAttribute("role", "menu");
       items.hidden = true;
+      const props = document.createElement("button");
+      props.type = "button";
+      props.className = "page-props-item";
+      props.setAttribute("role", "menuitem");
+      props.setAttribute("aria-keyshortcuts", "p");
+      const key = document.createElement("kbd");
+      key.textContent = "p";
+      props.append(icon("list"), "Page properties", key);
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "page-delete";
       remove.setAttribute("role", "menuitem");
       remove.append(icon("trash-2"), "Delete page");
-      items.append(remove);
+      items.append(props, remove);
       menu.append(toggle, items);
       header.append(menu);
 
@@ -413,7 +421,11 @@ export class HermeticEditor extends HTMLElement {
         const open = items.hidden;
         items.hidden = !open;
         toggle.setAttribute("aria-expanded", String(open));
-        if (open) remove.focus();
+        if (open) props.focus();
+      });
+      props.addEventListener("click", () => {
+        close(false);
+        this.editProperties();
       });
       remove.addEventListener("click", () => {
         close(false);
@@ -424,6 +436,12 @@ export class HermeticEditor extends HTMLElement {
           e.preventDefault();
           e.stopPropagation();
           close(true);
+        } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !items.hidden) {
+          e.preventDefault();
+          const shown = [...items.querySelectorAll<HTMLButtonElement>("button:not([hidden])")];
+          const at = shown.indexOf(document.activeElement as HTMLButtonElement);
+          const by = e.key === "ArrowDown" ? 1 : -1;
+          shown[(at + by + shown.length) % shown.length]?.focus();
         }
       });
       document.addEventListener("click", (e) => {
@@ -431,6 +449,7 @@ export class HermeticEditor extends HTMLElement {
       });
     }
     menu.dataset.file = payload.file;
+    menu.querySelector<HTMLElement>(".page-delete")!.hidden = !payload.exists;
   }
 
   private async confirmDelete(): Promise<void> {
@@ -484,6 +503,19 @@ export class HermeticEditor extends HTMLElement {
       }
     });
     dialog.showModal();
+  }
+
+  // --- Page properties ------------------------------------------------------------------
+
+  /** The properties dialog; its rows become the page's first block when it closes. */
+  private editProperties(): void {
+    if (!this.doc || document.querySelector("dialog[open]")) return;
+    this.end(true);
+    editProperties(this, pageProps(this.doc), (rows) => {
+      if (!this.doc || !setPageProps(this.doc, rows)) return;
+      this.render();
+      this.saveNow();
+    });
   }
 
   // --- Task labels ----------------------------------------------------------------------

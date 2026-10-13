@@ -202,6 +202,12 @@ describe("outliner operations", () => {
     expect(backspace(doc, find(doc, "onetwo"))).toBeNull();
   });
 
+  test("Backspace does not join a block with children into text outside bullets", () => {
+    const doc = load("page-props");
+    expect(backspace(doc, find(doc, "first"))).toBeNull();
+    expect(serialize(doc)).toBe("alias:: auth, [[login]]\ntags::  security\n\n- first\n  - child\n");
+  });
+
   test("Backspace deletes an empty block, but does not join into a parent", () => {
     const doc = load("empty-bullets");
     const nodes = flatten(doc).map((e) => e.node);

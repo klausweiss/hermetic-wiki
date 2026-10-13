@@ -56,7 +56,7 @@ While a block is being edited:
 - Tab SHALL make the block, with its children, the last child of its previous sibling; without a previous sibling it SHALL do nothing.
 - Shift+Tab SHALL make the block, with its children, the next sibling of its parent; its later siblings SHALL stay children of the former parent. For a top-level block it SHALL do nothing.
 - Alt+Shift+Up and Alt+Shift+Down SHALL swap the block, with its children, with its previous or next sibling.
-- Backspace with the cursor at the start of the block SHALL delete the block if it is empty and has no children. Otherwise, if the previous block in document order has no children, it SHALL append the block's text to that block. In both cases editing continues at the join point in the previous block.
+- Backspace with the cursor at the start of the block SHALL delete the block if it is empty and has no children. Otherwise, if the previous block in document order has no children, and is a bullet or the block has no children, it SHALL append the block's text to that block. In both cases editing continues at the join point in the previous block.
 - Up on the first line and Down on the last line SHALL move editing to the previous or next block in document order.
 - Ctrl+Enter (Cmd+Enter on macOS) SHALL cycle the block's task marker: none, `TODO`, `DOING`, `DONE`, none.
 
@@ -112,6 +112,31 @@ While a block is being edited, these keys (Cmd instead of Ctrl on macOS) SHALL t
 #### Scenario: Undo
 - **WHEN** the author presses Ctrl+B on a selection and then Ctrl+Z
 - **THEN** the text is as before the Ctrl+B
+
+### Requirement: Page properties dialog
+Where editing is available, the `p` key (while no text field has focus and no dialog is open) and "Page properties" in the page actions menu SHALL open a dialog listing the page's properties (see "Page properties" in block-model) as rows of a key field, a value field and a delete button; a page without properties SHALL start with one empty row. In the dialog:
+
+- Up and Down SHALL move to the same control of the previous or next row. Down on the last row SHALL add an empty row, unless the last row is empty.
+- Tab and Shift+Tab SHALL cycle through a row's key, value and delete button.
+- The delete button SHALL remove its row only when pressed (Enter, Space or a click) twice in a row; the first press SHALL mark it as asking for confirmation, and moving focus away SHALL clear that.
+- Ctrl+Enter (Cmd+Enter on macOS) SHALL add an empty row below the current one.
+- Enter in a field, or "Save", SHALL save and close the dialog. Escape, or "Cancel", SHALL close it without changing anything.
+- Backspace in the key of an empty row SHALL remove the row (while there are others); at the start of an empty value it SHALL move to the key.
+- A key SHALL accept only letters, digits, `-` and `_`; typing `:` or a space in a key SHALL move to the value.
+
+The dialog SHALL show these keys. Saving SHALL NOT happen while a row has a value but no key; that row SHALL then be marked and focused. On saving, rows without a key SHALL be left out and the rest SHALL become the page's first block as `key:: value` lines: replacing an existing properties block in place, otherwise added as text at the top of the page followed by a blank line, and removed when no property remains. When the properties are unchanged, the file SHALL NOT change. The shortcuts dialog SHALL list the `p` key, and the menu item SHALL show it.
+
+#### Scenario: Add a property
+- **WHEN** the author presses `p` on the page `- first`, types `alias`, Tab, `auth`, and Enter
+- **THEN** the file is `alias:: auth`, a blank line, and `- first`
+
+#### Scenario: Cancel
+- **WHEN** the author changes a value in the dialog and presses Escape
+- **THEN** the file is unchanged
+
+#### Scenario: Edit in place
+- **WHEN** the page starts with `alias:: auth` and `tags:: security` and the author presses the `tags` row's delete button twice and then Enter
+- **THEN** the page starts with `alias:: auth` and the rest of the file is unchanged
 
 ### Requirement: Saving
 Edits SHALL be saved to the page's markdown file without an explicit save action: when editing of a block ends, after every outliner key that changes the block structure, and 1 second after the last change while typing. Saves of one page SHALL happen one at a time, each including all changes made before it started. The page SHALL show whether all changes are saved, being saved, or not saved. When a save fails because the server cannot be reached, the editor SHALL keep the changes, retry when the server is reachable again, and the browser SHALL warn before leaving the page with unsaved changes. A saved change SHALL be visible on every page it affects within 2 seconds for a notes directory of about 5,000 pages.
@@ -306,7 +331,7 @@ Where editing is available, clicking a task's label (`TODO`, `DOING`, or `DONE`)
 - **THEN** the task moves to its next state
 
 ### Requirement: Deleting pages
-Where editing is available, a page that has a file (a regular page, a journal day, or the home page's `index.md`) SHALL offer "Delete page" in a page actions menu: a small menu button in the page header that opens the menu, which closes again on Escape (returning focus to the button), on a click elsewhere, or once an action is chosen. Choosing "Delete page" SHALL ask for confirmation, naming the file and the number of blocks on other pages that reference the page; nothing SHALL change unless the author confirms. A confirmed deletion SHALL move the file to the trash (see "Safe writes"), open the home page, and leave every other file unchanged. A page that is still referenced SHALL remain as a page without a file. Pages without a file SHALL NOT offer the action (nor, while it is the only action, the menu).
+Where editing is available, an editable page SHALL have a page actions menu: a small menu button in the page header that opens the menu, which closes again on Escape (returning focus to the button), on a click elsewhere, or once an action is chosen; Up and Down SHALL move between its items. A page that has a file (a regular page, a journal day, or the home page's `index.md`) SHALL offer "Delete page" in it. Choosing "Delete page" SHALL ask for confirmation, naming the file and the number of blocks on other pages that reference the page; nothing SHALL change unless the author confirms. A confirmed deletion SHALL move the file to the trash (see "Safe writes"), open the home page, and leave every other file unchanged. A page that is still referenced SHALL remain as a page without a file. Pages without a file SHALL NOT offer the action.
 
 #### Scenario: Delete a page
 - **WHEN** the author deletes the page `scratch` (`pages/scratch.md`), which nothing references, and confirms
@@ -318,7 +343,7 @@ Where editing is available, a page that has a file (a regular page, a journal da
 
 #### Scenario: Out of the way
 - **WHEN** a page with a file is opened in edit mode
-- **THEN** its header shows only a small menu button, and "Delete page" appears when that button is chosen
+- **THEN** its header shows only a small menu button, and "Page properties" and "Delete page" appear when that button is chosen
 
 #### Scenario: Cancel
 - **WHEN** the author chooses "Delete page" and cancels the confirmation

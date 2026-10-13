@@ -106,7 +106,8 @@ export function backspace(doc: Doc, node: Node): Focus | null {
     place.siblings.splice(place.index, 1);
     return { node: prev, offset: prev.body.length };
   }
-  if (prev.children.length > 0) return null;
+  // Text outside bullets cannot have children.
+  if (prev.children.length > 0 || (!prev.bullet && node.children.length > 0)) return null;
   const offset = prev.body.length;
   prev.body += node.body;
   prev.children = node.children;

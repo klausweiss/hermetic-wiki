@@ -40,3 +40,6 @@ export const EDITING_ATTR = "data-hermetic-editing";
 
 /** Dispatched on `document` (by the `g d` shortcut) to open today's journal. */
 export const OPEN_TODAY = "hermetic-open-today";
+
+/** Dispatched on `document` (by the `p` shortcut) to edit the page's properties. */
+export const EDIT_PROPERTIES = "hermetic-edit-properties";

@@ -2,6 +2,8 @@
 // the sidebar only through events and the URL, so it works with or without one.
 
 import {
+  EDITING_ATTR,
+  EDIT_PROPERTIES,
   OPEN_TODAY,
   SEARCH_FOCUS,
   SEARCH_TOGGLE,
@@ -53,6 +55,7 @@ const HELP: readonly Shortcut[] = [
   { keys: "Esc", what: "Close the top sidebar pane", sidebar: true },
   { keys: "\\", what: "Show or hide the sidebar", sidebar: true },
   { keys: "?", what: "Show these shortcuts" },
+  { keys: "p", what: "Edit the page's properties", editing: true },
   { keys: "Click a block", what: "Edit it", editing: true },
   { keys: "Enter", what: "New block below (Shift + Enter: line break)", editing: true },
   { keys: "Tab / Shift + Tab", what: "Indent / outdent the block", editing: true },
@@ -133,6 +136,13 @@ export class HermeticShortcuts extends HTMLElement {
         if (hasSearch()) {
           e.preventDefault();
           document.dispatchEvent(new Event(SEARCH_FOCUS));
+        }
+        break;
+      case "p":
+        // Only on a page open for editing; the editor shows the properties dialog.
+        if (document.documentElement.hasAttribute(EDITING_ATTR) && !document.querySelector("dialog[open]")) {
+          e.preventDefault();
+          document.dispatchEvent(new Event(EDIT_PROPERTIES));
         }
         break;
       case "\\":

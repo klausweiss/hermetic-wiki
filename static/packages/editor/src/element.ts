@@ -13,6 +13,8 @@ import { sameText, serialize } from "./serialize";
 
 /** How long after the last keystroke a change is saved. */
 export const IDLE_SAVE_MS = 1000;
+/** How long "Saved" stays in the corner; "Not saved" stays for as long as it is true. */
+export const SAVED_SHOWN_MS = 6000;
 /** sessionStorage key: the site path whose first block to edit once it has loaded. */
 const START_KEY = "hermetic-editor-start";
 /** How long after it is recorded a page starts editing when it loads. */
@@ -61,6 +63,7 @@ export class HermeticEditor extends HTMLElement {
   private nodes = new WeakMap<Element, Node>();
   private active: Active | null = null;
   private idle = 0;
+  private statusFade = 0;
   private section: HTMLElement | null = null;
   private status: HTMLElement | null = null;
   private ready = false;
@@ -121,7 +124,7 @@ export class HermeticEditor extends HTMLElement {
       state: (s) => this.showState(s),
     });
     this.resync(payload, rendered);
-    this.showState("saved");
+    // The status stays empty, and so hidden, until the first edit.
 
     document.addEventListener(PAGES_CHANGED, (e) => {
       const { changed, removed } = (e as CustomEvent<{ changed: string[]; removed: string[] }>).detail;
@@ -238,6 +241,12 @@ export class HermeticEditor extends HTMLElement {
     if (!this.status || !this.path) return;
     this.status.dataset.state = state;
     this.status.textContent = state === "saved" ? "Saved" : state === "saving" ? "Saving…" : "Not saved";
+    this.status.classList.remove("faded");
+    clearTimeout(this.statusFade);
+    if (state === "saved") {
+      const status = this.status;
+      this.statusFade = window.setTimeout(() => status.classList.add("faded"), SAVED_SHOWN_MS);
+    }
   }
 
   // --- Loading and rendering ------------------------------------------------------------

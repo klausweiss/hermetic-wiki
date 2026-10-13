@@ -483,6 +483,8 @@ dialog.search-dialog::backdrop { background: rgb(0 0 0 / 0.5); }
   color: var(--muted); font-size: 0.7rem;
 }
 .edit-status[data-state="unsaved"] { color: var(--todo); }
+.edit-status:empty { display: none; }
+.edit-status.faded { opacity: 0; transition: opacity 0.4s ease; }
 html[data-hermetic-editing] section.content li.block > .block-body { cursor: text; }
 .block-editor {
   display: block; width: 100%; box-sizing: border-box; resize: none; overflow: hidden;

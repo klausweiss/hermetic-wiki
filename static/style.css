@@ -332,6 +332,8 @@ button:hover { color: var(--text); background: var(--surface); }
 
 .view-toggle { display: inline-flex; gap: 0.25rem; margin-bottom: 1rem; }
 .view-toggle button[aria-pressed="true"] { color: var(--text); background: var(--surface); }
+.page-header:has(> .view-toggle) { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
+.page-header > .view-toggle { margin-bottom: 0; }
 
 /* Journal timeline */
 
@@ -343,6 +345,40 @@ hermetic-timeline.show-timeline > h2, hermetic-timeline.show-timeline > ul.days 
 .timeline-day > h2 { font-size: 1.3rem; margin-top: 1.75rem; }
 .timeline-sentinel { height: 1px; }
 .timeline-end { color: var(--muted); font-style: italic; text-align: center; margin: 2rem 0; }
+
+/* Journal calendar: one row of month grids at the top of the timeline, scrolling sideways
+   however long the journal gets. Months off screen skip rendering. */
+.calendar {
+  --cell: 1.05rem;
+  display: flex; align-items: stretch; gap: 0.75rem;
+  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin;
+  padding: 0.25rem 0 0.5rem; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+}
+.calendar-month {
+  flex: none; content-visibility: auto;
+  contain-intrinsic-size: calc(7 * var(--cell) + 6px) calc(7 * var(--cell) + 6px);
+}
+.calendar-title { font-size: 0.7rem; font-weight: 600; color: var(--muted); line-height: var(--cell); white-space: nowrap; }
+.calendar-grid {
+  display: grid; gap: 1px;
+  grid-template-columns: repeat(7, var(--cell)); grid-auto-rows: var(--cell);
+  font-size: 0.6rem; line-height: var(--cell); text-align: center; font-variant-numeric: tabular-nums;
+}
+.calendar-grid > * { border-radius: 3px; color: var(--muted); opacity: 0.55; }
+.calendar-grid > a.has-entry {
+  opacity: 1; color: var(--link); font-weight: 650;
+  background: color-mix(in srgb, var(--link) 16%, transparent);
+}
+.calendar-grid > a.has-entry:hover, .calendar-grid > a.has-entry:focus-visible {
+  text-decoration: none; color: var(--bg); background: var(--link); outline: none;
+}
+.calendar-grid > .today { opacity: 1; box-shadow: inset 0 0 0 1px var(--text); }
+.calendar-gap {
+  flex: none; align-self: stretch; display: grid; place-items: center;
+  padding: 0 0.15rem; border-left: 1px dashed var(--border); border-right: 1px dashed var(--border);
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font-size: 0.65rem; color: var(--muted); white-space: nowrap; cursor: default;
+}
 
 /* Sidebar */
 

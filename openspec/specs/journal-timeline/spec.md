@@ -38,3 +38,18 @@ Links and Shift+click inside the timeline SHALL behave as on any page: plain cli
 #### Scenario: Open a topic from the timeline
 - **WHEN** the user Shift+clicks `[[auth]]` inside a day in the timeline
 - **THEN** the `auth` page opens in the sidebar and the timeline stays in place
+
+### Requirement: Journal calendar
+The timeline view SHALL start with a calendar of the months that have journal days with a source file, and the list view SHALL NOT show it. Each month SHALL be a small grid of its days, weeks starting on Monday, where days with an entry are highlighted links to their day pages and today is marked. Months without entries between two months with entries SHALL NOT be drawn; each run of them SHALL be shown as one gap marker stating how long it lasted. The calendar SHALL stay one row of months high however many months the journal spans, oldest on the left, scrolling sideways, and SHALL initially show the newest month.
+
+#### Scenario: Navigate from the calendar
+- **WHEN** the user clicks a highlighted day in the calendar
+- **THEN** that day's page opens
+
+#### Scenario: Gap between months
+- **WHEN** the journal has entries in June 2025 and August 2026 and none in between
+- **THEN** the calendar shows June 2025, then a marker for 1 year 1 month without entries, then August 2026
+
+#### Scenario: Long-running journal
+- **WHEN** the journal spans ten years
+- **THEN** the calendar is as tall as for one month, and shows the newest month without scrolling

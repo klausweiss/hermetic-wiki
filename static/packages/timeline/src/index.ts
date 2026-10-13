@@ -1,8 +1,11 @@
 // <hermetic-timeline>: wraps the journal list (`ul.days` links, newest first) and adds a
-// timeline view (the default) showing full journal days, loaded as the reader scrolls. Without the
-// script the element is inert and the list inside it shows as usual.
+// timeline view (the default) showing full journal days, loaded as the reader scrolls, under a
+// calendar of the days with entries. Without the script the element is inert and the list
+// inside it shows as usual.
 
 import { fetchPage, readEnv, whenParsed } from "@hermetic/core";
+
+import { calendar, scrollToNewest } from "./calendar";
 
 const VIEW_PARAM = "view";
 const TIMELINE = "timeline";
@@ -36,10 +39,20 @@ export class HermeticTimeline extends HTMLElement {
     const listButton = viewButton("List");
     const timelineButton = viewButton("Timeline");
     toggle.append(listButton, timelineButton);
-    this.prepend(toggle);
+    // Beside the page title, where it takes no height of its own.
+    const header = this.parentElement?.querySelector(":scope > .page-header");
+    if (header) {
+      header.append(toggle);
+    } else {
+      this.prepend(toggle);
+    }
 
     const timeline = document.createElement("div");
     timeline.className = "timeline";
+    const cal = calendar(days.map((a) => ({ date: a.textContent ?? "", href: a.href })));
+    timeline.append(cal);
+    // The strip can only be scrolled once it is laid out, so the first time it is shown.
+    let calendarShown = false;
     const sentinel = document.createElement("div");
     sentinel.className = "timeline-sentinel";
     timeline.append(sentinel);
@@ -94,6 +107,10 @@ export class HermeticTimeline extends HTMLElement {
       if (isTimeline) {
         url.searchParams.delete(VIEW_PARAM);
         observer.observe(sentinel);
+        if (!calendarShown) {
+          calendarShown = true;
+          scrollToNewest(cal);
+        }
       } else {
         url.searchParams.set(VIEW_PARAM, LIST);
         observer.unobserve(sentinel);

@@ -1,4 +1,4 @@
-.PHONY: build test test-perf run site serve lint fmt frontend bench-search clean
+.PHONY: build test test-perf site serve-test lint fmt frontend bench-search clean
 
 # Arguments passed to the binary, e.g. `make run ARGS="build notes/"`.
 ARGS ?=
@@ -14,16 +14,17 @@ test:
 test-perf:
 	cargo test --release -- --ignored --nocapture
 
-run:
-	cargo run -- $(ARGS)
-
 # Builds the test fixture notes into ./site, for looking at the output in a browser.
 site:
 	cargo run -- build tests/fixtures/notes site
 
 # Serves the test fixture notes with live reload (Ctrl+C to stop).
-serve:
+serve-test:
 	cargo run -- serve tests/fixtures/notes
+
+# Serves the project's wiki with live reload (Ctrl+C to stop).
+wiki-serve:
+	cargo run -- serve wiki --title "hermetic.wiki"
 
 lint:
 	cargo fmt --check

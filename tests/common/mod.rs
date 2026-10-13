@@ -64,7 +64,7 @@ impl Drop for Notes {
 pub fn build_site(notes: &Path) -> (Notes, PathBuf, BuildReport) {
     let holder = Notes::empty();
     let out = holder.path().join("site");
-    let report = site::build(notes, &out).expect("build succeeds");
+    let report = site::build(notes, &out, None).expect("build succeeds");
     (holder, out, report)
 }
 

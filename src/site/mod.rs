@@ -66,8 +66,9 @@ pub fn title_for(notes: &Path) -> String {
         .map_or_else(|| "notes".to_owned(), |n| n.to_string_lossy().into_owned())
 }
 
-/// Builds the notes directory `notes` into the output directory `out`.
-pub fn build(notes: &Path, out: &Path) -> Result<BuildReport, BuildError> {
+/// Builds the notes directory `notes` into the output directory `out`. The site title
+/// is `title`, or the notes directory's name when `None`.
+pub fn build(notes: &Path, out: &Path, title: Option<&str>) -> Result<BuildReport, BuildError> {
     let notes = match fs::canonicalize(notes) {
         Ok(p) if p.is_dir() => p,
         _ => return Err(BuildError::NotADirectory(notes.to_path_buf())),
@@ -76,7 +77,7 @@ pub fn build(notes: &Path, out: &Path) -> Result<BuildReport, BuildError> {
     check_output(&notes, &out)?;
 
     let (graph, mut diagnostics) = Graph::load(&notes);
-    let title = title_for(&notes);
+    let title = title.map_or_else(|| title_for(&notes), str::to_owned);
 
     let name = out.file_name().unwrap_or_default().to_string_lossy();
     let tmp = out.with_file_name(format!("{name}.hermetic-tmp-{}", std::process::id()));

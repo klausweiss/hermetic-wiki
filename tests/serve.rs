@@ -24,6 +24,7 @@ fn start(notes: &Path) -> Running {
         notes: notes.to_path_buf(),
         bind: Bind::Loopback,
         port: Some(0),
+        title: None,
         timing: fast(),
     })
     .expect("server starts")
@@ -140,6 +141,21 @@ impl Events {
         }
         out
     }
+}
+
+#[test]
+fn custom_site_title() {
+    let notes = Notes::new(&[("pages/a.md", "- a")]);
+    let server = serve::start(serve::Options {
+        notes: notes.path().to_path_buf(),
+        bind: Bind::Loopback,
+        port: Some(0),
+        title: Some("My Wiki".to_owned()),
+        timing: fast(),
+    })
+    .expect("server starts");
+    let body = String::from_utf8(get(server.addr, "/pages/a.html").body).unwrap();
+    assert!(body.contains("<title>a · My Wiki</title>"), "{body}");
 }
 
 #[test]
@@ -389,6 +405,7 @@ fn change_served_within_two_seconds_at_5000_pages() {
         notes: notes.path().to_path_buf(),
         bind: Bind::Loopback,
         port: Some(0),
+        title: None,
         timing: Timing::default(),
     })
     .unwrap();

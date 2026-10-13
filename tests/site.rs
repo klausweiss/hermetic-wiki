@@ -369,10 +369,10 @@ fn rebuilding_replaces_the_previous_output() {
     let notes = Notes::new(&[("pages/a.md", "- a"), ("pages/b.md", "- b")]);
     let holder = Notes::empty();
     let out = holder.path().join("site");
-    site::build(notes.path(), &out).unwrap();
+    site::build(notes.path(), &out, None).unwrap();
     assert!(out.join("pages/b.html").exists());
     fs::remove_file(notes.path().join("pages/b.md")).unwrap();
-    site::build(notes.path(), &out).unwrap();
+    site::build(notes.path(), &out, None).unwrap();
     assert!(!out.join("pages/b.html").exists());
     assert!(out.join("pages/a.html").exists() && out.join(MARKER).exists());
 }
@@ -382,13 +382,13 @@ fn foreign_directory_is_not_touched() {
     let notes = Notes::new(&[("pages/a.md", "- a")]);
     let holder = Notes::new(&[("site/report.pdf", "pdf")]);
     let out = holder.path().join("site");
-    let err = site::build(notes.path(), &out).unwrap_err();
+    let err = site::build(notes.path(), &out, None).unwrap_err();
     assert!(matches!(err, BuildError::UnsafeOutput { .. }), "{err}");
     assert_eq!(fs::read_dir(&out).unwrap().count(), 1);
     // An empty directory is fine.
     let empty = Notes::empty();
     fs::create_dir(empty.path().join("site")).unwrap();
-    site::build(notes.path(), &empty.path().join("site")).unwrap();
+    site::build(notes.path(), &empty.path().join("site"), None).unwrap();
 }
 
 #[test]
@@ -402,7 +402,7 @@ fn output_would_contain_or_be_inside_the_notes() {
         notes.path().join("assets/out"),
         notes.path().join("x/../pages"),
     ] {
-        let err = site::build(notes.path(), &out).unwrap_err();
+        let err = site::build(notes.path(), &out, None).unwrap_err();
         assert!(
             matches!(err, BuildError::UnsafeOutput { .. }),
             "{}: {err}",
@@ -415,7 +415,12 @@ fn output_would_contain_or_be_inside_the_notes() {
 #[test]
 fn missing_notes_directory() {
     let holder = Notes::empty();
-    let err = site::build(&holder.path().join("nope"), &holder.path().join("site")).unwrap_err();
+    let err = site::build(
+        &holder.path().join("nope"),
+        &holder.path().join("site"),
+        None,
+    )
+    .unwrap_err();
     assert!(matches!(err, BuildError::NotADirectory(_)));
     assert!(!holder.path().join("site").exists());
 }
@@ -428,12 +433,12 @@ fn failed_build_leaves_old_output_intact() {
     let holder = Notes::empty();
     let parent = holder.path().join("parent");
     let out = parent.join("site");
-    site::build(notes.path(), &out).unwrap();
+    site::build(notes.path(), &out, None).unwrap();
     let before = read(&out, "pages/a.html");
     fs::write(notes.path().join("pages/a.md"), "- changed").unwrap();
     // A read-only parent makes creating the temporary directory fail.
     fs::set_permissions(&parent, fs::Permissions::from_mode(0o555)).unwrap();
-    let result = site::build(notes.path(), &out);
+    let result = site::build(notes.path(), &out, None);
     fs::set_permissions(&parent, fs::Permissions::from_mode(0o755)).unwrap();
     if nix_is_root() {
         return; // root ignores permissions; nothing to check
@@ -450,8 +455,8 @@ fn nix_is_root() -> bool {
 fn output_inside_notes_root_is_not_read_as_notes() {
     let notes = Notes::new(&[("pages/a.md", "- a")]);
     let out = notes.path().join("site");
-    site::build(notes.path(), &out).unwrap();
-    let report = site::build(notes.path(), &out).unwrap();
+    site::build(notes.path(), &out, None).unwrap();
+    let report = site::build(notes.path(), &out, None).unwrap();
     assert_eq!(report.pages, 1);
     assert!(report.diagnostics.is_empty());
     let (g, _) = hermetic::Graph::load(notes.path());

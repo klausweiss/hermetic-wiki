@@ -17,6 +17,7 @@ fn start(notes: &Path) -> Running {
         notes: notes.to_path_buf(),
         bind: Bind::Loopback,
         port: Some(0),
+        title: None,
         timing: Timing {
             poll: Duration::from_millis(30),
             quiet: Duration::from_millis(60),

@@ -38,6 +38,8 @@ pub struct Options {
     pub bind: Bind,
     /// Exact port; `None` tries 8000 to 8099.
     pub port: Option<u16>,
+    /// Site title; `None` uses the notes directory's name.
+    pub title: Option<String>,
     pub timing: watch::Timing,
 }
 
@@ -123,7 +125,7 @@ pub fn start(options: Options) -> Result<Running, ServeError> {
         Ok(p) if p.is_dir() => p,
         _ => return Err(ServeError::NotADirectory(options.notes.clone())),
     };
-    let title = site::title_for(&notes);
+    let title = options.title.unwrap_or_else(|| site::title_for(&notes));
     let initial_snapshot = watch::snapshot(&notes);
     let (build, pages, diagnostics) = build_site(&notes, &title).map_err(ServeError::Build)?;
 

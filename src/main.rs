@@ -9,12 +9,17 @@ const USAGE: &str = "\
 hermetic - turn a directory of markdown notes into a static wiki
 
 Usage:
-  hermetic build <notes-dir> [<output-dir>]   Build the site (output defaults to ./site)
+  hermetic build <notes-dir> [<output-dir>] [options]
+                                              Build the site (output defaults to ./site)
   hermetic serve [<notes-dir>] [options]      Serve the notes as a live site
   hermetic help [<topic>]                     Show the full reference: commands,
                                               notes layout, syntax, and pages
   hermetic --help                             Show this help
   hermetic --version                          Show the version
+
+Options (build and serve):
+  --title <name>    Site title shown in every page header (default: the
+                    notes directory's name)
 
 Serve options:
   --port <n>        Listen on exactly this port (default: 8000, or the next free one)
@@ -52,15 +57,13 @@ fn main() -> ExitCode {
             println!("hermetic {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
-        ["build", notes] => build(notes, "site"),
-        ["build", notes, out] => build(notes, out),
+        ["build", rest @ ..] => match parse_build(rest) {
+            Ok((notes, out, title)) => build(notes, out, title),
+            Err(msg) => usage_error(&msg),
+        },
         ["serve", rest @ ..] => match parse_serve(rest) {
             Ok(options) => serve(options),
-            Err(msg) => {
-                eprintln!("error: {msg}\n");
-                eprint!("{USAGE}");
-                ExitCode::from(2)
-            }
+            Err(msg) => usage_error(&msg),
         },
         _ => {
             eprint!("{USAGE}");
@@ -69,8 +72,34 @@ fn main() -> ExitCode {
     }
 }
 
-fn build(notes: &str, out: &str) -> ExitCode {
-    match hermetic::site::build(Path::new(notes), Path::new(out)) {
+fn usage_error(msg: &str) -> ExitCode {
+    eprintln!("error: {msg}\n");
+    eprint!("{USAGE}");
+    ExitCode::from(2)
+}
+
+/// Parses `build` arguments into the notes directory, output directory, and title.
+fn parse_build<'a>(args: &[&'a str]) -> Result<(&'a str, &'a str, Option<&'a str>), String> {
+    let mut dirs = Vec::new();
+    let mut title = None;
+    let mut args = args.iter();
+    while let Some(&arg) = args.next() {
+        match arg {
+            "--title" => title = Some(*args.next().ok_or("--title needs a value")?),
+            flag if flag.starts_with("--") => return Err(format!("unknown option `{flag}`")),
+            dir => dirs.push(dir),
+        }
+    }
+    match dirs.as_slice() {
+        [notes] => Ok((notes, "site", title)),
+        [notes, out] => Ok((notes, out, title)),
+        [] => Err("missing notes directory".to_owned()),
+        [_, _, extra, ..] => Err(format!("unexpected argument `{extra}`")),
+    }
+}
+
+fn build(notes: &str, out: &str, title: Option<&str>) -> ExitCode {
+    match hermetic::site::build(Path::new(notes), Path::new(out), title) {
         Ok(report) => {
             for d in &report.diagnostics {
                 eprintln!("warning: {d}");
@@ -95,6 +124,7 @@ fn parse_serve(args: &[&str]) -> Result<serve::Options, String> {
     let mut port = None;
     let mut host: Option<IpAddr> = None;
     let mut public = false;
+    let mut title = None;
     let mut args = args.iter();
     while let Some(&arg) = args.next() {
         let mut value = |name: &str| {
@@ -112,6 +142,7 @@ fn parse_serve(args: &[&str]) -> Result<serve::Options, String> {
                 host = Some(v.parse().map_err(|_| format!("invalid address `{v}`"))?);
             }
             "--public" => public = true,
+            "--title" => title = Some(value("--title")?.to_owned()),
             flag if flag.starts_with("--") => return Err(format!("unknown option `{flag}`")),
             dir if notes.is_none() => notes = Some(PathBuf::from(dir)),
             extra => return Err(format!("unexpected argument `{extra}`")),
@@ -127,6 +158,7 @@ fn parse_serve(args: &[&str]) -> Result<serve::Options, String> {
         notes: notes.unwrap_or_else(|| PathBuf::from(".")),
         bind,
         port,
+        title,
         timing: serve::watch::Timing::default(),
     })
 }

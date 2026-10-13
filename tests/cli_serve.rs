@@ -203,6 +203,7 @@ fn errors_and_usage() {
         &["--host", "not-an-ip"],
         &["--host", "127.0.0.1", "--public"],
         &["--frob"],
+        &["--title"],
         &["a", "b"],
     ] {
         let (code, err) = run(notes.path(), args);

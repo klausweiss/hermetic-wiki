@@ -37,7 +37,7 @@ Every generated page SHALL be fully usable when opened directly from disk (`file
 - **THEN** its only `<script>` element loads `_hermetic/app.js` via a relative URL, and it has no inline scripts
 
 ### Requirement: Site navigation
-Every page SHALL include a header whose site title links to the home page and which links to the journal list, the all-pages list, and the open-tasks page, and SHALL use the notes directory's name as the site title. Each page SHALL contain exactly one `<main>` element holding all page-specific content, and SHALL declare the relative path from itself to the output root in a `<meta name="hermetic-root">` element.
+Every page SHALL include a header whose site title links to the home page and which links to the journal list, the all-pages list, and the open-tasks page, and SHALL use the `--title` value as the site title when given, or the notes directory's name otherwise. Each page SHALL contain exactly one `<main>` element holding all page-specific content, and SHALL declare the relative path from itself to the output root in a `<meta name="hermetic-root">` element.
 
 #### Scenario: Header on every page
 - **WHEN** any generated page is opened

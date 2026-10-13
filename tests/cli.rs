@@ -38,6 +38,24 @@ fn explicit_output_directory() {
 }
 
 #[test]
+fn site_title_defaults_to_folder_name_and_can_be_overridden() {
+    let work = Notes::new(&[("my notes/pages/a.md", "- a")]);
+    let o = hermetic(work.path(), &["build", "my notes"]);
+    assert_eq!(o.status.code(), Some(0), "{}", stderr(&o));
+    let html = std::fs::read_to_string(work.path().join("site/pages/a.html")).unwrap();
+    assert!(html.contains("<title>a · my notes</title>"), "{html}");
+
+    let o = hermetic(
+        work.path(),
+        &["build", "--title", "Team & Co", "my notes", "out"],
+    );
+    assert_eq!(o.status.code(), Some(0), "{}", stderr(&o));
+    let html = std::fs::read_to_string(work.path().join("out/pages/a.html")).unwrap();
+    assert!(html.contains("<title>a · Team &amp; Co</title>"), "{html}");
+    assert!(html.contains(">Team &amp; Co</a>"), "{html}");
+}
+
+#[test]
 fn missing_notes_directory() {
     let work = Notes::empty();
     let o = hermetic(work.path(), &["build", "nope"]);
@@ -53,7 +71,13 @@ fn missing_notes_directory() {
 #[test]
 fn unknown_command_and_wrong_arguments() {
     let work = Notes::empty();
-    for args in [&["frobnicate"][..], &["build"], &["build", "a", "b", "c"]] {
+    for args in [
+        &["frobnicate"][..],
+        &["build"],
+        &["build", "a", "b", "c"],
+        &["build", "a", "--title"],
+        &["build", "--frob", "a"],
+    ] {
         let o = hermetic(work.path(), args);
         assert_eq!(o.status.code(), Some(2), "{args:?}");
         assert!(stderr(&o).contains("Usage:"));

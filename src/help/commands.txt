@@ -1,6 +1,6 @@
 COMMANDS
 
-  hermetic build <notes-dir> [<output-dir>]
+  hermetic build <notes-dir> [<output-dir>] [--title <name>]
       Build the notes into a static site. The output directory defaults to
       ./site. Needs no configuration file and no network access.
 
@@ -17,7 +17,11 @@ COMMANDS
       Problems in the notes (a broken link, a duplicate id, ...) are printed
       as warnings with file and line. They never stop the build.
 
+      --title <name>    Site title shown in every page header and browser
+                        tab. Defaults to the notes directory's name.
+
   hermetic serve [<notes-dir>] [--port <n>] [--host <address>] [--public]
+                 [--title <name>]
       Serve the notes as a live site at http://127.0.0.1:8000/ (or the next
       free port up to 8099). The notes directory defaults to the current
       one. The site itself is never written to disk. When a note changes,
@@ -39,6 +43,7 @@ COMMANDS
       --public          Listen on all interfaces and also print the
                         local-network URL. Anyone on your network can then
                         read the notes. Not combinable with --host.
+      --title <name>    Site title, as for build.
 
   hermetic help [<topic>]
       Print this reference, or one topic of it: commands, layout, syntax,

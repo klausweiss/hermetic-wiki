@@ -183,7 +183,11 @@ fn underscore_journal_file_is_saved_in_place() {
     // The day is at its usual address, backed by its existing file.
     let r = get_source(server.addr, "journals/2026-07-07.html");
     assert_eq!(r.status, 200);
-    assert!(r.body.contains(r#""file":"journals/2026_07_07.md""#), "{}", r.body);
+    assert!(
+        r.body.contains(r#""file":"journals/2026_07_07.md""#),
+        "{}",
+        r.body
+    );
     let version = field(&r.body, "version");
     let r = put_source(server.addr, "journals/2026-07-07.html", &version, "- new\n");
     assert_eq!(r.status, 200, "{}", r.body);
@@ -194,7 +198,12 @@ fn underscore_journal_file_is_saved_in_place() {
     assert!(!notes.path().join("journals/2026-07-07.md").exists());
 
     // A new day is written with underscores.
-    let r = put_source(server.addr, "journals/2026-07-09.html", "missing", "- fresh\n");
+    let r = put_source(
+        server.addr,
+        "journals/2026-07-09.html",
+        "missing",
+        "- fresh\n",
+    );
     assert_eq!(r.status, 200, "{}", r.body);
     assert!(notes.path().join("journals/2026_07_09.md").exists());
     assert!(!notes.path().join("journals/2026-07-09.md").exists());

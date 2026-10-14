@@ -1,5 +1,5 @@
 # Packages the `hermetic` binary as a Python wheel, so it installs with
-# `uv tool install git+ssh://git@github.com/klausweiss/hermetic-wiki.git`.
+# `uv tool install "git+ssh://git@github.com/klausweiss/hermetic-wiki.git#subdirectory=packaging"`.
 # Building needs a Rust toolchain; the browser script is committed (static/dist/app.js),
 # so Bun is not needed.
 [build-system]
@@ -13,3 +13,4 @@ dynamic = ["version"]
 
 [tool.maturin]
 bindings = "bin"
+manifest-path = "../Cargo.toml"

@@ -25,3 +25,6 @@ target/
 # Search benchmark: dependencies and generated output
 /bench/search/node_modules/
 /bench/search/out/
+
+# Output of `nix build`
+/result

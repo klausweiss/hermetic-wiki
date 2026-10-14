@@ -1,17 +1,23 @@
 //! Cargo's build script (see `build` in Cargo.toml), not a module of the crate: records
 //! the commit of hermetic's source for the site footer (`HERMETIC_COMMIT`), or nothing
-//! when it is not built from a git checkout.
+//! when it is not built from a git checkout. A `HERMETIC_COMMIT` set in the environment
+//! wins, for builds without a checkout that still know their commit (the Nix flake).
 
 use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
-    let commit = Command::new("git")
-        .args(["rev-parse", "--short=7", "HEAD"])
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .and_then(|o| String::from_utf8(o.stdout).ok())
+    println!("cargo:rerun-if-env-changed=HERMETIC_COMMIT");
+    let from_env = std::env::var("HERMETIC_COMMIT").ok();
+    let commit = from_env
+        .or_else(|| {
+            Command::new("git")
+                .args(["rev-parse", "--short=7", "HEAD"])
+                .output()
+                .ok()
+                .filter(|o| o.status.success())
+                .and_then(|o| String::from_utf8(o.stdout).ok())
+        })
         .map(|s| s.trim().to_owned())
         .filter(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_hexdigit()))
         .unwrap_or_default();

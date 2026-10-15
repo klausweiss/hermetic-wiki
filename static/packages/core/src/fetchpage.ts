@@ -1,6 +1,6 @@
 // Fetching another generated page and extracting its content for reuse in this one.
 
-import { absolutize } from "./links";
+import { rebase } from "./links";
 
 /** Attribute marking the element a fragment pointed at, after ids were removed. */
 export const TARGET_ATTR = "data-hermetic-target";
@@ -13,7 +13,7 @@ export interface FetchedPage {
 }
 
 /**
- * Fetches `url` and returns its article with every `href`/`src` made absolute (so links
+ * Fetches `url` and returns its article with every `href`/`src` rebased (so links
  * keep pointing where they did on the original page) and ids removed (so they cannot
  * clash with this page's anchors). The element the URL's fragment pointed at is
  * marked with `TARGET_ATTR`. Returns null when the page is missing or has no article.
@@ -36,7 +36,7 @@ export async function fetchPage(url: URL): Promise<FetchedPage | null> {
   const pageUrl = url.href.split("#")[0] ?? url.href;
   for (const attr of ["href", "src"]) {
     for (const el of article.querySelectorAll(`[${attr}]`)) {
-      el.setAttribute(attr, absolutize(el.getAttribute(attr) ?? "", pageUrl));
+      el.setAttribute(attr, rebase(el.getAttribute(attr) ?? "", pageUrl));
     }
   }
   const fragment = decodeURIComponent(url.hash.slice(1));

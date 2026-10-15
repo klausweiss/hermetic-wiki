@@ -47,6 +47,25 @@ export function absolutize(value: string, pageUrl: string): string {
   }
 }
 
+/**
+ * Rewrites an attribute URL so it keeps pointing at the same place from another page of the
+ * site. Relative URLs (the wiki's own links) become root-relative (`/pages/x.html`) rather
+ * than absolute, so they do not read as links leaving the site (`[href^="http://"]`); URLs
+ * written with a scheme or host stay absolute, even when they point at this site.
+ */
+export function rebase(value: string, pageUrl: string): string {
+  const url = absolutize(value, pageUrl);
+  if (/^[a-z][a-z0-9+.-]*:/i.test(value.trim()) || value.trim().startsWith("//")) {
+    return url;
+  }
+  try {
+    const parsed = new URL(url);
+    return parsed.pathname + parsed.search + parsed.hash;
+  } catch {
+    return url;
+  }
+}
+
 /** The parts of an `<a>` element (HTML or SVG) that say where it links to. */
 export interface Anchor {
   getAttribute(name: string): string | null;

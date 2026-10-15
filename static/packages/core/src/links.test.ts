@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { absolutize, anchorHref, classify, isSafePagePath } from "./links";
+import { absolutize, anchorHref, classify, isSafePagePath, rebase } from "./links";
 
 const root = "http://localhost:8000/wiki/";
 
@@ -91,4 +91,15 @@ test("anchorHref resolves the attribute, for HTML and SVG links alike", () => {
   );
   expect(anchorHref(anchor("https://example.com/", base))).toBe("https://example.com/");
   expect(anchorHref(anchor(null, base))).toBe(base);
+});
+
+test("rebase makes relative links root-relative and keeps absolute ones", () => {
+  const page = "http://h/wiki/journals/2026-10-14.html";
+  expect(rebase("../pages/plugin%20system.html", page)).toBe("/wiki/pages/plugin%20system.html");
+  expect(rebase("#b2", page)).toBe("/wiki/journals/2026-10-14.html#b2");
+  expect(rebase("https://example.com/", page)).toBe("https://example.com/");
+  expect(rebase("http://other:8000/x.html", page)).toBe("http://other:8000/x.html");
+  expect(rebase("http://h/wiki/journals.html", page)).toBe("http://h/wiki/journals.html");
+  expect(rebase("//other/x.html", page)).toBe("http://other/x.html");
+  expect(rebase("mailto:me@example.com", page)).toBe("mailto:me@example.com");
 });

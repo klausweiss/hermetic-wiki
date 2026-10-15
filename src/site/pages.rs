@@ -58,7 +58,7 @@ pub fn page_files(site: &Site, page: PageId) -> Vec<OutFile> {
     main.push_str("</section>\n</article>\n");
 
     let mut files = vec![OutFile {
-        html: document(&site.title, site.open_tasks, &path, &title, &main),
+        html: document(&site.title, &path, &title, &main),
         path: path.clone(),
     }];
     for (i, chunk) in chunks.iter().enumerate().skip(1) {
@@ -77,7 +77,6 @@ pub fn page_files(site: &Site, page: PageId) -> Vec<OutFile> {
         files.push(OutFile {
             html: document(
                 &site.title,
-                site.open_tasks,
                 &file,
                 &format!("{title} — references {n}"),
                 &main,
@@ -169,7 +168,7 @@ fn day_links<T: Copy>(
 /// The page of a journal day that is not in the site (no file, no references), as a day
 /// referenced without a file would be shown. `days` are the journal days that have a
 /// file, sorted. `hermetic serve` shows it so the day can be written in the browser.
-pub fn blank_day(site_title: &str, open_tasks: usize, date: Date, days: &[Date]) -> OutFile {
+pub fn blank_day(site_title: &str, date: Date, days: &[Date]) -> OutFile {
     let path = layout::journal_html_path(date);
     let main = format!(
         "<article class=\"page\">\n<header class=\"page-header\">\n<h1>{date} <span class=\"weekday\">{weekday}</span></h1>\n{nav}</header>\n<p class=\"empty\">There is no journal entry for this day.</p>\n<section class=\"linked-refs\">\n<h2>Linked references <span class=\"count\">0</span></h2>\n<p class=\"empty\">No other page references this one yet.</p>\n</section>\n</article>\n",
@@ -184,7 +183,6 @@ pub fn blank_day(site_title: &str, open_tasks: usize, date: Date, days: &[Date])
     OutFile {
         html: document(
             site_title,
-            open_tasks,
             &path,
             &format!("{date} {}", date.weekday()),
             &main,
@@ -429,7 +427,7 @@ fn journal_list(site: &Site, path: PathBuf, view: &str, footer: &str) -> OutFile
     main.push_str(footer);
     main.push_str("</article>\n");
     OutFile {
-        html: document(&site.title, site.open_tasks, &path, "Journals", &main),
+        html: document(&site.title, &path, "Journals", &main),
         path,
     }
 }
@@ -445,7 +443,7 @@ pub fn search_page(site: &Site) -> OutFile {
         Run <code>hermetic serve</code> in the notes folder, or host the site on a web server.</p>\n\
         </article>\n";
     OutFile {
-        html: document(&site.title, site.open_tasks, &path, "Search", main),
+        html: document(&site.title, &path, "Search", main),
         path,
     }
 }
@@ -479,7 +477,7 @@ pub fn all_pages(site: &Site) -> OutFile {
     }
     main.push_str("</ul>\n</article>\n");
     OutFile {
-        html: document(&site.title, site.open_tasks, &path, "All pages", &main),
+        html: document(&site.title, &path, "All pages", &main),
         path,
     }
 }
@@ -522,7 +520,7 @@ pub fn task_files(site: &Site) -> Vec<OutFile> {
         main.push_str(&pager(&path, n, &paths));
         main.push_str("</article>\n");
         files.push(OutFile {
-            html: document(&site.title, site.open_tasks, &path, "Open tasks", &main),
+            html: document(&site.title, &path, "Open tasks", &main),
             path,
         });
     }

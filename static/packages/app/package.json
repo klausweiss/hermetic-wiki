@@ -10,6 +10,7 @@
     "@hermetic/search": "workspace:*",
     "@hermetic/shortcuts": "workspace:*",
     "@hermetic/sidebar": "workspace:*",
+    "@hermetic/task-count": "workspace:*",
     "@hermetic/theme-toggle": "workspace:*",
     "@hermetic/timeline": "workspace:*"
   }

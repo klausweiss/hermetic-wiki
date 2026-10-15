@@ -1,0 +1,8 @@
+{
+  "name": "@hermetic/task-count",
+  "private": true,
+  "type": "module",
+  "description": "<hermetic-task-count>: the number of open tasks on the site navigation's \"Open tasks\" link.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@hermetic/core": "workspace:*" }
+}

@@ -335,6 +335,58 @@ fn global_tasks_are_paginated() {
 }
 
 #[test]
+fn open_task_count_is_a_data_file() {
+    let (_n, _h, out, _) = built(&[
+        ("pages/a.md", "- TODO one\n- DOING two\n- DONE closed"),
+        ("journals/2026-10-12.md", "- TODO three [[a]]"),
+    ]);
+    assert_eq!(read(&out, "_hermetic/open-tasks.json"), r#"{"count":3}"#);
+    for (rel, bytes) in common::tree(&out) {
+        if rel.extension().is_some_and(|e| e == "html") {
+            let html = String::from_utf8(bytes).unwrap();
+            let start = html.find(r#"<nav class="site-nav">"#).expect("has nav");
+            let nav = &html[start..start + html[start..].find("</nav>").unwrap()];
+            assert!(
+                nav.contains(r#"Open tasks<hermetic-task-count></hermetic-task-count></a>"#),
+                "{}: {nav}",
+                rel.display()
+            );
+            assert!(!nav.contains("count\""), "{}: {nav}", rel.display());
+        }
+    }
+}
+
+#[test]
+fn ticking_off_a_task_changes_only_the_pages_that_show_it() {
+    let files = [
+        ("pages/auth.md", "- TODO rotate keys\n- notes"),
+        ("pages/kafka.md", "- uses [[auth]]\n- TODO upgrade"),
+        (
+            "journals/2026-10-12.md",
+            "- met about [[kafka]] and [[auth]]",
+        ),
+        ("index.md", "- start at [[auth]]"),
+    ];
+    let notes = Notes::new(&files);
+    let (_before_holder, before, _) = build_site(notes.path());
+    notes.write("pages/auth.md", b"- DONE rotate keys\n- notes");
+    let (_after_holder, after, _) = build_site(notes.path());
+
+    let (before, after) = (common::tree(&before), common::tree(&after));
+    assert_eq!(
+        before.keys().collect::<Vec<_>>(),
+        after.keys().collect::<Vec<_>>()
+    );
+    let changed: Vec<String> = before
+        .iter()
+        .filter(|(rel, bytes)| after[*rel] != **bytes)
+        .map(|(rel, _)| site::url_path(rel))
+        .filter(|rel| rel.ends_with(".html"))
+        .collect();
+    assert_eq!(changed, ["pages/auth.html", "tasks.html"]);
+}
+
+#[test]
 fn fonts_and_licenses_shipped() {
     let (_n, _h, out, _) = built(&[("pages/a.md", "- x")]);
     for f in [

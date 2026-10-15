@@ -22,10 +22,13 @@ use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 use std::fs;
 use std::io;
+use std::num::NonZeroUsize;
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread;
 
 use crate::diag::Diagnostic;
-use crate::graph::Graph;
+use crate::graph::{Graph, PageId};
 use crate::layout;
 
 /// Name of the file marking a directory as hermetic output.
@@ -136,41 +139,98 @@ pub fn render(
     notes: &Path,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> io::Result<Rendered> {
-    let mut files = SiteFiles::new();
-    let mut add =
-        |path: PathBuf, html: String| files.insert(path, Content::Bytes(html.into_bytes()));
+    let threads = thread::available_parallelism().map_or(1, NonZeroUsize::get);
+    render_with(graph, title, notes, diagnostics, threads)
+}
 
+/// Pages a render worker takes at a time: small enough that a few slow pages (with
+/// thousands of linked references) do not leave the other workers idle.
+const PAGES_PER_TAKE: usize = 32;
+
+/// `render` with `threads` page workers. The output does not depend on `threads`.
+fn render_with(
+    graph: &Graph,
+    title: &str,
+    notes: &Path,
+    diagnostics: &mut Vec<Diagnostic>,
+    threads: usize,
+) -> io::Result<Rendered> {
     let site = render::Site::new(graph, title);
-    let mut pages = 0;
-    for (id, page) in graph.pages() {
-        // Without `index.md`, the page `index` is shown by the default home page.
-        if page.is_implicit() && layout::is_home_name(&page.name) {
-            continue;
-        }
-        for file in pages::page_files(&site, id) {
-            add(file.path, file.html);
-        }
-        pages += 1;
-    }
-    let mut site_files = vec![pages::journal_index(&site), pages::all_pages(&site)];
-    // A root `index.md` is the page `index`, already rendered as `index.html`.
-    if !files.contains_key(Path::new("index.html")) {
-        site_files.push(pages::default_home(&site));
-    }
-    site_files.extend(pages::task_files(&site));
-    site_files.push(pages::search_page(&site));
-    site_files.push(graph_view::graph_page(&site));
-    for file in site_files {
+    // Without `index.md`, the page `index` is shown by the default home page.
+    let ids: Vec<PageId> = graph
+        .pages()
+        .filter(|(_, page)| !(page.is_implicit() && layout::is_home_name(&page.name)))
+        .map(|(id, _)| id)
+        .collect();
+    // A root `index.md` is the page `index`, rendered as `index.html` like any page.
+    let has_home = ids
+        .iter()
+        .any(|&id| site.out_path(id) == Path::new("index.html"));
+
+    // Every page and site-wide file only reads the graph, so they render concurrently.
+    // The graph layout and the search index are the longest single jobs: they start
+    // first and run alongside the page workers.
+    let next = AtomicUsize::new(0);
+    let (page_files, site_files, index) = thread::scope(|s| {
+        let site = &site;
+        let graph_page = s.spawn(|| graph_view::graph_page(site));
+        let index = s.spawn(|| {
+            let info = crate::search::index::SiteInfo {
+                path: &|p| site.out_path(p).to_path_buf(),
+                title: &|p| graph.page(p).name.clone(),
+                anchor: &|b| site.anchor(b),
+            };
+            crate::search::index::build(graph, &info)
+        });
+        let other = s.spawn(|| {
+            let mut files = vec![pages::journal_index(site), pages::all_pages(site)];
+            if !has_home {
+                files.push(pages::default_home(site));
+            }
+            files.extend(pages::task_files(site));
+            files.push(pages::search_page(site));
+            files
+        });
+        let workers: Vec<_> = (0..threads.max(1))
+            .map(|_| {
+                s.spawn(|| {
+                    let mut out = Vec::new();
+                    loop {
+                        let start = next.fetch_add(PAGES_PER_TAKE, Ordering::Relaxed);
+                        if start >= ids.len() {
+                            break out;
+                        }
+                        let end = (start + PAGES_PER_TAKE).min(ids.len());
+                        for &id in &ids[start..end] {
+                            out.extend(pages::page_files(site, id));
+                        }
+                    }
+                })
+            })
+            .collect();
+        let page_files: Vec<pages::OutFile> = workers
+            .into_iter()
+            .flat_map(|w| w.join().expect("page render worker panicked"))
+            .collect();
+        let mut site_files = other.join().expect("site-wide render panicked");
+        site_files.push(graph_page.join().expect("graph render panicked"));
+        let index = index.join().expect("search index build panicked");
+        (page_files, site_files, index)
+    });
+
+    let mut files = SiteFiles::new();
+    for file in page_files.into_iter().chain(site_files) {
         files.insert(file.path, Content::Bytes(file.html.into_bytes()));
     }
-    let info = crate::search::index::SiteInfo {
-        path: &|p| site.out_path(p).to_path_buf(),
-        title: &|p| graph.page(p).name.clone(),
-        anchor: &|b| site.anchor(b),
-    };
-    for (path, bytes) in crate::search::index::build(graph, &info) {
+    for (path, bytes) in index {
         files.insert(path, Content::Bytes(bytes));
     }
+    let count = format!("{{\"count\":{}}}", graph.open_tasks().len());
+    files.insert(
+        PathBuf::from(html::OPEN_TASKS),
+        Content::Bytes(count.into_bytes()),
+    );
+    let pages = ids.len();
     let generated: HashSet<PathBuf> = files.keys().cloned().collect();
     for (path, bytes) in assets::EMBEDDED {
         files.insert(PathBuf::from(path), Content::Bytes(bytes.to_vec()));
@@ -266,4 +326,58 @@ fn absolute(path: &Path) -> io::Result<PathBuf> {
         out.push(name);
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn output_does_not_depend_on_threads() {
+        let base = std::env::temp_dir().join(format!("hermetic-threads-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        for dir in ["pages/area", "journals", "assets"] {
+            fs::create_dir_all(base.join(dir)).unwrap();
+        }
+        // Enough pages for several takes per worker, with links, block refs, tasks,
+        // namespaces, journal days and an attachment.
+        for i in 0..200 {
+            let page = format!(
+                "- about [[p{}]] and [[area/p{}]]\n  - TODO task {i} for [[p{}]]\n- see ((b{}))\n  id:: b{i}\n",
+                (i * 7) % 200,
+                (i * 13) % 50,
+                (i * 3) % 200,
+                (i + 1) % 200,
+            );
+            fs::write(base.join(format!("pages/p{i}.md")), page).unwrap();
+        }
+        for i in 0..50 {
+            let page = format!("- part of [[p{i}]]\n  - DOING thing {i}\n");
+            fs::write(base.join(format!("pages/area/p{i}.md")), page).unwrap();
+            let day = format!("- met [[p{}]]\n", i * 4);
+            fs::write(
+                base.join(format!("journals/2026-01-{:02}.md", 1 + i % 28)),
+                day,
+            )
+            .unwrap();
+        }
+        fs::write(base.join("index.md"), "- home of [[p0]]\n").unwrap();
+        fs::write(base.join("assets/a.png"), b"png").unwrap();
+        let notes = fs::canonicalize(&base).unwrap();
+
+        let (graph, _) = Graph::load(&notes);
+        let render = |threads| render_with(&graph, "t", &notes, &mut Vec::new(), threads).unwrap();
+        let one = render(1);
+        let four = render(4);
+        assert!(one.pages > 4 * PAGES_PER_TAKE, "{} pages", one.pages);
+        assert_eq!(one.pages, four.pages);
+        assert_eq!(
+            one.files.keys().collect::<Vec<_>>(),
+            four.files.keys().collect::<Vec<_>>()
+        );
+        for (path, content) in &one.files {
+            assert!(four.files[path] == *content, "{} differs", path.display());
+        }
+        let _ = fs::remove_dir_all(&base);
+    }
 }

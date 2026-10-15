@@ -49,6 +49,7 @@ fn fixture_file_list() {
         "_hermetic/fonts/JetBrainsMono-Regular.woff2",
         "_hermetic/fonts/LICENSE-Inter.txt",
         "_hermetic/fonts/LICENSE-JetBrainsMono.txt",
+        "_hermetic/open-tasks.json",
         "_hermetic/style.css",
         "graph.html",
         "index.html",

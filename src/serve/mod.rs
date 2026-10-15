@@ -76,8 +76,6 @@ struct Build {
     attachments: BTreeMap<PathBuf, (u64, Option<SystemTime>)>,
     /// Pages the editor may change, by site path.
     editable: edit::EditMap,
-    /// Number of open tasks, for the navigation of pages rendered on request.
-    open_tasks: usize,
 }
 
 struct State {
@@ -203,7 +201,6 @@ fn build_site(notes: &Path, title: &str) -> io::Result<(Build, usize, Vec<Diagno
         files: rendered.files,
         attachments,
         editable: edit::editable_pages(&graph),
-        open_tasks: graph.open_tasks().len(),
     };
     Ok((build, rendered.pages, diagnostics))
 }
@@ -398,7 +395,7 @@ fn blank_day(state: &State, build: &Build, path: &str) -> Option<String> {
         .filter_map(|page| page.date)
         .collect();
     days.sort();
-    Some(site::blank_day(&state.title, build.open_tasks, date, &days).html)
+    Some(site::blank_day(&state.title, date, &days).html)
 }
 
 /// The edit API: `GET` returns a page's source payload, `PUT` saves it, `DELETE` moves
@@ -599,7 +596,6 @@ mod tests {
                 .collect(),
             attachments: BTreeMap::new(),
             editable: edit::EditMap::new(),
-            open_tasks: 0,
         }
     }
 

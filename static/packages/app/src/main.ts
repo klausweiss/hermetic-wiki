@@ -9,6 +9,7 @@ import { define as defineLiveReload } from "@hermetic/live-reload";
 import { define as defineSearch } from "@hermetic/search";
 import { define as defineShortcuts } from "@hermetic/shortcuts";
 import { applyInitialLayout, define as defineSidebar } from "@hermetic/sidebar";
+import { define as defineTaskCount } from "@hermetic/task-count";
 import { applyStoredTheme, define as defineThemeToggle } from "@hermetic/theme-toggle";
 import { define as defineTimeline } from "@hermetic/timeline";
 
@@ -17,6 +18,7 @@ applyStoredTheme();
 applyInitialLayout();
 defineThemeToggle();
 defineSidebar();
+defineTaskCount();
 defineTimeline();
 defineGraph();
 defineShortcuts();

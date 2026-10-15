@@ -17,6 +17,7 @@
         "@hermetic/search": "workspace:*",
         "@hermetic/shortcuts": "workspace:*",
         "@hermetic/sidebar": "workspace:*",
+        "@hermetic/task-count": "workspace:*",
         "@hermetic/theme-toggle": "workspace:*",
         "@hermetic/timeline": "workspace:*",
       },
@@ -62,6 +63,12 @@
         "@hermetic/core": "workspace:*",
       },
     },
+    "packages/task-count": {
+      "name": "@hermetic/task-count",
+      "dependencies": {
+        "@hermetic/core": "workspace:*",
+      },
+    },
     "packages/theme-toggle": {
       "name": "@hermetic/theme-toggle",
       "dependencies": {
@@ -91,6 +98,8 @@
     "@hermetic/shortcuts": ["@hermetic/shortcuts@workspace:packages/shortcuts"],
 
     "@hermetic/sidebar": ["@hermetic/sidebar@workspace:packages/sidebar"],
+
+    "@hermetic/task-count": ["@hermetic/task-count@workspace:packages/task-count"],
 
     "@hermetic/theme-toggle": ["@hermetic/theme-toggle@workspace:packages/theme-toggle"],
 

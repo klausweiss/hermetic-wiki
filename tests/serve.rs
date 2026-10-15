@@ -365,6 +365,44 @@ fn events_list_exactly_the_affected_pages() {
 }
 
 #[test]
+fn adding_a_task_elsewhere_changes_only_the_count_and_its_pages() {
+    let notes = Notes::new(&[
+        ("pages/redis.md", "- cache\n- TODO tune"),
+        ("pages/unrelated.md", "- other"),
+        ("journals/2026-10-12.md", "- looked at [[redis]]"),
+    ]);
+    let server = start(notes.path());
+    assert_eq!(
+        get(server.addr, "/_hermetic/open-tasks.json").body,
+        br#"{"count":1}"#
+    );
+    let mut events = Events::connect(server.addr);
+    notes.write("pages/unrelated.md", b"- other\n- TODO new task");
+    let data = events.data(Duration::from_millis(800));
+    assert_eq!(data.len(), 1, "{data:?}");
+    let json = &data[0];
+    for path in [
+        "_hermetic/open-tasks.json",
+        "pages/unrelated.html",
+        "tasks.html",
+    ] {
+        assert!(
+            json.contains(&format!("\"{path}\"")),
+            "{path} missing from {json}"
+        );
+    }
+    assert_eq!(json.matches(".html\"").count(), 2, "{json}");
+    assert!(
+        !json.contains("redis") && !json.contains("journals/"),
+        "{json}"
+    );
+    assert_eq!(
+        get(server.addr, "/_hermetic/open-tasks.json").body,
+        br#"{"count":2}"#
+    );
+}
+
+#[test]
 fn rebuild_failure_keeps_serving() {
     // An unreadable attachment directory makes rendering fail; the old build stays.
     use std::os::unix::fs::PermissionsExt;

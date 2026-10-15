@@ -152,7 +152,10 @@ h3 { font-size: 1rem; margin: 1.25rem 0 0.25rem; font-weight: 600; }
 .count {
   font-size: 0.75rem; font-weight: 500; color: var(--muted);
   background: var(--surface); border-radius: 999px; padding: 0.05rem 0.5rem; vertical-align: middle;
+  font-variant-numeric: tabular-nums;
 }
+/* A badge whose number is not confirmed yet (see <hermetic-task-count>). */
+.count-pending { opacity: 0.5; }
 .empty { color: var(--muted); font-style: italic; }
 
 /* Blocks */

@@ -22,3 +22,16 @@ export function parseCount(text: string): number | null {
 export function mentionsCount(changes: { changed: string[]; removed: string[] }): boolean {
   return changes.changed.includes(COUNT_PATH) || changes.removed.includes(COUNT_PATH);
 }
+
+/** Browser-storage key of the last count seen, per site (several can share an origin). */
+export function storageKey(root: URL): string {
+  return `hermetic-task-count:${root.href}`;
+}
+
+/** A remembered count, or null when there is none or it is not a valid count. */
+export function parseStored(value: string | null): number | null {
+  if (value === null || !/^\d{1,15}$/.test(value)) {
+    return null;
+  }
+  return Number(value);
+}

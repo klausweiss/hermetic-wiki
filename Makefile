@@ -1,4 +1,4 @@
-.PHONY: build test test-perf site serve-test lint fmt frontend bench-search clean
+.PHONY: build test test-perf site serve-test lint fmt frontend bench-search icons clean
 
 # Arguments passed to the binary, e.g. `make run ARGS="build notes/"`.
 ARGS ?=
@@ -38,6 +38,11 @@ fmt:
 # downloads Pagefind and a headless browser).
 bench-search:
 	$(MAKE) -C sandbox/search-bench bench
+
+# Redraws the favicon and touch icon in static/ from sandbox/favicon/ (needs python3
+# and rsvg-convert).
+icons:
+	$(MAKE) -C sandbox/favicon icons
 
 # Rebuilds the browser script (static/dist/app.js) from static/ts/.
 frontend:

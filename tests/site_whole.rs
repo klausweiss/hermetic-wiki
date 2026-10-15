@@ -40,6 +40,8 @@ fn fixture_file_list() {
         ".hermetic-site",
         "_hermetic/LICENSE-Lucide.txt",
         "_hermetic/app.js",
+        "_hermetic/apple-touch-icon.png",
+        "_hermetic/favicon.svg",
         "_hermetic/fonts/InterVariable-Italic.woff2",
         "_hermetic/fonts/InterVariable.woff2",
         "_hermetic/fonts/JetBrainsMono-Bold.woff2",

@@ -18,6 +18,10 @@ pub const EMBEDDED: &[(&str, &[u8])] = &[
         "_hermetic/favicon.svg",
         include_bytes!("../../static/favicon.svg"),
     ),
+    (
+        "_hermetic/apple-touch-icon.png",
+        include_bytes!("../../static/apple-touch-icon.png"),
+    ),
     // Compiled from static/ts/ by `make -C static build`; committed so building
     // hermetic needs no JavaScript tooling.
     (

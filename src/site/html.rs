@@ -38,6 +38,8 @@ pub fn strip_tags(html: &str) -> String {
 pub const STYLESHEET: &str = "_hermetic/style.css";
 pub const SCRIPT: &str = "_hermetic/app.js";
 pub const FAVICON: &str = "_hermetic/favicon.svg";
+/// The larger, opaque icon for bookmark tiles and home screens.
+pub const TOUCH_ICON: &str = "_hermetic/apple-touch-icon.png";
 
 /// Relative path from the file at `path` to the output root: `.`, `..`, `../..`, ...
 pub fn root_path(path: &Path) -> String {
@@ -77,6 +79,7 @@ pub fn document(
          <meta name=\"hermetic-root\" content=\"{root}\">\n\
          <title>{title} · {site}</title>\n\
          <link rel=\"icon\" href=\"{icon}\" type=\"image/svg+xml\">\n\
+         <link rel=\"apple-touch-icon\" href=\"{touch_icon}\">\n\
          <link rel=\"stylesheet\" href=\"{css}\">\n\
          <script src=\"{script}\"></script>\n\
          </head>\n\
@@ -94,6 +97,7 @@ pub fn document(
         title = esc(title),
         site = esc(site_title),
         icon = to(FAVICON),
+        touch_icon = to(TOUCH_ICON),
         css = to(STYLESHEET),
         script = to(SCRIPT),
         index = to("index.html"),

@@ -28,3 +28,6 @@ target/
 
 # Output of `nix build`
 /result
+
+# Icon generator: intermediate SVGs and the detailed art (see sandbox/favicon/Makefile)
+/sandbox/favicon/out/

@@ -37,6 +37,7 @@ pub fn strip_tags(html: &str) -> String {
 
 pub const STYLESHEET: &str = "_hermetic/style.css";
 pub const SCRIPT: &str = "_hermetic/app.js";
+pub const FAVICON: &str = "_hermetic/favicon.svg";
 
 /// Relative path from the file at `path` to the output root: `.`, `..`, `../..`, ...
 pub fn root_path(path: &Path) -> String {
@@ -75,6 +76,7 @@ pub fn document(
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
          <meta name=\"hermetic-root\" content=\"{root}\">\n\
          <title>{title} · {site}</title>\n\
+         <link rel=\"icon\" href=\"{icon}\" type=\"image/svg+xml\">\n\
          <link rel=\"stylesheet\" href=\"{css}\">\n\
          <script src=\"{script}\"></script>\n\
          </head>\n\
@@ -91,6 +93,7 @@ pub fn document(
         root = esc(&root_path(path)),
         title = esc(title),
         site = esc(site_title),
+        icon = to(FAVICON),
         css = to(STYLESHEET),
         script = to(SCRIPT),
         index = to("index.html"),
@@ -153,6 +156,11 @@ mod tests {
 
         let page = document("notes", 0, Path::new("pages/a.html"), "a", "x");
         assert!(page.contains(r#"href="../_hermetic/style.css""#));
+        assert!(
+            page.contains(
+                r#"<link rel="icon" href="../_hermetic/favicon.svg" type="image/svg+xml">"#
+            )
+        );
         assert!(page.contains(r#"<a href="../tasks.html">Open tasks</a>"#));
         assert!(page.contains(r#"<a href="../graph.html">Graph</a>"#));
 

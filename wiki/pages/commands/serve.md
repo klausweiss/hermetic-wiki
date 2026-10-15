@@ -1,0 +1,2 @@
+alias:: edit mode
+

@@ -23,8 +23,8 @@ target/
 /static/node_modules/
 
 # Search benchmark: dependencies and generated output
-/bench/search/node_modules/
-/bench/search/out/
+/sandbox/search-bench/node_modules/
+/sandbox/search-bench/out/
 
 # Output of `nix build`
 /result

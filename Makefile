@@ -37,7 +37,7 @@ fmt:
 # Relevance and performance benchmark of search against Pagefind (development only;
 # downloads Pagefind and a headless browser).
 bench-search:
-	$(MAKE) -C bench/search bench
+	$(MAKE) -C sandbox/search-bench bench
 
 # Rebuilds the browser script (static/dist/app.js) from static/ts/.
 frontend:

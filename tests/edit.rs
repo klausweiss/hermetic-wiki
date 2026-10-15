@@ -278,6 +278,28 @@ fn new_pages_and_days() {
     assert!(all.iter().all(|n| !n.starts_with('.')), "{all:?}");
 }
 
+/// A day without a file is rendered by the site when a page references it, and by the
+/// server when none does. The editor finds its place in both by the same markup.
+#[test]
+fn days_without_a_file_have_the_markup_the_editor_needs() {
+    let notes = Notes::new(&[("journals/2026-10-12.md", "- see [[2026-10-14]]\n")]);
+    let server = start(notes.path());
+    let referenced = page(server.addr, "journals/2026-10-14.html");
+    let blank = page(server.addr, "journals/2026-10-13.html");
+    for (html, refs) in [(&referenced, 1), (&blank, 0)] {
+        for marker in [
+            "<article class=\"page\">\n<header class=\"page-header\">\n<h1>",
+            "</header>\n<p class=\"empty\">There is no journal entry for this day.</p>\n",
+            &format!(
+                "<section class=\"linked-refs\">\n<h2>Linked references <span class=\"count\">{refs}</span></h2>\n"
+            ),
+            "<hermetic-editor></hermetic-editor>",
+        ] {
+            assert!(html.contains(marker), "{marker:?} not in\n{html}");
+        }
+    }
+}
+
 #[test]
 fn pages_without_content_have_no_file() {
     let notes = Notes::new(&[("journals/2026-10-12.md", "- standup [[empty]]\n")]);

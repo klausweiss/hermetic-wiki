@@ -45,17 +45,11 @@ pub fn page_files(site: &Site, page: PageId) -> Vec<OutFile> {
     main.push_str(&namespace_children(site, &path, page));
     main.push_str(&open_tasks(site, &path, page));
     main.push_str(&related(site, &path, page));
-    main.push_str(&format!(
-        "<section class=\"linked-refs\">\n<h2>Linked references <span class=\"count\">{}</span></h2>\n",
-        refs.len()
-    ));
-    if let Some(first) = chunks.first() {
-        main.push_str(&ref_groups(site, &path, first));
-        main.push_str(&pager(&path, 1, &paths));
-    } else {
-        main.push_str("<p class=\"empty\">No other page references this one yet.</p>\n");
-    }
-    main.push_str("</section>\n</article>\n");
+    let first = chunks
+        .first()
+        .map(|first| ref_groups(site, &path, first) + &pager(&path, 1, &paths));
+    main.push_str(&linked_refs(refs.len(), first.as_deref()));
+    main.push_str("</article>\n");
 
     let mut files = vec![OutFile {
         html: document(&site.title, &path, &title, &main),
@@ -89,7 +83,7 @@ pub fn page_files(site: &Site, page: PageId) -> Vec<OutFile> {
 
 fn page_header(site: &Site, from: &Path, page: PageId) -> String {
     let p = site.g.page(page);
-    let mut out = String::from("<header class=\"page-header\">\n");
+    let mut out = String::new();
     // Namespace ancestors, outermost first.
     let mut ancestors = Vec::new();
     let mut cur = p.ns_parent;
@@ -109,18 +103,45 @@ fn page_header(site: &Site, from: &Path, page: PageId) -> String {
         out.push_str("</nav>\n");
     }
     match p.date() {
-        Some(date) => {
-            out.push_str(&format!(
-                "<h1>{} <span class=\"weekday\">{}</span></h1>\n",
-                esc(&p.name),
-                date.weekday()
-            ));
-            out.push_str(&day_nav(site, from, date));
-        }
+        Some(date) => out.push_str(&journal_title(date, &day_nav(site, from, date))),
         None => out.push_str(&format!("<h1>{}</h1>\n", esc(p.leaf_name()))),
     }
-    out.push_str("</header>\n");
-    out
+    header(&out)
+}
+
+// The pieces below are shared with `blank_day`, which renders a journal day that is not
+// in the graph. The editor finds its place by this markup (`header.page-header`,
+// `article > p.empty`, `section.linked-refs h2 .count`), so both must use them.
+
+fn header(inner: &str) -> String {
+    format!("<header class=\"page-header\">\n{inner}</header>\n")
+}
+
+/// A journal day's title and its links to the nearest days around it.
+fn journal_title(date: Date, nav: &str) -> String {
+    format!(
+        "<h1>{date} <span class=\"weekday\">{}</span></h1>\n{nav}",
+        date.weekday()
+    )
+}
+
+/// The body of a page without a file.
+fn empty_body(journal: bool) -> String {
+    let text = if journal {
+        "There is no journal entry for this day."
+    } else {
+        "This page has no content of its own yet."
+    };
+    format!("<p class=\"empty\">{text}</p>\n")
+}
+
+/// The linked-references section: `count` references, of which `shown` is the first
+/// file's HTML (`None` when there are none).
+fn linked_refs(count: usize, shown: Option<&str>) -> String {
+    format!(
+        "<section class=\"linked-refs\">\n<h2>Linked references <span class=\"count\">{count}</span></h2>\n{}</section>\n",
+        shown.unwrap_or("<p class=\"empty\">No other page references this one yet.</p>\n")
+    )
 }
 
 /// Links to the nearest earlier and later journal days that have a file.
@@ -170,15 +191,17 @@ fn day_links<T: Copy>(
 /// file, sorted. `hermetic serve` shows it so the day can be written in the browser.
 pub fn blank_day(site_title: &str, date: Date, days: &[Date]) -> OutFile {
     let path = Address::Journal(date).html_path();
+    let nav = day_links(
+        days,
+        date,
+        |d| d,
+        |d| href(&path, &Address::Journal(d).html_path(), None),
+    );
     let main = format!(
-        "<article class=\"page\">\n<header class=\"page-header\">\n<h1>{date} <span class=\"weekday\">{weekday}</span></h1>\n{nav}</header>\n<p class=\"empty\">There is no journal entry for this day.</p>\n<section class=\"linked-refs\">\n<h2>Linked references <span class=\"count\">0</span></h2>\n<p class=\"empty\">No other page references this one yet.</p>\n</section>\n</article>\n",
-        weekday = date.weekday(),
-        nav = day_links(
-            days,
-            date,
-            |d| d,
-            |d| href(&path, &Address::Journal(d).html_path(), None)
-        ),
+        "<article class=\"page\">\n{}{}{}</article>\n",
+        header(&journal_title(date, &nav)),
+        empty_body(true),
+        linked_refs(0, None),
     );
     OutFile {
         html: document(
@@ -194,12 +217,7 @@ pub fn blank_day(site_title: &str, date: Date, days: &[Date]) -> OutFile {
 fn page_body(site: &Site, from: &Path, page: PageId) -> String {
     let p = site.g.page(page);
     if p.is_implicit() {
-        let text = if p.is_journal() {
-            "There is no journal entry for this day."
-        } else {
-            "This page has no content of its own yet."
-        };
-        return format!("<p class=\"empty\">{text}</p>\n");
+        return empty_body(p.is_journal());
     }
     format!(
         "<section class=\"content\">\n{}\n</section>\n",

@@ -19,8 +19,9 @@ use std::time::{Duration, Instant, SystemTime};
 
 use crate::diag::Diagnostic;
 use crate::graph::Graph;
+use crate::json;
 use crate::layout::{self, Date};
-use crate::site::{self, Content, SiteFiles};
+use crate::site::{self, Content, SiteFiles, url_path};
 
 /// Which addresses the server listens on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -286,17 +287,9 @@ fn diff(old: &Build, new: &Build) -> (Vec<String>, Vec<String>) {
     (changed, removed)
 }
 
-/// A site path with `/` separators, not percent-encoded.
-fn url_path(path: &Path) -> String {
-    path.components()
-        .map(|c| c.as_os_str().to_string_lossy())
-        .collect::<Vec<_>>()
-        .join("/")
-}
-
 fn event_json(changed: &[String], removed: &[String]) -> String {
     let list = |items: &[String]| {
-        let quoted: Vec<String> = items.iter().map(|s| json_string(s)).collect();
+        let quoted: Vec<String> = items.iter().map(|s| json::string(s)).collect();
         format!("[{}]", quoted.join(","))
     };
     format!(
@@ -304,20 +297,6 @@ fn event_json(changed: &[String], removed: &[String]) -> String {
         list(changed),
         list(removed)
     )
-}
-
-fn json_string(s: &str) -> String {
-    let mut out = String::from("\"");
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
 }
 
 fn broadcast(state: &State, json: &str) {
@@ -455,39 +434,40 @@ fn source(
     drop(build);
 
     let _rebuilding = state.rebuilding.lock().expect("rebuild lock");
-    let target = match edit::checked_target(&state.notes, &edit::source_path(&page)) {
+    let file = edit::source_path(&page);
+    let target = match edit::checked_target(&state.notes, &file) {
         Ok(target) => target,
-        Err(edit::Unsafe::Outside) => return (403, b"outside the notes\n".to_vec()),
-        Err(edit::Unsafe::Io(e)) => return (500, format!("{e}\n").into_bytes()),
+        Err(e) => return unsafe_status(e),
     };
     let current = match fs::read(&target) {
         Ok(bytes) => Some(bytes),
         Err(e) if e.kind() == io::ErrorKind::NotFound => None,
         Err(e) => return (500, format!("{e}\n").into_bytes()),
     };
-    let file = edit::source_path(&page);
     let payload = |bytes: Option<&[u8]>| match edit::source_json(&file, bytes) {
         Some(json) => (200, json.into_bytes()),
         None => (500, b"the file is not UTF-8\n".to_vec()),
+    };
+    // The newer file the request was not based on, as a 409.
+    let conflict = |bytes: Option<&[u8]>| {
+        let (status, json) = payload(bytes);
+        (if status == 200 { 409 } else { status }, json)
     };
     if delete {
         let Some(bytes) = current else {
             return (404, b"the page has no file\n".to_vec());
         };
         if request.header(edit::VERSION_HEADER) != Some(edit::version(Some(&bytes)).as_str()) {
-            let (status, json) = payload(Some(&bytes));
-            return (if status == 200 { 409 } else { status }, json);
+            return conflict(Some(&bytes));
         }
         let trashed = match edit::move_to_trash(&state.notes, &target) {
             Ok(trashed) => trashed,
-            Err(edit::Unsafe::Outside) => return (403, b"outside the notes\n".to_vec()),
-            Err(edit::Unsafe::Io(e)) => return (500, format!("{e}\n").into_bytes()),
+            Err(e) => return unsafe_status(e),
         };
-        *state.snapshot.lock().expect("snapshot lock") = watch::snapshot(&state.notes);
-        rebuild(state);
+        commit(state);
         let json = format!(
             "{{\"deleted\":true,\"trash\":{}}}",
-            json_string(&trashed.to_string_lossy())
+            json::string(&trashed.to_string_lossy())
         );
         return (200, json.into_bytes());
     }
@@ -502,8 +482,7 @@ fn source(
         return (400, b"missing version\n".to_vec());
     };
     if base != edit::version(current.as_deref()) {
-        let (status, json) = payload(current.as_deref());
-        return (if status == 200 { 409 } else { status }, json);
+        return conflict(current.as_deref());
     }
     // A page saved without content has no file (see `browser-editing`), except the home
     // page, which "Write a home page" creates with an empty block.
@@ -512,20 +491,31 @@ fn source(
             if let Err(e) = edit::remove_note(&state.notes, &target) {
                 return (500, format!("{e}\n").into_bytes());
             }
-            *state.snapshot.lock().expect("snapshot lock") = watch::snapshot(&state.notes);
-            rebuild(state);
+            commit(state);
         }
         return payload(None);
     }
     let bytes = edit::file_bytes(&text, current.as_deref());
-    match edit::write_atomic(&state.notes, &target, &bytes) {
-        Ok(()) => {}
-        Err(edit::Unsafe::Outside) => return (403, b"outside the notes\n".to_vec()),
-        Err(edit::Unsafe::Io(e)) => return (500, format!("{e}\n").into_bytes()),
+    if let Err(e) = edit::write_atomic(&state.notes, &target, &bytes) {
+        return unsafe_status(e);
     }
+    commit(state);
+    payload(Some(&bytes))
+}
+
+/// The response for a write the edit checks refused or that failed.
+fn unsafe_status(e: edit::Unsafe) -> (u16, Vec<u8>) {
+    match e {
+        edit::Unsafe::Outside => (403, b"outside the notes\n".to_vec()),
+        edit::Unsafe::Io(e) => (500, format!("{e}\n").into_bytes()),
+    }
+}
+
+/// After the server changed the notes itself: takes the new snapshot (so the watcher
+/// does not rebuild again) and rebuilds.
+fn commit(state: &State) {
     *state.snapshot.lock().expect("snapshot lock") = watch::snapshot(&state.notes);
     rebuild(state);
-    payload(Some(&bytes))
 }
 
 /// A server-sent event stream: one `data:` line per rebuild that changed something.

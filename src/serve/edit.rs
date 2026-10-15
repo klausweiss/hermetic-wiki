@@ -13,8 +13,8 @@ use std::time::{Duration, SystemTime};
 use crate::graph::Graph;
 use crate::layout::{self, Date, JOURNALS_DIR, PAGES_DIR, ROOT_INDEX};
 use crate::parse::{self, BlockKind};
-use crate::search::index::json_string;
-use crate::site;
+use crate::site::{self, url_path};
+use crate::{fnv, json};
 
 use super::http::{self, Request};
 
@@ -46,11 +46,7 @@ pub fn editable_pages(g: &Graph) -> EditMap {
     g.pages()
         .map(|(id, p)| {
             let path = site::page_output_path(g, id);
-            let key = path
-                .components()
-                .map(|c| c.as_os_str().to_string_lossy())
-                .collect::<Vec<_>>()
-                .join("/");
+            let key = url_path(&path);
             let page = Editable {
                 name: p.name.clone(),
                 date: p.date(),
@@ -147,12 +143,7 @@ pub fn version(bytes: Option<&[u8]>) -> String {
     let Some(bytes) = bytes else {
         return MISSING.to_owned();
     };
-    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
-    for &b in bytes {
-        hash ^= u64::from(b);
-        hash = hash.wrapping_mul(0x0100_0000_01b3);
-    }
-    format!("{hash:016x}")
+    format!("{:016x}", fnv::hash(bytes))
 }
 
 /// Why a target file may not be written.
@@ -442,18 +433,15 @@ pub fn source_json(file: &Path, bytes: Option<&[u8]>) -> Option<String> {
     let mut out = format!(
         "{{\"exists\":{},\"file\":{},\"version\":{},\"text\":{},\"indent\":{},\"blocks\":[",
         bytes.is_some(),
-        json_string(&file.to_string_lossy().replace('\\', "/")),
-        json_string(&version(bytes)),
-        json_string(&text),
-        json_string(&indent_unit(&text)),
+        json::string(&url_path(file)),
+        json::string(&version(bytes)),
+        json::string(&text),
+        json::string(&indent_unit(&text)),
     );
     for (i, b) in blocks.iter().enumerate() {
         let depth = b.parent.map_or(0, |p| depths[p] + 1);
         depths.push(depth);
-        let anchor = match b.prop("id").filter(|id| parse::is_valid_block_id(id)) {
-            Some(id) => format!("id-{id}"),
-            None => format!("b{}", i + 1),
-        };
+        let anchor = parse::anchor(b.prop("id").filter(|id| parse::is_valid_block_id(id)), i);
         if i > 0 {
             out.push(',');
         }
@@ -464,8 +452,8 @@ pub fn source_json(file: &Path, bytes: Option<&[u8]>) -> Option<String> {
             b.lines.end,
             b.line - 1,
             b.kind == BlockKind::Bullet,
-            json_string(&anchor),
-            json_string(&b.body),
+            json::string(&anchor),
+            json::string(&b.body),
             b.column
         );
     }

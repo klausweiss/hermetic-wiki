@@ -151,31 +151,29 @@ pub fn encode_segment(segment: &str) -> String {
 /// Decodes `%XX` sequences in a file name segment. A `%` not followed by two hex digits is
 /// kept literally. If decoding would produce invalid UTF-8, the segment is returned as is.
 pub fn decode_segment(segment: &str) -> String {
-    let bytes = segment.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
+    percent_decode(segment).unwrap_or_else(|| segment.to_string())
+}
+
+/// Decodes `%XX` sequences, keeping a `%` not followed by two hex digits literally;
+/// `None` if the result is not UTF-8.
+pub fn percent_decode(s: &str) -> Option<String> {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
     let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%'
-            && i + 2 < bytes.len()
-            && let (Some(hi), Some(lo)) = (hex_value(bytes[i + 1]), hex_value(bytes[i + 2]))
+    while i < b.len() {
+        if b[i] == b'%'
+            && i + 2 < b.len()
+            && b[i + 1].is_ascii_hexdigit()
+            && b[i + 2].is_ascii_hexdigit()
         {
-            out.push(hi * 16 + lo);
+            out.push(u8::from_str_radix(&s[i + 1..i + 3], 16).expect("hex digits"));
             i += 3;
             continue;
         }
-        out.push(bytes[i]);
+        out.push(b[i]);
         i += 1;
     }
-    String::from_utf8(out).unwrap_or_else(|_| segment.to_string())
-}
-
-fn hex_value(b: u8) -> Option<u8> {
-    match b {
-        b'0'..=b'9' => Some(b - b'0'),
-        b'a'..=b'f' => Some(b - b'a' + 10),
-        b'A'..=b'F' => Some(b - b'A' + 10),
-        _ => None,
-    }
+    String::from_utf8(out).ok()
 }
 
 /// Relative path (`pages/...md`) of the file that stores a regular page.

@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use crate::diag::{Diagnostic, DiagnosticKind};
 use crate::layout::{
     self, Date, JOURNALS_DIR, NameKey, PAGES_DIR, SourceFile, SourceKind, normalize_name,
-    validate_name,
+    percent_decode, validate_name,
 };
 use crate::parse::{self, BlockKind, ParsedBlock, Property, RawRef, RawRefKind, TaskState};
 
@@ -100,12 +100,8 @@ pub struct Block {
     pub parent: Option<BlockId>,
     pub children: Vec<BlockId>,
     pub kind: BlockKind,
-    /// 0-based line range owned by this block in its page's file.
-    pub lines: Range<u32>,
     /// 1-based line of the block's first non-blank line.
     pub line: u32,
-    /// Exact source text owned by this block.
-    pub source: String,
     /// Display content without properties and task marker.
     pub content: String,
     pub props: Vec<Property>,
@@ -596,9 +592,7 @@ impl Graph {
                 parent,
                 children: Vec::new(),
                 kind: pb.kind,
-                lines: pb.lines.clone(),
                 line: pb.line,
-                source: pb.source.clone(),
                 content: pb.content.clone(),
                 props: pb.props.clone(),
                 id: block_id,
@@ -788,9 +782,12 @@ impl Graph {
 
 /// Case-insensitive name order with a case-sensitive tie-break, for determinism.
 fn display_order(a: &str, b: &str) -> std::cmp::Ordering {
-    a.to_lowercase()
-        .cmp(&b.to_lowercase())
-        .then_with(|| a.cmp(b))
+    display_key(a).cmp(&display_key(b))
+}
+
+/// Sort key of a page name in [`display_order`].
+pub fn display_key(name: &str) -> (String, &str) {
+    (name.to_lowercase(), name)
 }
 
 struct Loaded {
@@ -1021,7 +1018,7 @@ fn resolve_link_path(file: &Path, dest: &str) -> LinkPath {
         Some(JOURNALS_DIR) if parts.len() > 1 => {
             let stem = parts
                 .last()
-                .and_then(|f| f.strip_suffix(".md"))
+                .and_then(|f| f.strip_suffix(layout::EXTENSION))
                 .unwrap_or_default();
             LinkPath::Page(match Date::parse_file_stem(stem) {
                 Some(date) => date.to_string(),
@@ -1030,25 +1027,4 @@ fn resolve_link_path(file: &Path, dest: &str) -> LinkPath {
         }
         _ => LinkPath::Outside,
     }
-}
-
-/// Decodes `%XX` sequences of a URL path; `None` if the result is not UTF-8.
-fn percent_decode(s: &str) -> Option<String> {
-    let b = s.as_bytes();
-    let mut out = Vec::with_capacity(b.len());
-    let mut i = 0;
-    while i < b.len() {
-        if b[i] == b'%'
-            && i + 2 < b.len()
-            && b[i + 1].is_ascii_hexdigit()
-            && b[i + 2].is_ascii_hexdigit()
-        {
-            out.push(u8::from_str_radix(&s[i + 1..i + 3], 16).expect("hex digits"));
-            i += 3;
-            continue;
-        }
-        out.push(b[i]);
-        i += 1;
-    }
-    String::from_utf8(out).ok()
 }

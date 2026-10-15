@@ -146,6 +146,15 @@ pub fn is_valid_block_id(id: &str) -> bool {
             .any(|c| c.is_whitespace() || c == '(' || c == ')')
 }
 
+/// HTML anchor of a block: `id-<id>` for a valid block id, else `b<n>` (1-based position
+/// among its page's blocks). The editor relies on the rendered page using the same rule.
+pub fn anchor(id: Option<&str>, index: usize) -> String {
+    match id {
+        Some(id) => format!("id-{id}"),
+        None => format!("b{}", index + 1),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Line scanner
 // ---------------------------------------------------------------------------

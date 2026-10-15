@@ -126,27 +126,41 @@ fn page_header(site: &Site, from: &Path, page: PageId) -> String {
 
 /// Links to the nearest earlier and later journal days that have a file.
 fn day_nav(site: &Site, from: &Path, date: Date) -> String {
-    let days: Vec<(Date, String)> = site
-        .journal_days
-        .iter()
-        .map(|&(d, p)| (d, site.page_href(from, p)))
-        .collect();
-    day_links(&days, date)
+    day_links(
+        &site.journal_days,
+        date,
+        |(d, _)| d,
+        |(_, p)| site.page_href(from, p),
+    )
 }
 
-/// The day navigation from `date` among `days` (sorted, with each day's link).
-fn day_links(days: &[(Date, String)], date: Date) -> String {
-    let prev = days[..days.partition_point(|(d, _)| *d < date)].last();
-    let next = days[days.partition_point(|(d, _)| *d <= date)..].first();
+/// The day navigation from `date` among `days` (sorted by `day`); only the two
+/// neighbours' links are built.
+fn day_links<T: Copy>(
+    days: &[T],
+    date: Date,
+    day: impl Fn(T) -> Date,
+    link: impl Fn(T) -> String,
+) -> String {
+    let prev = days[..days.partition_point(|&t| day(t) < date)].last();
+    let next = days[days.partition_point(|&t| day(t) <= date)..].first();
     if prev.is_none() && next.is_none() {
         return String::new();
     }
     let mut out = String::from("<nav class=\"day-nav\">");
-    if let Some((d, link)) = prev {
-        out.push_str(&format!("<a rel=\"prev\" href=\"{}\">← {d}</a>", esc(link)));
+    if let Some(&t) = prev {
+        let d = day(t);
+        out.push_str(&format!(
+            "<a rel=\"prev\" href=\"{}\">← {d}</a>",
+            esc(&link(t))
+        ));
     }
-    if let Some((d, link)) = next {
-        out.push_str(&format!("<a rel=\"next\" href=\"{}\">{d} →</a>", esc(link)));
+    if let Some(&t) = next {
+        let d = day(t);
+        out.push_str(&format!(
+            "<a rel=\"next\" href=\"{}\">{d} →</a>",
+            esc(&link(t))
+        ));
     }
     out.push_str("</nav>\n");
     out
@@ -156,15 +170,16 @@ fn day_links(days: &[(Date, String)], date: Date) -> String {
 /// referenced without a file would be shown. `days` are the journal days that have a
 /// file, sorted. `hermetic serve` shows it so the day can be written in the browser.
 pub fn blank_day(site_title: &str, open_tasks: usize, date: Date, days: &[Date]) -> OutFile {
-    let path = journal_html(date);
-    let days: Vec<(Date, String)> = days
-        .iter()
-        .map(|&d| (d, href(&path, &journal_html(d), None)))
-        .collect();
+    let path = layout::journal_html_path(date);
     let main = format!(
         "<article class=\"page\">\n<header class=\"page-header\">\n<h1>{date} <span class=\"weekday\">{weekday}</span></h1>\n{nav}</header>\n<p class=\"empty\">There is no journal entry for this day.</p>\n<section class=\"linked-refs\">\n<h2>Linked references <span class=\"count\">0</span></h2>\n<p class=\"empty\">No other page references this one yet.</p>\n</section>\n</article>\n",
         weekday = date.weekday(),
-        nav = day_links(&days, date),
+        nav = day_links(
+            days,
+            date,
+            |d| d,
+            |d| href(&path, &layout::journal_html_path(d), None)
+        ),
     );
     OutFile {
         html: document(
@@ -176,10 +191,6 @@ pub fn blank_day(site_title: &str, open_tasks: usize, date: Date, days: &[Date])
         ),
         path,
     }
-}
-
-fn journal_html(date: Date) -> PathBuf {
-    PathBuf::from(layout::JOURNALS_DIR).join(format!("{date}.html"))
 }
 
 fn page_body(site: &Site, from: &Path, page: PageId) -> String {
@@ -448,10 +459,7 @@ pub fn all_pages(site: &Site) -> OutFile {
         .filter(|(_, p)| !p.is_journal())
         .map(|(id, _)| id)
         .collect();
-    pages.sort_by_cached_key(|&p| {
-        let name = &site.g.page(p).name;
-        (name.to_lowercase(), name.clone())
-    });
+    pages.sort_by_cached_key(|&p| crate::graph::display_key(&site.g.page(p).name));
     let mut main = format!(
         "<article class=\"page index\" data-view=\"pages\">\n<header class=\"page-header\"><h1>All pages <span class=\"count\">{}</span></h1></header>\n<ul class=\"all-pages\">",
         pages.len()

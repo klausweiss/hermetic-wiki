@@ -56,10 +56,7 @@ impl<'g> Site<'g> {
     /// HTML anchor of a block: `id-<id>` or `b<n>` (1-based position in its page).
     pub fn anchor(&self, block: BlockId) -> String {
         let b = self.g.block(block);
-        match &b.id {
-            Some(id) => format!("id-{id}"),
-            None => format!("b{}", b.index + 1),
-        }
+        crate::parse::anchor(b.id.as_deref(), b.index as usize)
     }
 
     pub fn page_href(&self, from: &Path, page: PageId) -> String {

@@ -10,6 +10,8 @@
 
 use std::collections::HashMap;
 
+use crate::fnv;
+
 /// A node to place.
 #[derive(Debug, Clone, Copy)]
 pub struct Node {
@@ -35,11 +37,7 @@ const MAX_DEPTH: u32 = 24;
 
 /// A stable 64-bit seed for a name (FNV-1a, never a randomly keyed hasher).
 pub fn seed(bytes: &[u8]) -> u64 {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    for &b in bytes {
-        h ^= u64::from(b);
-        h = h.wrapping_mul(0x0000_0100_0000_01b3);
-    }
+    let mut h = fnv::hash(bytes);
     // FNV's low bits mix poorly for short inputs; finish with a splitmix64 round.
     h = (h ^ (h >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
     h = (h ^ (h >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);

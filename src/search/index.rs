@@ -24,6 +24,8 @@ use super::normalize::words;
 use super::stem::stem;
 use super::text::{PREVIEW_CHARS, block_text, truncate};
 use crate::graph::{BlockId, Graph, PageId};
+use crate::site::url_path;
+use crate::{fnv, json};
 
 pub const VERSION: u32 = 1;
 pub const DOC_CHUNK: usize = 256;
@@ -148,8 +150,8 @@ pub fn build(g: &Graph, site: &SiteInfo) -> BTreeMap<PathBuf, Vec<u8>> {
         let _ = write!(
             shard,
             "[{},{},\"{packed}\"]",
-            json_string(term),
-            json_string(if &s == term { "" } else { &s }),
+            json::string(term),
+            json::string(if &s == term { "" } else { &s }),
         );
     }
     let keys: Vec<String> = shards.keys().map(|k| hex(k)).collect();
@@ -176,9 +178,9 @@ pub fn build(g: &Graph, site: &SiteInfo) -> BTreeMap<PathBuf, Vec<u8>> {
                 });
             entries.push(format!(
                 "[{index},{},{},{}]",
-                json_string(&doc.anchor),
+                json::string(&doc.anchor),
                 doc.parent.map_or(0, |p| id - p),
-                json_string(&doc.preview)
+                json::string(&doc.preview)
             ));
         }
         let pages: Vec<String> = pages
@@ -187,8 +189,8 @@ pub fn build(g: &Graph, site: &SiteInfo) -> BTreeMap<PathBuf, Vec<u8>> {
                 let path = (site.path)(p);
                 format!(
                     "[{},{}]",
-                    json_string(&url_path(&path)),
-                    json_string(&(site.title)(p))
+                    json::string(&url_path(&path)),
+                    json::string(&(site.title)(p))
                 )
             })
             .collect();
@@ -213,7 +215,7 @@ pub fn build(g: &Graph, site: &SiteInfo) -> BTreeMap<PathBuf, Vec<u8>> {
     };
     let id = files
         .values()
-        .fold(0xcbf2_9ce4_8422_2325u64, |h, bytes| fnv1a(h, bytes));
+        .fold(fnv::OFFSET, |h, bytes| fnv::extend(h, bytes));
     let journal = journal_docs.map_or_else(|| "null".to_owned(), |(a, b)| format!("[{a},{b}]"));
     let meta = format!(
         "{{\"version\":{VERSION},\"id\":\"{id:016x}\",\"n_docs\":{},\"avg_len\":[{:.3},{:.3}],\"k1\":{K1},\"b\":{B},\"journal_docs\":{journal},\"doc_chunk\":{DOC_CHUNK},\"shards\":[{}]}}",
@@ -221,7 +223,7 @@ pub fn build(g: &Graph, site: &SiteInfo) -> BTreeMap<PathBuf, Vec<u8>> {
         avg(lengths[0]),
         avg(lengths[1]),
         keys.iter()
-            .map(|k| json_string(k))
+            .map(|k| json::string(k))
             .collect::<Vec<_>>()
             .join(",")
     );
@@ -270,38 +272,6 @@ pub fn hex(key: &str) -> String {
     key.bytes().map(|b| format!("{b:02x}")).collect()
 }
 
-fn url_path(path: &Path) -> String {
-    path.components()
-        .map(|c| c.as_os_str().to_string_lossy())
-        .collect::<Vec<_>>()
-        .join("/")
-}
-
-fn fnv1a(mut h: u64, bytes: &[u8]) -> u64 {
-    for &b in bytes {
-        h ^= u64::from(b);
-        h = h.wrapping_mul(0x0100_0000_01b3);
-    }
-    h
-}
-
-pub fn json_string(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 2);
-    out.push('"');
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            c if (c as u32) < 0x20 => {
-                let _ = write!(out, "\\u{:04x}", c as u32);
-            }
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -310,7 +280,6 @@ mod tests {
     fn helpers() {
         assert_eq!(hex("re"), "7265");
         assert_eq!(hex("ż"), "c5bc");
-        assert_eq!(json_string("a\"b\\c\n"), r#""a\"b\\c\u000a""#);
         let mut s = String::new();
         for n in [0, 1, 31, 32, 1000, 1 << 20] {
             pack(&mut s, n);

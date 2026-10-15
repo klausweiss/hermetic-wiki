@@ -19,6 +19,15 @@ pub fn output_path(g: &Graph, page: PageId) -> PathBuf {
     }
 }
 
+/// A relative path with `/` separators on every platform, not percent-encoded: how
+/// output files are named in the search index, the edit API and live-reload events.
+pub fn url_path(path: &Path) -> String {
+    path.components()
+        .map(|c| c.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
 /// Replaces the trailing markdown extension with `.html`. Names may contain other dots, so this is a
 /// string operation rather than an extension swap.
 fn md_to_html(path: &Path) -> PathBuf {

@@ -82,8 +82,7 @@ fn svg(site: &Site, from: &Path, o: &crate::graph::Overview) -> String {
         let name = &site.g.page(o.nodes[i]).name;
         (
             std::cmp::Reverse(o.mentions[i]),
-            name.to_lowercase(),
-            name.clone(),
+            crate::graph::display_key(name),
         )
     });
     let mut tiers = vec![0; n];

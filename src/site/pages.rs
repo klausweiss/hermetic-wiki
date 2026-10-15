@@ -8,7 +8,7 @@ use super::html::{document, esc};
 use super::paths::{href, refs_continuation_path, tasks_continuation_path};
 use super::render::{Mode, Site, task_badge};
 use crate::graph::{BlockId, LinkedRef, PageId};
-use crate::layout::{self, Date};
+use crate::layout::{Address, Date};
 
 /// Linked references shown per file.
 pub const REFS_PER_FILE: usize = 100;
@@ -169,7 +169,7 @@ fn day_links<T: Copy>(
 /// referenced without a file would be shown. `days` are the journal days that have a
 /// file, sorted. `hermetic serve` shows it so the day can be written in the browser.
 pub fn blank_day(site_title: &str, date: Date, days: &[Date]) -> OutFile {
-    let path = layout::journal_html_path(date);
+    let path = Address::Journal(date).html_path();
     let main = format!(
         "<article class=\"page\">\n<header class=\"page-header\">\n<h1>{date} <span class=\"weekday\">{weekday}</span></h1>\n{nav}</header>\n<p class=\"empty\">There is no journal entry for this day.</p>\n<section class=\"linked-refs\">\n<h2>Linked references <span class=\"count\">0</span></h2>\n<p class=\"empty\">No other page references this one yet.</p>\n</section>\n</article>\n",
         weekday = date.weekday(),
@@ -177,7 +177,7 @@ pub fn blank_day(site_title: &str, date: Date, days: &[Date]) -> OutFile {
             days,
             date,
             |d| d,
-            |d| href(&path, &layout::journal_html_path(d), None)
+            |d| href(&path, &Address::Journal(d).html_path(), None)
         ),
     );
     OutFile {

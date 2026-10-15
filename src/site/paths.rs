@@ -2,20 +2,17 @@
 
 use std::path::{Component, Path, PathBuf};
 
-use crate::graph::{Graph, PageId, PageKind};
-use crate::layout;
+use crate::graph::{Graph, PageId};
+use crate::layout::{self, Address};
 
 /// Output path (relative to the output root) of a page's HTML file.
 pub fn output_path(g: &Graph, page: PageId) -> PathBuf {
     let p = g.page(page);
-    match (&p.file, p.kind) {
-        // Journal days are always at `journals/YYYY-MM-DD.html`, whether the file is named
-        // `YYYY-MM-DD.md` or `YYYY_MM_DD.md`, so a day's address does not depend on it.
-        (_, PageKind::Journal(date)) => layout::journal_html_path(date),
-        (Some(file), _) => md_to_html(file),
-        // Without `index.md`, the page `index` is the default home page.
-        (None, PageKind::Regular) if layout::is_home_name(&p.name) => PathBuf::from("index.html"),
-        (None, PageKind::Regular) => md_to_html(&layout::page_file_path(&p.name)),
+    match (&p.file, p.date()) {
+        // A regular page's file decides where it is served; a journal day's address does
+        // not depend on whether its file is named `YYYY-MM-DD.md` or `YYYY_MM_DD.md`.
+        (Some(file), None) => md_to_html(file),
+        (_, date) => Address::of(&p.name, date).html_path(),
     }
 }
 

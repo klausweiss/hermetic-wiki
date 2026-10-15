@@ -1,6 +1,7 @@
 //! Source directory conventions: which files are journals and pages, how page names map
 //! to file paths and back, and how names are normalized and compared.
 
+use std::borrow::Cow;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -176,9 +177,9 @@ pub fn percent_decode(s: &str) -> Option<String> {
     String::from_utf8(out).ok()
 }
 
-/// Relative path (`pages/...md`) of the file that stores a regular page.
+/// Relative path (`pages/<encoded segments><ext>`) of a regular page's file.
 /// The name must be valid (see [`validate_name`]).
-pub fn page_file_path(name: &str) -> PathBuf {
+fn page_path(name: &str, ext: &str) -> PathBuf {
     let mut path = PathBuf::from(PAGES_DIR);
     let name = normalize_name(name);
     let segments: Vec<&str> = name.split('/').collect();
@@ -186,19 +187,8 @@ pub fn page_file_path(name: &str) -> PathBuf {
     for dir in dirs {
         path.push(encode_segment(dir));
     }
-    path.push(format!("{}{EXTENSION}", encode_segment(last)));
+    path.push(format!("{}{ext}", encode_segment(last)));
     path
-}
-
-/// Relative path (`journals/YYYY_MM_DD.md`) of the file a new journal day is written to.
-pub fn journal_file_path(date: Date) -> PathBuf {
-    let stem = date.to_string().replace('-', "_");
-    PathBuf::from(JOURNALS_DIR).join(format!("{stem}{EXTENSION}"))
-}
-
-/// Relative path (`journals/YYYY-MM-DD.html`) of a journal day's HTML page.
-pub fn journal_html_path(date: Date) -> PathBuf {
-    PathBuf::from(JOURNALS_DIR).join(format!("{date}.html"))
 }
 
 /// Page name of a regular page stored at `rel` (relative to the root, under `pages/`).
@@ -215,6 +205,123 @@ pub fn page_name_from_path(rel: &Path) -> Option<String> {
     let mut decoded: Vec<String> = dirs.iter().map(|d| decode_segment(d)).collect();
     decoded.push(decode_segment(stem));
     Some(normalize_name(&decoded.join("/")))
+}
+
+// ---------------------------------------------------------------------------
+// Addresses
+// ---------------------------------------------------------------------------
+
+/// Where a page lives: the one place that maps page names to source and HTML paths and
+/// back. A page that has a file is served next to that file's path, which can differ
+/// from [`Address::html_path`] (an NFD file name, a journal file without a valid date);
+/// the paths here are those of a page without a file, and where a new file is written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Address {
+    /// The page `index`: the root `index.md`, served at `index.html`.
+    Home,
+    /// A journal day: `journals/YYYY_MM_DD.md` (or `YYYY-MM-DD.md`), served at
+    /// `journals/YYYY-MM-DD.html`.
+    Journal(Date),
+    /// Any other page: `pages/<encoded segments>.md`. Never a home name.
+    Page(String),
+}
+
+impl Address {
+    /// The address of the page called `name`, a journal day when `date` is given.
+    pub fn of(name: &str, date: Option<Date>) -> Address {
+        match date {
+            Some(date) => Address::Journal(date),
+            None if is_home_name(name) => Address::Home,
+            None => Address::Page(name.to_owned()),
+        }
+    }
+
+    /// The page stored at `rel` (relative to the notes root): the root `index.md`, a
+    /// markdown file under `journals/` (a regular page when its name is not a date), or
+    /// one under `pages/` (where `index` becomes [`PAGES_INDEX_PAGE`]). `None` for any
+    /// other path.
+    pub fn from_source_path(rel: &Path) -> Option<Address> {
+        if rel == Path::new(ROOT_INDEX) {
+            return Some(Address::Home);
+        }
+        let mut components = rel.components();
+        let top = components.next()?.as_os_str();
+        if top == JOURNALS_DIR && components.next().is_some() {
+            let stem = rel.file_name()?.to_str()?.strip_suffix(EXTENSION)?;
+            return Some(match Date::parse_file_stem(stem) {
+                Some(date) => Address::Journal(date),
+                None => Address::Page(normalize_name(&decode_segment(stem))),
+            });
+        }
+        if top == PAGES_DIR {
+            let name = page_name_from_path(rel)?;
+            return Some(Address::Page(if is_home_name(&name) {
+                PAGES_INDEX_PAGE.to_owned()
+            } else {
+                name
+            }));
+        }
+        None
+    }
+
+    /// The page without a file served at `rel` (a `/`-separated site path), which must
+    /// be exactly this address's [`html_path`](Address::html_path).
+    pub fn from_html_path(rel: &str) -> Option<Address> {
+        if rel == "index.html" {
+            return Some(Address::Home);
+        }
+        let stem = rel.strip_suffix(".html")?;
+        if let Some(day) = stem
+            .strip_prefix(JOURNALS_DIR)
+            .and_then(|s| s.strip_prefix('/'))
+        {
+            return Date::parse(day).map(Address::Journal);
+        }
+        let name = page_name_from_path(&PathBuf::from(format!("{stem}{EXTENSION}")))?;
+        if validate_name(&name).is_err() || is_home_name(&name) {
+            return None;
+        }
+        let address = Address::Page(name);
+        // Only the path the name maps to, segment by segment on every platform.
+        let canonical = address.html_path();
+        let same = canonical
+            .components()
+            .map(|c| c.as_os_str().to_str())
+            .eq(rel.split('/').map(Some));
+        same.then_some(address)
+    }
+
+    /// The page's name.
+    pub fn name(&self) -> Cow<'_, str> {
+        match self {
+            Address::Home => Cow::Borrowed(ROOT_INDEX_PAGE),
+            Address::Journal(date) => Cow::Owned(date.to_string()),
+            Address::Page(name) => Cow::Borrowed(name),
+        }
+    }
+
+    /// Where a new file for the page is written, relative to the notes root. New journal
+    /// days use `YYYY_MM_DD.md`.
+    pub fn source_path(&self) -> PathBuf {
+        match self {
+            Address::Home => PathBuf::from(ROOT_INDEX),
+            Address::Journal(date) => {
+                let stem = date.to_string().replace('-', "_");
+                PathBuf::from(JOURNALS_DIR).join(format!("{stem}{EXTENSION}"))
+            }
+            Address::Page(name) => page_path(name, EXTENSION),
+        }
+    }
+
+    /// The page's HTML path relative to the output root, when it has no file. Journal
+    /// days are always here, whatever their file is called.
+    pub fn html_path(&self) -> PathBuf {
+        match self {
+            Address::Home => PathBuf::from("index.html"),
+            Address::Journal(date) => PathBuf::from(JOURNALS_DIR).join(format!("{date}.html")),
+            Address::Page(name) => page_path(name, ".html"),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -355,53 +462,43 @@ pub fn scan(root: &Path, diags: &mut Vec<Diagnostic>) -> Vec<SourceFile> {
 
     let mut journal_files = Vec::new();
     collect_markdown(root, Path::new(JOURNALS_DIR), &mut journal_files, diags);
-    for rel in journal_files {
-        let stem = rel
-            .file_name()
-            .and_then(|n| n.to_str())
-            .and_then(|n| n.strip_suffix(EXTENSION))
-            .unwrap_or_default()
-            .to_owned();
-        match Date::parse_file_stem(&stem) {
-            Some(date) => journals.push(SourceFile {
+    let mut add = |rel: PathBuf, diags: &mut Vec<Diagnostic>| {
+        let Some(address) = Address::from_source_path(&rel) else {
+            return;
+        };
+        let name = address.name().into_owned();
+        if let Address::Journal(date) = address {
+            journals.push(SourceFile {
                 rel,
-                name: date.to_string(),
+                name,
                 kind: SourceKind::Journal(date),
-            }),
-            None => {
-                diags.push(Diagnostic::new(
-                    DiagnosticKind::InvalidJournalName,
-                    rel.clone(),
-                    None,
-                    "journal file name is not a valid YYYY-MM-DD (or YYYY_MM_DD) date; treated as a regular page",
-                ));
-                pages.push(SourceFile {
-                    rel,
-                    name: normalize_name(&decode_segment(&stem)),
-                    kind: SourceKind::Regular,
-                });
-            }
+            });
+            return;
         }
+        if rel.starts_with(JOURNALS_DIR) {
+            diags.push(Diagnostic::new(
+                DiagnosticKind::InvalidJournalName,
+                rel.clone(),
+                None,
+                "journal file name is not a valid YYYY-MM-DD (or YYYY_MM_DD) date; treated as a regular page",
+            ));
+        }
+        pages.push(SourceFile {
+            rel,
+            name,
+            kind: SourceKind::Regular,
+        });
+    };
+    for rel in journal_files {
+        add(rel, diags);
     }
-
     let mut page_files = Vec::new();
     collect_markdown(root, Path::new(PAGES_DIR), &mut page_files, diags);
     for rel in page_files {
-        if let Some(name) = page_name_from_path(&rel) {
-            pages.push(SourceFile {
-                rel,
-                name,
-                kind: SourceKind::Regular,
-            });
-        }
+        add(rel, diags);
     }
-
     if root.join(ROOT_INDEX).is_file() {
-        pages.push(SourceFile {
-            rel: PathBuf::from(ROOT_INDEX),
-            name: ROOT_INDEX_PAGE.to_owned(),
-            kind: SourceKind::Regular,
-        });
+        add(PathBuf::from(ROOT_INDEX), diags);
     }
 
     journals.sort_by(|a, b| {
@@ -504,6 +601,104 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
 
+    fn day(s: &str) -> Date {
+        Date::parse(s).unwrap()
+    }
+
+    #[test]
+    fn address_from_source_path() {
+        let page = |name: &str| Some(Address::Page(name.to_owned()));
+        let cases = [
+            ("index.md", Some(Address::Home)),
+            (
+                "journals/2026_10_01.md",
+                Some(Address::Journal(day("2026-10-01"))),
+            ),
+            (
+                "journals/2026-10-01.md",
+                Some(Address::Journal(day("2026-10-01"))),
+            ),
+            (
+                "journals/sub/2026-10-01.md",
+                Some(Address::Journal(day("2026-10-01"))),
+            ),
+            ("journals/2026-13-01.md", page("2026-13-01")),
+            ("journals/a%2Fb.md", page("a/b")),
+            ("journals/x.png", None),
+            ("pages/Project X/Auth Flow.md", page("Project X/Auth Flow")),
+            ("pages/a%2Fb.md", page("a/b")),
+            ("pages/Zu\u{308}rich.md", page("Z\u{fc}rich")),
+            ("pages/index.md", page(PAGES_INDEX_PAGE)),
+            ("pages/Index.md", page(PAGES_INDEX_PAGE)),
+            ("pages/index (in pages).md", page(PAGES_INDEX_PAGE)),
+            ("pages/x.png", None),
+            ("journals", None),
+            ("other/x.md", None),
+            ("x.md", None),
+        ];
+        for (rel, want) in cases {
+            assert_eq!(Address::from_source_path(Path::new(rel)), want, "{rel}");
+        }
+    }
+
+    #[test]
+    fn address_paths_and_names() {
+        let cases = [
+            (Address::Home, "index", "index.md", "index.html"),
+            (
+                Address::Journal(day("2026-10-01")),
+                "2026-10-01",
+                "journals/2026_10_01.md",
+                "journals/2026-10-01.html",
+            ),
+            (
+                Address::Page("Project X/a:b".to_owned()),
+                "Project X/a:b",
+                "pages/Project X/a%3Ab.md",
+                "pages/Project X/a%3Ab.html",
+            ),
+        ];
+        for (address, name, source, html) in cases {
+            assert_eq!(address.name(), name);
+            assert_eq!(address.source_path(), PathBuf::from(source));
+            assert_eq!(address.html_path(), PathBuf::from(html));
+            assert_eq!(
+                Address::from_html_path(html),
+                Some(address.clone()),
+                "{html}"
+            );
+            assert_eq!(Address::from_source_path(Path::new(source)), Some(address));
+        }
+        assert_eq!(Address::of("Index", None), Address::Home);
+        assert_eq!(
+            Address::of("2026-10-01", Some(day("2026-10-01"))),
+            Address::Journal(day("2026-10-01"))
+        );
+        assert_eq!(Address::of("a", None), Address::Page("a".to_owned()));
+    }
+
+    #[test]
+    fn address_from_html_path_is_exact() {
+        for rel in [
+            "index",
+            "pages/index.html",
+            "pages/a//b.html",
+            "pages/./a.html",
+            "pages/a:b.html",
+            "pages/.hidden.html",
+            "journals/2026_10_01.html",
+            "journals/2026-13-01.html",
+            "journals/sub/2026-10-01.html",
+            "other/a.html",
+        ] {
+            assert_eq!(Address::from_html_path(rel), None, "{rel}");
+        }
+        assert_eq!(
+            Address::from_html_path("pages/a%3Ab.html"),
+            Some(Address::Page("a:b".to_owned()))
+        );
+    }
+
     #[test]
     fn invalid_names() {
         let cases = [
@@ -538,24 +733,33 @@ mod tests {
     #[test]
     fn spec_encoding_scenarios() {
         assert_eq!(
-            page_file_path("C#: a|b?"),
+            Address::Page("C#: a|b?".to_owned()).source_path(),
             PathBuf::from("pages/C#%3A a%7Cb%3F.md")
         );
         assert_eq!(
-            page_file_path("50% done"),
+            Address::Page("50% done".to_owned()).source_path(),
             PathBuf::from("pages/50%25 done.md")
         );
-        assert_eq!(page_file_path("con"), PathBuf::from("pages/%63on.md"));
         assert_eq!(
-            page_file_path("con.txt"),
+            Address::Page("con".to_owned()).source_path(),
+            PathBuf::from("pages/%63on.md")
+        );
+        assert_eq!(
+            Address::Page("con.txt".to_owned()).source_path(),
             PathBuf::from("pages/%63on.txt.md")
         );
-        assert_eq!(page_file_path("etc."), PathBuf::from("pages/etc%2E.md"));
         assert_eq!(
-            page_file_path("Project X/Auth Flow"),
+            Address::Page("etc.".to_owned()).source_path(),
+            PathBuf::from("pages/etc%2E.md")
+        );
+        assert_eq!(
+            Address::Page("Project X/Auth Flow".to_owned()).source_path(),
             PathBuf::from("pages/Project X/Auth Flow.md")
         );
-        assert_eq!(page_file_path("a /b"), PathBuf::from("pages/a%20/b.md"));
+        assert_eq!(
+            Address::Page("a /b".to_owned()).source_path(),
+            PathBuf::from("pages/a%20/b.md")
+        );
     }
 
     #[test]
@@ -617,11 +821,11 @@ mod tests {
             assert_eq!(Date::parse_file_stem(bad), None, "{bad}");
         }
         assert_eq!(
-            journal_file_path(d),
+            Address::Journal(d).source_path(),
             PathBuf::from("journals/2026_10_12.md")
         );
         assert_eq!(
-            journal_html_path(d),
+            Address::Journal(d).html_path(),
             PathBuf::from("journals/2026-10-12.html")
         );
         assert!(Date::parse("2026-09-30").unwrap() < d);
@@ -652,7 +856,7 @@ mod tests {
         })]
         #[test]
         fn encoding_round_trips(name in valid_name()) {
-            let path = page_file_path(&name);
+            let path = Address::Page(name.clone()).source_path();
             prop_assert_eq!(page_name_from_path(&path), Some(name.clone()));
             // Encoded file names contain no characters unsafe on any major platform.
             for component in path.components().skip(1) {

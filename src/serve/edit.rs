@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 
 use crate::graph::Graph;
-use crate::layout::{self, Date, JOURNALS_DIR, PAGES_DIR, ROOT_INDEX};
+use crate::layout::{self, Address, Date, JOURNALS_DIR, PAGES_DIR, ROOT_INDEX};
 use crate::parse::{self, BlockKind};
 use crate::site::{self, url_path};
 use crate::{fnv, json};
@@ -65,38 +65,16 @@ pub fn resolve(map: &EditMap, path: &str) -> Option<Editable> {
     if let Some(page) = map.get(path) {
         return Some(page.clone());
     }
-    // The home page can always be written, which creates the root `index.md`.
-    if path == "index.html" {
-        return Some(Editable {
-            name: layout::ROOT_INDEX_PAGE.to_owned(),
-            date: None,
-            file: None,
-        });
-    }
-    let stem = path.strip_suffix(".html")?;
-    if let Some(day) = stem
-        .strip_prefix(JOURNALS_DIR)
-        .and_then(|s| s.strip_prefix('/'))
-    {
-        let date = Date::parse(day)?;
-        return Some(Editable {
-            name: day.to_owned(),
-            date: Some(date),
-            file: None,
-        });
-    }
-    // Only a path that is exactly where the page's name would put it.
-    let file = PathBuf::from(format!("{stem}{}", layout::EXTENSION));
-    let name = layout::page_name_from_path(&file)?;
-    if layout::validate_name(&name).is_err()
-        || layout::is_home_name(&name)
-        || layout::page_file_path(&name).to_str() != file.to_str()
-    {
-        return None;
-    }
+    // A page without a file: the home page (written to the root `index.md`), a journal
+    // day, or a page at exactly the path its name maps to.
+    let address = Address::from_html_path(path)?;
+    let date = match address {
+        Address::Journal(date) => Some(date),
+        _ => None,
+    };
     Some(Editable {
-        name,
-        date: None,
+        name: address.name().into_owned(),
+        date,
         file: None,
     })
 }
@@ -104,12 +82,9 @@ pub fn resolve(map: &EditMap, path: &str) -> Option<Editable> {
 /// The source file of a page relative to the notes root: its existing file, or the
 /// path its name maps to.
 pub fn source_path(page: &Editable) -> PathBuf {
-    match (&page.file, page.date) {
-        (Some(file), _) => file.clone(),
-        (None, Some(date)) => layout::journal_file_path(date),
-        // The page `index` is the home page, stored at the notes root.
-        (None, None) if layout::is_home_name(&page.name) => PathBuf::from(ROOT_INDEX),
-        (None, None) => layout::page_file_path(&page.name),
+    match &page.file {
+        Some(file) => file.clone(),
+        None => Address::of(&page.name, page.date).source_path(),
     }
 }
 

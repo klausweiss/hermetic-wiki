@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use crate::diag::{Diagnostic, DiagnosticKind};
 use crate::layout::{
-    self, Date, JOURNALS_DIR, NameKey, PAGES_DIR, SourceFile, SourceKind, normalize_name,
+    self, Address, Date, JOURNALS_DIR, NameKey, PAGES_DIR, SourceFile, SourceKind, normalize_name,
     percent_decode, validate_name,
 };
 use crate::parse::{self, BlockKind, ParsedBlock, Property, RawRef, RawRefKind, TaskState};
@@ -193,8 +193,8 @@ impl Graph {
     pub fn load(root: &Path) -> (Graph, Vec<Diagnostic>) {
         let mut diags = Vec::new();
         let files = layout::scan(root, &mut diags);
-        let mut loaded = read_and_parse(root, files, &mut diags);
-        reserve_home_name(&mut loaded, &mut diags);
+        let loaded = read_and_parse(root, files, &mut diags);
+        warn_pages_index(&loaded, &mut diags);
         let keep = pick_colliding_winners(&loaded, &mut diags);
 
         let mut g = Graph {
@@ -820,10 +820,14 @@ fn read_and_parse(root: &Path, files: Vec<SourceFile>, diags: &mut Vec<Diagnosti
 }
 
 /// `index` is the home page, stored in the root `index.md`: a file under `pages/` that
-/// would also be `index` becomes the page `index (in pages)` instead.
-fn reserve_home_name(loaded: &mut [Loaded], diags: &mut Vec<Diagnostic>) {
-    for l in loaded.iter_mut() {
-        if l.file.rel.starts_with(layout::PAGES_DIR) && layout::is_home_name(&l.file.name) {
+/// would also be `index` is the page `index (in pages)` instead, which this warns about.
+fn warn_pages_index(loaded: &[Loaded], diags: &mut Vec<Diagnostic>) {
+    for l in loaded {
+        // Its name is already `PAGES_INDEX_PAGE` (see `Address::from_source_path`); only
+        // a file named `index` is warned about, not one named `index (in pages)`.
+        let named_index = l.file.rel.starts_with(layout::PAGES_DIR)
+            && layout::page_name_from_path(&l.file.rel).is_some_and(|n| layout::is_home_name(&n));
+        if named_index {
             diags.push(Diagnostic::new(
                 DiagnosticKind::ReservedName,
                 l.file.rel.clone(),
@@ -833,7 +837,6 @@ fn reserve_home_name(loaded: &mut [Loaded], diags: &mut Vec<Diagnostic>) {
                     layout::PAGES_INDEX_PAGE
                 ),
             ));
-            l.file.name = layout::PAGES_INDEX_PAGE.to_owned();
         }
     }
 }
@@ -1001,30 +1004,17 @@ fn resolve_link_path(file: &Path, dest: &str) -> LinkPath {
             s => parts.push(s.to_owned()),
         }
     }
-    if parts.len() == 1 && parts[0] == layout::ROOT_INDEX {
-        return LinkPath::Page(layout::ROOT_INDEX_PAGE.to_owned());
+    let inside = match parts.first().map(String::as_str) {
+        Some(PAGES_DIR | JOURNALS_DIR) => parts.len() > 1,
+        Some(layout::ROOT_INDEX) => parts.len() == 1,
+        _ => false,
+    };
+    if !inside {
+        return LinkPath::Outside;
     }
+    // A path inside the notes that is not a page file (`pages/x.png`) is a broken link.
     let rel: PathBuf = parts.iter().collect();
-    match parts.first().map(String::as_str) {
-        Some(PAGES_DIR) if parts.len() > 1 => {
-            let name = layout::page_name_from_path(&rel).unwrap_or_default();
-            // A file under `pages/` named `index` is not the home page (see `Graph::load`).
-            LinkPath::Page(if layout::is_home_name(&name) {
-                layout::PAGES_INDEX_PAGE.to_owned()
-            } else {
-                name
-            })
-        }
-        Some(JOURNALS_DIR) if parts.len() > 1 => {
-            let stem = parts
-                .last()
-                .and_then(|f| f.strip_suffix(layout::EXTENSION))
-                .unwrap_or_default();
-            LinkPath::Page(match Date::parse_file_stem(stem) {
-                Some(date) => date.to_string(),
-                None => normalize_name(&layout::decode_segment(stem)),
-            })
-        }
-        _ => LinkPath::Outside,
-    }
+    LinkPath::Page(
+        Address::from_source_path(&rel).map_or_else(String::new, |a| a.name().into_owned()),
+    )
 }

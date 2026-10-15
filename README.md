@@ -1,4 +1,4 @@
-# hermetic
+# <img src="static/favicon.svg" width="32" height="32" alt=""> hermetic
 
 The files for installing hermetic with uv and Nix are in [`packaging/`](packaging/).
 

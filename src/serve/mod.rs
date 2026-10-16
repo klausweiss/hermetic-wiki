@@ -326,7 +326,8 @@ fn handle(state: &State, mut stream: TcpStream) -> io::Result<()> {
         } else {
             "text/plain"
         };
-        return stream.write_all(&http::response(status, content_type, &body, false));
+        stream.write_all(&http::response(status, content_type, &body, false))?;
+        return close_after_body(&stream, &mut reader);
     }
     if request.target.split(['?', '#']).next() == Some(http::ASSET_PATH) {
         let (status, body) = asset(state, &request, &mut reader, same_machine);
@@ -335,7 +336,8 @@ fn handle(state: &State, mut stream: TcpStream) -> io::Result<()> {
         } else {
             "text/plain"
         };
-        return stream.write_all(&http::response(status, content_type, &body, false));
+        stream.write_all(&http::response(status, content_type, &body, false))?;
+        return close_after_body(&stream, &mut reader);
     }
     let head = request.method == "HEAD";
     if request.method != "GET" && !head {
@@ -391,6 +393,21 @@ fn handle(state: &State, mut stream: TcpStream) -> io::Result<()> {
         body
     };
     stream.write_all(&http::response(200, content_type, &body, head))
+}
+
+/// Most a refused request's body is read to close its connection cleanly.
+const DRAIN_LIMIT: u64 = 4 * edit::MAX_ASSET as u64;
+
+/// Ends a response to a request whose body may be unread (it was refused before being
+/// read): closing a socket with unread data resets the connection, and the client may
+/// then lose the response. So the response is ended first and the rest is read away.
+fn close_after_body(stream: &TcpStream, reader: &mut impl io::Read) -> io::Result<()> {
+    stream.shutdown(std::net::Shutdown::Write)?;
+    let _ = io::copy(
+        &mut io::Read::take(&mut *reader, DRAIN_LIMIT),
+        &mut io::sink(),
+    );
+    Ok(())
 }
 
 /// The page of a journal day at site path `path` that has no page in the build, so that

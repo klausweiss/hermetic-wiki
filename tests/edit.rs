@@ -930,6 +930,8 @@ fn refused_uploads() {
         Some(40 * 1024 * 1024),
     );
     assert_eq!(too_large.0, 413);
+    // Refused before their body is read: the response must still arrive, not a reset.
+    let image = [PNG, &[0; 1024 * 1024]].concat();
     // Only `POST` uploads.
     for method in ["GET", "PUT", "DELETE"] {
         let r = send_bytes(
@@ -937,14 +939,21 @@ fn refused_uploads() {
             method,
             &asset_url("pages/auth.html"),
             &upload_headers(addr, None),
-            PNG,
+            &image,
             None,
         );
         assert_eq!(r.0, 405, "{method}");
     }
     // Another website, or a form without the edit header.
     let forged = |headers: Vec<(&'static str, String)>, why: &str| {
-        let r = send_bytes(addr, "POST", &asset_url("index.html"), &headers, PNG, None);
+        let r = send_bytes(
+            addr,
+            "POST",
+            &asset_url("index.html"),
+            &headers,
+            &image,
+            None,
+        );
         assert_eq!(r.0, 403, "{why}");
     };
     forged(

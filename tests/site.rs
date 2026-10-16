@@ -424,6 +424,110 @@ fn image_next_to_a_page() {
 }
 
 #[test]
+fn journal_image_in_linked_references() {
+    let (_n, _h, out, _) = built(&[(
+        "journals/2026_10_17.md",
+        "- [[auth]] ![flow](../assets/flow.png)",
+    )]);
+    let own = main_of(&out, "journals/2026-10-17.html");
+    assert!(
+        own.contains(r#"<img src="../assets/flow.png" alt="flow" />"#),
+        "{own}"
+    );
+    let refs = main_of(&out, "pages/auth.html");
+    assert!(
+        refs.contains(r#"<img src="../assets/flow.png" alt="flow" />"#),
+        "{refs}"
+    );
+}
+
+#[test]
+fn image_on_a_continuation_page() {
+    let mut journal: String = (0..100).map(|i| format!("- ref {i} [[auth]]\n")).collect();
+    journal.push_str("- late [[auth]] ![flow](../assets/flow.png)\n");
+    let (_n, _h, out, _) = built(&[("journals/2026-10-12.md", &journal)]);
+    let second = main_of(&out, "refs/pages/auth/2.html");
+    assert!(
+        second.contains(r#"<img src="../../../assets/flow.png" alt="flow" />"#),
+        "{second}"
+    );
+}
+
+#[test]
+fn image_of_a_namespaced_page_through_a_block_reference() {
+    let (_n, _h, out, _) = built(&[
+        (
+            "pages/Project X/Auth.md",
+            "- ![seq](../../assets/seq.png)\n  id:: seq",
+        ),
+        ("journals/2026_10_17.md", "- see ((seq))"),
+    ]);
+    let own = main_of(&out, "pages/Project X/Auth.html");
+    assert!(
+        own.contains(r#"<img src="../../assets/seq.png" alt="seq" />"#),
+        "{own}"
+    );
+    let journal = main_of(&out, "journals/2026-10-17.html");
+    assert!(
+        journal.contains(r#"<img src="../assets/seq.png" alt="seq" />"#),
+        "{journal}"
+    );
+}
+
+#[test]
+fn image_next_to_its_note_shown_elsewhere() {
+    let (_n, _h, out, _) = built(&[
+        ("pages/auth.md", "- ![flow](auth-flow.png)\n  id:: flow"),
+        ("journals/2026_10_17.md", "- see ((flow))"),
+    ]);
+    let own = main_of(&out, "pages/auth.html");
+    assert!(
+        own.contains(r#"<img src="auth-flow.png" alt="flow" />"#),
+        "{own}"
+    );
+    let journal = main_of(&out, "journals/2026-10-17.html");
+    assert!(
+        journal.contains(r#"<img src="../pages/auth-flow.png" alt="flow" />"#),
+        "{journal}"
+    );
+}
+
+#[test]
+fn root_relative_attachments() {
+    let (_n, _h, out, _) = built(&[(
+        "pages/auth.md",
+        "- ![logo](/assets/logo.png) [spec](</assets/the spec.pdf#page=2>)",
+    )]);
+    let html = main_of(&out, "pages/auth.html");
+    assert!(
+        html.contains(r#"<img src="../assets/logo.png" alt="logo" />"#),
+        "{html}"
+    );
+    assert!(
+        html.contains(r#"<a href="../assets/the%20spec.pdf#page=2">spec</a>"#),
+        "{html}"
+    );
+}
+
+#[test]
+fn attachments_left_as_written() {
+    let (_n, _h, out, _) = built(&[(
+        "pages/auth.md",
+        "- ![x](https://example.com/x.png) ![y](data:image/png;base64,AAAA) ![z](../../../outside.png)",
+    )]);
+    let html = main_of(&out, "pages/auth.html");
+    assert!(
+        html.contains(r#"src="https://example.com/x.png""#),
+        "{html}"
+    );
+    assert!(
+        html.contains(r#"src="data:image/png;base64,AAAA""#),
+        "{html}"
+    );
+    assert!(html.contains(r#"src="../../../outside.png""#), "{html}");
+}
+
+#[test]
 fn attachment_conflicts_and_symlinks() {
     let notes = Notes::new(&[
         ("pages/auth.md", "- x"),

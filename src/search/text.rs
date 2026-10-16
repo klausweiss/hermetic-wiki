@@ -19,7 +19,7 @@ fn substitute<'r>(text: &str, refs: impl Iterator<Item = &'r Ref>) -> String {
         .filter_map(|r| match r.kind {
             RawRefKind::Page | RawRefKind::Tag => Some((r.range.clone(), r.text.as_str())),
             RawRefKind::Block => Some((r.range.clone(), "")),
-            RawRefKind::MdLink => None,
+            RawRefKind::MdLink | RawRefKind::Attachment => None,
         })
         .collect();
     edits.sort_by_key(|(range, _)| std::cmp::Reverse(range.start));

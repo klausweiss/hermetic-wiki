@@ -115,6 +115,16 @@ impl<'g> Site<'g> {
                     }
                     edits.push((dest, url));
                 }
+                (RawRefKind::Attachment, RefTarget::Attachment(a)) => {
+                    let Some(dest) = r.dest.clone() else { continue };
+                    // Attachments are published at their path in the notes.
+                    let mut url = href(from, self.g.attachment(a), None);
+                    if let Some((_, fragment)) = r.text.split_once('#') {
+                        url.push('#');
+                        url.push_str(fragment);
+                    }
+                    edits.push((dest, url));
+                }
                 (kind @ (RawRefKind::Page | RawRefKind::Tag), RefTarget::Page(p)) => {
                     let (class, prefix) = match kind {
                         RawRefKind::Tag => ("tag", "#"),

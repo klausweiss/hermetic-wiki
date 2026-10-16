@@ -17,6 +17,8 @@ pub const EVENTS_PATH: &str = "/_hermetic/events";
 pub const EDITOR_TAG: &str = "<hermetic-editor></hermetic-editor>";
 /// The edit API: one page's source, by site path.
 pub const SOURCE_PATH: &str = "/_hermetic/source";
+/// The edit API's image upload, by the site path of the page the image is for.
+pub const ASSET_PATH: &str = "/_hermetic/asset";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Request {
@@ -213,6 +215,7 @@ pub fn is_loopback_host(host: &str, port: u16) -> bool {
 pub fn status_text(status: u16) -> &'static str {
     match status {
         200 => "OK",
+        201 => "Created",
         400 => "Bad Request",
         403 => "Forbidden",
         404 => "Not Found",
@@ -220,6 +223,7 @@ pub fn status_text(status: u16) -> &'static str {
         409 => "Conflict",
         411 => "Length Required",
         413 => "Content Too Large",
+        415 => "Unsupported Media Type",
         _ => "Internal Server Error",
     }
 }

@@ -33,6 +33,8 @@ COMMANDS
       Shift+Tab indent and outdent, [[ and (( complete page and block
       references. Edits are saved to the note files automatically; a save
       is refused if the file changed on disk since the page loaded it.
+      Paste or drop PNG, JPEG, GIF, or WebP images into a block: they are
+      stored in assets/ and linked relative to the note, as Logseq does.
       "Today" opens today's journal. A journal day's file is created with
       its first content and deleted once it is emptied again (nothing
       but one empty block); files left empty otherwise go after an hour.

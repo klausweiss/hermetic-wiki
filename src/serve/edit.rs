@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 
 use crate::graph::Graph;
-use crate::layout::{self, Address, Date, JOURNALS_DIR, PAGES_DIR, ROOT_INDEX};
+use crate::layout::{self, ASSETS_DIR, Address, Date, JOURNALS_DIR, PAGES_DIR, ROOT_INDEX};
 use crate::parse::{self, BlockKind};
 use crate::site::{self, url_path};
 use crate::{fnv, json};
@@ -26,6 +26,12 @@ pub const MISSING: &str = "missing";
 pub const VERSION_HEADER: &str = "x-hermetic-version";
 /// Request header every write must carry; it forces a CORS preflight on other origins.
 pub const EDIT_HEADER: &str = "x-hermetic-edit";
+/// Upper bound on an uploaded image.
+pub const MAX_ASSET: usize = 32 * 1024 * 1024;
+/// Request header with an uploaded image's original file name, percent-encoded.
+pub const NAME_HEADER: &str = "x-hermetic-name";
+/// Longest stem of an uploaded image's file name.
+const MAX_STEM: usize = 64;
 
 /// A page that can be edited: its name, its date for journal days, and its source file
 /// relative to the notes root (`None` when it has none yet).
@@ -245,6 +251,129 @@ pub fn write_atomic(root: &Path, path: &Path, bytes: &[u8]) -> Result<(), Unsafe
         let _ = fs::remove_file(&tmp);
     }
     Ok(result?)
+}
+
+/// The extension for an image the editor may upload, recognized by its first bytes
+/// alone: PNG, JPEG, GIF, or WebP. Anything else (SVG included) is `None`.
+pub fn sniff_image(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        Some("png")
+    } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        Some("jpg")
+    } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+        Some("gif")
+    } else if bytes.len() >= 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP" {
+        Some("webp")
+    } else {
+        None
+    }
+}
+
+/// The stem for an uploaded image's file name, from its original name (percent-encoded,
+/// as sent in [`NAME_HEADER`]): without folders and extension, characters other than
+/// ASCII letters, digits, `-` and `_` replaced by `_`, at most [`MAX_STEM`] long, and
+/// `image` when nothing is left.
+pub fn asset_stem(name: Option<&str>) -> String {
+    let name = name.and_then(layout::percent_decode).unwrap_or_default();
+    let base = name.rsplit(['/', '\\']).next().unwrap_or_default();
+    let stem = match base.rfind('.') {
+        Some(dot) if dot > 0 => &base[..dot],
+        _ => base,
+    };
+    let stem: String = stem
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .take(MAX_STEM)
+        .collect();
+    if stem.chars().all(|c| c == '_') {
+        "image".to_owned()
+    } else {
+        stem
+    }
+}
+
+/// The markdown that shows the image `assets/<file_name>` in the note at `source`
+/// (relative to the notes root): its destination is relative to the note's folder.
+pub fn asset_markdown(source: &Path, stem: &str, file_name: &str) -> String {
+    let ext = file_name.rsplit('.').next().unwrap_or_default();
+    let up = source.parent().map_or(0, |p| p.components().count());
+    format!(
+        "![{stem}.{ext}]({}{ASSETS_DIR}/{file_name})",
+        "../".repeat(up)
+    )
+}
+
+/// Writes a new image to `assets/<stem>_<millis>_<n>.<ext>` in the notes `root`
+/// (canonical), with the smallest `n` that names no existing file, and returns its path
+/// relative to `root`. An existing file is never replaced: the image is written to a
+/// hidden temporary file and then hard-linked to its name, which fails when the name is
+/// taken. `assets/` is created when missing, and must not lead out of `root/assets`.
+pub fn write_new_asset(
+    root: &Path,
+    stem: &str,
+    ext: &str,
+    millis: u128,
+    bytes: &[u8],
+) -> Result<PathBuf, Unsafe> {
+    let dir = root.join(ASSETS_DIR);
+    fs::create_dir_all(&dir)?;
+    if fs::canonicalize(&dir)? != dir {
+        return Err(Unsafe::Outside);
+    }
+    let tmp = dir.join(format!(
+        ".{stem}.hermetic-{}-{}.tmp",
+        std::process::id(),
+        TEMP_COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    let result = (|| {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        drop(file);
+        for n in 0.. {
+            let name = format!("{stem}_{millis}_{n}.{ext}");
+            let path = dir.join(&name);
+            match fs::hard_link(&tmp, &path) {
+                Ok(()) => return Ok(name),
+                Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(e) => {
+                    // Some filesystems have no hard links: write in place, still never
+                    // replacing a file, but no longer atomically.
+                    eprintln!(
+                        "warning: cannot link {}: {e}; writing it directly",
+                        path.display()
+                    );
+                    match fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .open(&path)
+                    {
+                        Ok(mut file) => {
+                            let written = file.write_all(bytes).and_then(|()| file.sync_all());
+                            if written.is_err() {
+                                let _ = fs::remove_file(&path);
+                            }
+                            return written.map(|()| name);
+                        }
+                        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
+                        Err(e) => return Err(e),
+                    }
+                }
+            }
+        }
+        unreachable!("some name is free")
+    })();
+    let _ = fs::remove_file(&tmp);
+    Ok(PathBuf::from(ASSETS_DIR).join(result?))
 }
 
 /// The trash, in the notes root: a dot-directory, so the build and the watcher ignore it.
@@ -665,6 +794,92 @@ mod tests {
                 .flatten()
                 .all(|e| !e.file_name().to_string_lossy().ends_with(".tmp"))
         );
+        fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn image_formats() {
+        assert_eq!(sniff_image(b"\x89PNG\r\n\x1a\n...."), Some("png"));
+        assert_eq!(sniff_image(&[0xFF, 0xD8, 0xFF, 0xE0, 0]), Some("jpg"));
+        assert_eq!(sniff_image(b"GIF89a...."), Some("gif"));
+        assert_eq!(sniff_image(b"GIF87a...."), Some("gif"));
+        assert_eq!(sniff_image(b"RIFF\x10\0\0\0WEBPVP8 "), Some("webp"));
+        for bytes in [
+            &b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>"[..],
+            b"<?xml version=\"1.0\"?><svg/>",
+            b"<!doctype html><script>alert(1)</script>",
+            b"RIFF\x10\0\0\0WAVEfmt ",
+            b"\x89PN",
+            b"",
+        ] {
+            assert_eq!(sniff_image(bytes), None, "{bytes:?}");
+        }
+    }
+
+    #[test]
+    fn asset_stems() {
+        assert_eq!(asset_stem(None), "image");
+        assert_eq!(asset_stem(Some("image.png")), "image");
+        assert_eq!(
+            asset_stem(Some("Screenshot%20from%202026-10-17.png")),
+            "Screenshot_from_2026-10-17"
+        );
+        assert_eq!(asset_stem(Some("%E6%97%A5%E6%9C%AC.png")), "image");
+        assert_eq!(asset_stem(Some("caf%C3%A9.jpeg")), "caf_");
+        assert_eq!(asset_stem(Some("..%2F..%2Fetc%2Fpasswd")), "passwd");
+        assert_eq!(asset_stem(Some("C:%5Cpics%5Cmap.v2.gif")), "map_v2");
+        assert_eq!(asset_stem(Some(".hidden")), "_hidden");
+        assert_eq!(asset_stem(Some("%ZZ.png")), "_ZZ");
+        assert_eq!(asset_stem(Some(&"a".repeat(100))).len(), 64);
+    }
+
+    #[test]
+    fn asset_destinations() {
+        let md = |source: &str| asset_markdown(Path::new(source), "shot", "shot_1_0.png");
+        assert_eq!(md("index.md"), "![shot.png](assets/shot_1_0.png)");
+        assert_eq!(
+            md("journals/2026_10_17.md"),
+            "![shot.png](../assets/shot_1_0.png)"
+        );
+        assert_eq!(md("pages/auth.md"), "![shot.png](../assets/shot_1_0.png)");
+        assert_eq!(
+            md("pages/Project X/Auth.md"),
+            "![shot.png](../../assets/shot_1_0.png)"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn new_assets() {
+        let base = std::env::temp_dir().join(format!("hermetic-assets-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let root = base.join("notes");
+        fs::create_dir_all(&root).unwrap();
+        let root = fs::canonicalize(&root).unwrap();
+
+        let first = write_new_asset(&root, "shot", "png", 7, b"one").unwrap();
+        let second = write_new_asset(&root, "shot", "png", 7, b"two").unwrap();
+        assert_eq!(first, Path::new("assets/shot_7_0.png"));
+        assert_eq!(second, Path::new("assets/shot_7_1.png"));
+        assert_eq!(fs::read(root.join(&first)).unwrap(), b"one");
+        assert_eq!(fs::read(root.join(&second)).unwrap(), b"two");
+        let names: Vec<_> = fs::read_dir(root.join("assets"))
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(names.len(), 2, "no temporary files left: {names:?}");
+
+        // `assets` leading out of the notes.
+        let other = base.join("other");
+        fs::create_dir_all(&other).unwrap();
+        fs::remove_dir_all(root.join("assets")).unwrap();
+        std::os::unix::fs::symlink(&other, root.join("assets")).unwrap();
+        assert!(matches!(
+            write_new_asset(&root, "shot", "png", 7, b"x"),
+            Err(Unsafe::Outside)
+        ));
+        assert_eq!(fs::read_dir(&other).unwrap().count(), 0);
         fs::remove_dir_all(&base).unwrap();
     }
 

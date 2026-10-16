@@ -745,3 +745,229 @@ fn delete_never_leaves_the_notes() {
     // Not even an empty directory was created there.
     assert_eq!(fs::read_dir(outside.path()).unwrap().count(), 0);
 }
+
+const PNG: &[u8] = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR fake png";
+
+/// Sends a request with a binary body, or only a `Content-Length` of `length` and no
+/// body when given; returns the status, the response head, and the response body.
+fn send_bytes(
+    addr: SocketAddr,
+    method: &str,
+    target: &str,
+    headers: &[(&str, String)],
+    body: &[u8],
+    length: Option<usize>,
+) -> (u16, String, Vec<u8>) {
+    let mut stream = TcpStream::connect(addr).unwrap();
+    let mut head = format!(
+        "{method} {target} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nContent-Length: {}\r\n",
+        addr.port(),
+        length.unwrap_or(body.len())
+    );
+    for (name, value) in headers {
+        head.push_str(&format!("{name}: {value}\r\n"));
+    }
+    head.push_str("\r\n");
+    stream.write_all(head.as_bytes()).unwrap();
+    stream.write_all(body).unwrap();
+    stream.shutdown(std::net::Shutdown::Write).unwrap();
+    let mut raw = Vec::new();
+    stream.read_to_end(&mut raw).unwrap();
+    let end = raw
+        .windows(4)
+        .position(|w| w == b"\r\n\r\n")
+        .expect("header end");
+    let head = String::from_utf8(raw[..end].to_vec()).unwrap();
+    (head[9..12].parse().unwrap(), head, raw[end + 4..].to_vec())
+}
+
+fn asset_url(path: &str) -> String {
+    format!("/_hermetic/asset?path={}", path.replace(' ', "%20"))
+}
+
+/// The headers hermetic's editor sends with an upload.
+fn upload_headers(addr: SocketAddr, name: Option<&str>) -> Vec<(&'static str, String)> {
+    let mut headers = vec![
+        ("Origin", format!("http://127.0.0.1:{}", addr.port())),
+        ("X-Hermetic-Edit", "1".to_owned()),
+    ];
+    if let Some(name) = name {
+        headers.push(("X-Hermetic-Name", name.to_owned()));
+    }
+    headers
+}
+
+/// Uploads `body` for the page at `path`; returns the status and the response text.
+fn upload(addr: SocketAddr, path: &str, name: Option<&str>, body: &[u8]) -> (u16, String) {
+    let (status, _, body) = send_bytes(
+        addr,
+        "POST",
+        &asset_url(path),
+        &upload_headers(addr, name),
+        body,
+        None,
+    );
+    (status, String::from_utf8(body).unwrap())
+}
+
+/// Files in the notes' `assets/` folder.
+fn assets(notes: &Path) -> Vec<String> {
+    common::tree(&notes.join("assets"))
+        .keys()
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect()
+}
+
+#[test]
+fn upload_for_a_journal_day() {
+    let notes = Notes::new(&[("pages/auth.md", "- a\n")]);
+    let server = start(notes.path());
+    let before = server.rebuilds();
+    let (status, json) = upload(
+        server.addr,
+        "journals/2026-10-17.html",
+        Some("Screenshot%20from%202026-10-17.png"),
+        PNG,
+    );
+    assert_eq!(status, 201, "{json}");
+    let file = field(&json, "file");
+    let name = file.strip_prefix("assets/").expect("in assets/");
+    let (stem, rest) = name.split_at("Screenshot_from_2026-10-17_".len());
+    assert_eq!(stem, "Screenshot_from_2026-10-17_");
+    let millis = rest.strip_suffix("_0.png").expect("first of its name");
+    assert!(millis.parse::<u128>().unwrap() > 1_700_000_000_000);
+    assert_eq!(
+        field(&json, "markdown"),
+        format!("![Screenshot_from_2026-10-17.png](../assets/{name})")
+    );
+    assert_eq!(fs::read(notes.path().join(&file)).unwrap(), PNG);
+    assert_eq!(assets(notes.path()), [name]);
+    // The upload does not start the page's note.
+    assert!(!notes.path().join("journals").exists());
+    // The response comes after the rebuild: the image is served already.
+    let (status, head, body) = send_bytes(server.addr, "GET", &format!("/{file}"), &[], b"", None);
+    assert_eq!(status, 200);
+    assert!(head.contains("Content-Type: image/png\r\n"), "{head}");
+    assert_eq!(body, PNG);
+    std::thread::sleep(Duration::from_millis(400));
+    assert_eq!(server.rebuilds(), before + 1, "one rebuild per upload");
+}
+
+#[test]
+fn upload_destinations_are_relative_to_the_note() {
+    let notes = Notes::new(&[("index.md", "- home\n")]);
+    let server = start(notes.path());
+    let (status, json) = upload(server.addr, "index.html", None, PNG);
+    assert_eq!(status, 201, "{json}");
+    let markdown = field(&json, "markdown");
+    assert!(
+        markdown.starts_with("![image.png](assets/image_"),
+        "{markdown}"
+    );
+    let (status, json) = upload(
+        server.addr,
+        "pages/Project X/Auth.html",
+        Some("seq.gif"),
+        b"GIF89a....",
+    );
+    assert_eq!(status, 201, "{json}");
+    let markdown = field(&json, "markdown");
+    assert!(
+        markdown.starts_with("![seq.gif](../../assets/seq_"),
+        "{markdown}"
+    );
+    assert!(markdown.ends_with("_0.gif)"), "{markdown}");
+    assert!(!notes.path().join("pages").exists());
+}
+
+#[test]
+fn uploads_never_replace_files() {
+    let notes = Notes::empty();
+    let server = start(notes.path());
+    let a = upload(server.addr, "index.html", Some("a.png"), PNG);
+    let b = upload(
+        server.addr,
+        "index.html",
+        Some("a.png"),
+        b"\xFF\xD8\xFF\xE0 jpeg",
+    );
+    assert_eq!((a.0, b.0), (201, 201));
+    let (a, b) = (field(&a.1, "file"), field(&b.1, "file"));
+    assert_ne!(a, b);
+    assert!(b.ends_with(".jpg"), "{b}");
+    assert_eq!(fs::read(notes.path().join(&a)).unwrap(), PNG);
+    assert_eq!(assets(notes.path()).len(), 2);
+}
+
+#[test]
+fn refused_uploads() {
+    let notes = Notes::new(&[("pages/auth.md", "- a\n")]);
+    let server = start(notes.path());
+    let addr = server.addr;
+    let svg = b"<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>";
+    assert_eq!(
+        upload(addr, "pages/auth.html", Some("photo.png"), svg).0,
+        415
+    );
+    assert_eq!(
+        upload(
+            addr,
+            "pages/auth.html",
+            Some("photo.png"),
+            b"<!doctype html>"
+        )
+        .0,
+        415
+    );
+    assert_eq!(upload(addr, "tasks.html", None, PNG).0, 404);
+    assert_eq!(upload(addr, "refs/pages/auth/2.html", None, PNG).0, 404);
+    let too_large = send_bytes(
+        addr,
+        "POST",
+        &asset_url("pages/auth.html"),
+        &upload_headers(addr, None),
+        PNG,
+        Some(40 * 1024 * 1024),
+    );
+    assert_eq!(too_large.0, 413);
+    // Only `POST` uploads.
+    for method in ["GET", "PUT", "DELETE"] {
+        let r = send_bytes(
+            addr,
+            method,
+            &asset_url("pages/auth.html"),
+            &upload_headers(addr, None),
+            PNG,
+            None,
+        );
+        assert_eq!(r.0, 405, "{method}");
+    }
+    // Another website, or a form without the edit header.
+    let forged = |headers: Vec<(&'static str, String)>, why: &str| {
+        let r = send_bytes(addr, "POST", &asset_url("index.html"), &headers, PNG, None);
+        assert_eq!(r.0, 403, "{why}");
+    };
+    forged(
+        vec![
+            ("Origin", "https://evil.example".to_owned()),
+            ("X-Hermetic-Edit", "1".to_owned()),
+        ],
+        "another website",
+    );
+    forged(
+        vec![("Origin", format!("http://127.0.0.1:{}", addr.port()))],
+        "without the edit header",
+    );
+    assert!(!notes.path().join("assets").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn uploads_stay_in_the_notes() {
+    let outside = Notes::empty();
+    let notes = Notes::new(&[("pages/auth.md", "- a\n")]);
+    std::os::unix::fs::symlink(outside.path(), notes.path().join("assets")).unwrap();
+    let server = start(notes.path());
+    assert_eq!(upload(server.addr, "pages/auth.html", None, PNG).0, 403);
+    assert!(common::tree(outside.path()).is_empty());
+}

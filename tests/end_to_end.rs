@@ -16,6 +16,7 @@ fn dump(g: &Graph, diags: &[Diagnostic]) -> String {
     let target = |t: RefTarget| match t {
         RefTarget::Page(p) => format!("page {:?}", g.page(p).name),
         RefTarget::Block(b) => format!("block {:?}", g.block(b).content),
+        RefTarget::Attachment(a) => format!("attachment {:?}", g.attachment(a)),
         RefTarget::Unresolved => "unresolved".to_owned(),
     };
     for (id, page) in g.pages() {

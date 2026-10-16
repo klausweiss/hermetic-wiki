@@ -106,6 +106,74 @@ fn external_and_image_links_are_ignored() {
 }
 
 #[test]
+fn attachments_resolve_against_their_note() {
+    let notes = Notes::new(&[
+        (
+            "journals/2026-10-17.md",
+            "- ![shot](../assets/shot.png) [[auth]]",
+        ),
+        (
+            "pages/Project X/Auth.md",
+            "- ![seq](../../assets/seq%20one.png) [spec](/assets/spec.pdf#page=2)",
+        ),
+        ("pages/auth.md", "- ![flow](auth-flow.png)"),
+    ]);
+    let (g, diags) = notes.load();
+    assert!(diags.is_empty(), "{diags:?}");
+    let attachments = |text: &str| -> Vec<String> {
+        g.block(block(&g, text))
+            .refs
+            .iter()
+            .filter_map(|r| match r.target {
+                RefTarget::Attachment(a) => {
+                    assert_eq!(r.kind, RawRefKind::Attachment);
+                    Some(g.attachment(a).to_string_lossy().into_owned())
+                }
+                _ => None,
+            })
+            .collect()
+    };
+    assert_eq!(
+        attachments("![shot](../assets/shot.png) [[auth]]"),
+        ["assets/shot.png"]
+    );
+    assert_eq!(
+        attachments("![seq](../../assets/seq%20one.png) [spec](/assets/spec.pdf#page=2)"),
+        ["assets/seq one.png", "assets/spec.pdf"]
+    );
+    assert_eq!(
+        attachments("![flow](auth-flow.png)"),
+        ["pages/auth-flow.png"]
+    );
+}
+
+#[test]
+fn attachments_are_not_page_references() {
+    let notes = Notes::new(&[
+        (
+            "journals/2026-10-17.md",
+            "- ![x](../pages/auth.png) [[auth]]",
+        ),
+        ("pages/auth.md", "- ![y](../assets/y.png)"),
+    ]);
+    let (g, _) = notes.load();
+    let auth = page(&g, "auth");
+    assert_eq!(g.backlinks(auth).len(), 1);
+    assert!(g.related(auth).is_empty());
+}
+
+#[test]
+fn attachments_outside_the_notes_are_left_alone() {
+    let notes = Notes::new(&[(
+        "pages/a.md",
+        "- ![x](../../outside.png) ![y](../) ![z](https://example.com/z.png)",
+    )]);
+    let (g, diags) = notes.load();
+    assert!(diags.is_empty(), "{diags:?}");
+    assert!(g.blocks().all(|(_, b)| b.refs.is_empty()));
+}
+
+#[test]
 fn resolved_block_ref() {
     let notes = Notes::new(&[
         ("pages/redis.md", "- the TTL was wrong\n  id:: auth-ttl-bug"),

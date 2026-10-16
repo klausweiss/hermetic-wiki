@@ -140,3 +140,58 @@ export function advanceTask(body: string): string | null {
   const next = MARKERS[(current + 1) % MARKERS.length]!;
   return next + body.slice(MARKERS[current]!.length);
 }
+
+/** Where an image goes: a block and a cursor offset in its body, or the end of its text
+ * (`offset` null), or a new last top-level block (`node` null or no longer in the doc). */
+export interface Insertion {
+  node: Node | null;
+  offset: number | null;
+}
+
+/** The inserted range of a block's body. */
+export interface Inserted {
+  node: Node;
+  start: number;
+  end: number;
+}
+
+/**
+ * The end of a block's text before the property lines that end it (the first line
+ * always counts as text).
+ */
+export function textEnd(body: string): number {
+  const lines = body.split("\n");
+  let last = lines.length - 1;
+  while (last > 0 && PROPERTY.test(lines[last]!)) last--;
+  return lines.slice(0, last + 1).join("\n").length;
+}
+
+/**
+ * Inserts image markdown at `at`: at the cursor offset as is, or at the end of the
+ * block's text after a space. `more` marks a further image of the same paste or drop,
+ * which goes on its own line. Without the block, it starts a new last top-level block.
+ */
+export function insertImage(doc: Doc, at: Insertion, markdown: string, more: boolean): Inserted {
+  const node = at.node && locate(doc, at.node) ? at.node : null;
+  if (!node) {
+    const created = newNode(markdown);
+    doc.roots.push(created);
+    return { node: created, start: 0, end: markdown.length };
+  }
+  const body = node.body;
+  let offset: number;
+  let text: string;
+  if (more) {
+    offset = Math.min(at.offset ?? body.length, body.length);
+    text = `\n${markdown}`;
+  } else if (at.offset === null) {
+    offset = textEnd(body);
+    const before = body.slice(0, offset);
+    text = before === "" || /\s$/.test(before) ? markdown : ` ${markdown}`;
+  } else {
+    offset = Math.max(0, Math.min(at.offset, body.length));
+    text = markdown;
+  }
+  node.body = body.slice(0, offset) + text + body.slice(offset);
+  return { node, start: offset, end: offset + text.length };
+}

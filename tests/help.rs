@@ -53,6 +53,7 @@ fn refs(snippet: &str) -> Vec<(RawRefKind, String)> {
             let target = match r.target {
                 RefTarget::Page(p) => g.page(p).name.clone(),
                 RefTarget::Block(b) => format!("(({}))", g.block(b).id.as_deref().unwrap()),
+                RefTarget::Attachment(a) => g.attachment(a).to_string_lossy().into_owned(),
                 RefTarget::Unresolved => "unresolved".to_owned(),
             };
             (r.kind, target)

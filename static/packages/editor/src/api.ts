@@ -3,6 +3,13 @@
 import type { Payload } from "./model";
 
 export const SOURCE_PATH = "_hermetic/source";
+export const ASSET_PATH = "_hermetic/asset";
+
+/** An image stored by the server: its file in the notes and the markdown that shows it. */
+export interface Uploaded {
+  file: string;
+  markdown: string;
+}
 
 export type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -45,6 +52,20 @@ export class SourceApi {
     });
     if (r.status === 409) throw new Conflict((await r.json()) as Payload);
     if (!r.ok) throw new Refused(r.status);
+  }
+
+  /**
+   * Stores an image for the page at site path `path` in the notes' `assets/` folder.
+   * Refusals (e.g. 413 too large, 415 not an image) throw `Refused`; network errors throw
+   * TypeError.
+   */
+  async upload(path: string, image: Blob, name = ""): Promise<Uploaded> {
+    const url = `${new URL(ASSET_PATH, this.root).href}?path=${encodeURIComponent(path)}`;
+    const headers: Record<string, string> = { "X-Hermetic-Edit": "1" };
+    if (name) headers["X-Hermetic-Name"] = encodeURIComponent(name);
+    const r = await this.fetchFn(url, { method: "POST", headers, body: image });
+    if (!r.ok) throw new Refused(r.status);
+    return (await r.json()) as Uploaded;
   }
 
   /** Saves `text` as the page's source, based on `version`. Network errors throw TypeError. */

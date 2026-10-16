@@ -57,6 +57,9 @@ pub enum RawRefKind {
     Block,
     /// `[text](path.md)`; `text` holds the raw destination.
     MdLink,
+    /// `![alt](path)` or `[text](path)` to a file in the notes that is not a note;
+    /// `text` holds the raw destination.
+    Attachment,
 }
 
 /// A reference as written, before resolution.
@@ -67,7 +70,8 @@ pub struct RawRef {
     pub text: String,
     /// Byte range of the whole reference syntax within the scanned text.
     pub range: Range<usize>,
-    /// For markdown links: byte range of the destination token (including any `<>`).
+    /// For markdown links and attachments: byte range of the destination token
+    /// (including any `<>`).
     pub dest: Option<Range<usize>>,
 }
 
@@ -504,15 +508,23 @@ fn scan_chunk(s: &str, base: usize, out: &mut Vec<RawRef>) {
                 None => i += 1,
             },
             b'!' if next == Some(b'[') && b.get(i + 2) != Some(&b'[') => {
-                // Images are never references; skip them whole.
-                i = inline_link(s, i + 1).map_or(i + 1, |l| l.end);
+                // Images reference nothing but their file; their alt text is skipped.
+                match inline_link(s, i + 1) {
+                    Some(link) => {
+                        if is_attachment_link(&link.dest) {
+                            out.push(link_ref(RawRefKind::Attachment, &link, base, i));
+                        }
+                        i = link.end;
+                    }
+                    None => i += 1,
+                }
             }
             b'[' => match inline_link(s, i) {
                 Some(link) => {
                     if is_note_link(&link.dest) {
-                        let mut r = raw(RawRefKind::MdLink, &link.dest, base + i..base + link.end);
-                        r.dest = Some(base + link.dest_range.start..base + link.dest_range.end);
-                        out.push(r);
+                        out.push(link_ref(RawRefKind::MdLink, &link, base, i));
+                    } else if is_attachment_link(&link.dest) {
+                        out.push(link_ref(RawRefKind::Attachment, &link, base, i));
                     }
                     // Keep scanning the link text for other references.
                     skip = Some((link.text_end, link.end));
@@ -532,6 +544,13 @@ fn raw(kind: RawRefKind, text: &str, range: Range<usize>) -> RawRef {
         range,
         dest: None,
     }
+}
+
+/// A reference for the inline link starting at `i` (its `[`, or the `!` of an image).
+fn link_ref(kind: RawRefKind, link: &InlineLink, base: usize, i: usize) -> RawRef {
+    let mut r = raw(kind, &link.dest, base + i..base + link.end);
+    r.dest = Some(base + link.dest_range.start..base + link.dest_range.end);
+    r
 }
 
 /// Returns the index after an inline code span starting at `i`, or after the literal
@@ -713,6 +732,13 @@ fn unescape(s: &str) -> String {
 fn is_note_link(dest: &str) -> bool {
     let path = dest.split('#').next().unwrap_or_default();
     !path.is_empty() && !has_scheme(path) && path.ends_with(".md")
+}
+
+/// Whether a link or image destination points at a file in the notes other than a note:
+/// a relative or root-relative path without a URL scheme, not protocol-relative.
+fn is_attachment_link(dest: &str) -> bool {
+    let path = dest.split('#').next().unwrap_or_default();
+    !path.is_empty() && !has_scheme(path) && !path.starts_with("//") && !path.ends_with(".md")
 }
 
 fn has_scheme(s: &str) -> bool {
@@ -1029,7 +1055,6 @@ mod tests {
         );
         assert!(refs("[site](https://example.com/a.md)").is_empty());
         assert!(refs("![diagram](pic.md)").is_empty());
-        assert!(refs("[x](a.txt)").is_empty());
         assert!(refs("[x] (a.md)").is_empty());
         assert!(refs("`[x](a.md)`").is_empty());
         assert_eq!(
@@ -1047,11 +1072,53 @@ mod tests {
     }
 
     #[test]
+    fn attachments() {
+        assert_eq!(
+            refs("![flow](../assets/flow.png)"),
+            one(RawRefKind::Attachment, "../assets/flow.png")
+        );
+        assert_eq!(
+            refs("[spec](files/spec.pdf#page=2)"),
+            one(RawRefKind::Attachment, "files/spec.pdf#page=2")
+        );
+        assert_eq!(
+            refs("![x](</assets/a b.png> \"t\")"),
+            one(RawRefKind::Attachment, "/assets/a b.png")
+        );
+        for text in [
+            "![x](https://example.com/x.png)",
+            "![x](data:image/png;base64,AAAA)",
+            "![x](//cdn.example.com/x.png)",
+            "[x](#setup)",
+            "[x](mailto:a@example.com)",
+            "`![x](a.png)`",
+            "![x] (a.png)",
+        ] {
+            assert!(refs(text).is_empty(), "{text:?}");
+        }
+        // The alt text of an image is not scanned for references.
+        assert_eq!(
+            refs("![see [[auth]]](a.png)"),
+            one(RawRefKind::Attachment, "a.png")
+        );
+        // A link around an image: both are attachments, the link text is still scanned.
+        assert_eq!(
+            refs("[![x](a.png)](b.png)"),
+            vec![
+                (RawRefKind::Attachment, "b.png".into()),
+                (RawRefKind::Attachment, "a.png".into())
+            ]
+        );
+    }
+
+    #[test]
     fn markdown_link_destination_ranges() {
         for (text, dest) in [
             ("see [x](a.md) now", "a.md"),
             ("[x](<a b.md> \"t\")", "<a b.md>"),
             ("[x](a.md#s)", "a.md#s"),
+            ("see ![x](a.png) now", "a.png"),
+            ("![x](<a b.png> \"t\")", "<a b.png>"),
         ] {
             let r = &scan_refs(text)[0];
             assert_eq!(&text[r.dest.clone().unwrap()], dest, "{text:?}");
@@ -1072,7 +1139,7 @@ mod tests {
 
     #[test]
     fn ranges_point_at_source_text() {
-        let text = "x [[a]] y #b z ((c)) [t](d.md) #[[e f]]";
+        let text = "x [[a]] y #b z ((c)) [t](d.md) #[[e f]] ![i](g.png)";
         for r in scan_refs(text) {
             let s = &text[r.range.clone()];
             match r.kind {
@@ -1081,9 +1148,10 @@ mod tests {
                 RawRefKind::Tag => assert_eq!(s, "#[[e f]]"),
                 RawRefKind::Block => assert_eq!(s, "((c))"),
                 RawRefKind::MdLink => assert_eq!(s, "[t](d.md)"),
+                RawRefKind::Attachment => assert_eq!(s, "![i](g.png)"),
             }
         }
-        assert_eq!(scan_refs(text).len(), 5);
+        assert_eq!(scan_refs(text).len(), 6);
     }
 
     proptest::proptest! {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { Conflict, type FetchFn, SaveQueue, type SaveState, SourceApi } from "./api";
+import { Conflict, type FetchFn, Refused, SaveQueue, type SaveState, SourceApi } from "./api";
 import type { Payload } from "./model";
 
 const ROOT = new URL("http://127.0.0.1:8000/");
@@ -44,6 +44,45 @@ describe("SourceApi", () => {
     expect((init.headers as Record<string, string>)["X-Hermetic-Edit"]).toBe("1");
     expect((init.headers as Record<string, string>)["X-Hermetic-Version"]).toBe("v1");
     expect(init.body).toBe("- a\n");
+  });
+
+  test("uploads post the image with its name for the page", async () => {
+    const f = fakeFetch(() => json(201, { file: "assets/a_1_0.png", markdown: "![a.png](../assets/a_1_0.png)" }));
+    const api = new SourceApi(ROOT, f.fetch);
+    const image = new Blob(["png"], { type: "image/png" });
+    const r = await api.upload("pages/Project X/A.html", image, "Screen shot é.png");
+    expect(r.markdown).toBe("![a.png](../assets/a_1_0.png)");
+    expect(f.calls[0]!.url).toBe("http://127.0.0.1:8000/_hermetic/asset?path=pages%2FProject%20X%2FA.html");
+    const init = f.calls[0]!.init!;
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe(image);
+    const headers = init.headers as Record<string, string>;
+    expect(headers["X-Hermetic-Edit"]).toBe("1");
+    expect(headers["X-Hermetic-Name"]).toBe("Screen%20shot%20%C3%A9.png");
+    await api.upload("index.html", image);
+    expect("X-Hermetic-Name" in (f.calls[1]!.init!.headers as Record<string, string>)).toBeFalse();
+  });
+
+  test("refused uploads carry their status; network errors are TypeErrors", async () => {
+    for (const status of [413, 415, 404]) {
+      const api = new SourceApi(ROOT, fakeFetch(() => new Response("", { status })).fetch);
+      let caught: unknown;
+      try {
+        await api.upload("index.html", new Blob(["x"]));
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught instanceof Refused).toBeTrue();
+      expect((caught as Refused).status).toBe(status);
+    }
+    const offline = new SourceApi(ROOT, fakeFetch(() => "offline").fetch);
+    let caught: unknown;
+    try {
+      await offline.upload("index.html", new Blob(["x"]));
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught instanceof TypeError).toBeTrue();
   });
 
   test("409 is a conflict with the current page", async () => {

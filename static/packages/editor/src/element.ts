@@ -5,7 +5,7 @@
 
 import { EDITING_ATTR, EDIT_PROPERTIES, OPEN_TODAY, PAGES_CHANGED, carrySidebar, icon, readEnv, whenParsed } from "@hermetic/core";
 
-import { Conflict, type Refused, SaveQueue, type SaveState, SourceApi } from "./api";
+import { Conflict, Refused, SaveQueue, type SaveState, SourceApi } from "./api";
 import { type Doc, type Node, type Payload, flatten, fromPayload, newNode } from "./model";
 import { MARKERS, applied, toggle } from "./format";
 import * as ops from "./ops";
@@ -33,6 +33,16 @@ interface Active {
   node: Node;
   area: HTMLTextAreaElement;
 }
+
+/** Images of one paste or drop, inserted one by one as their uploads finish. */
+interface Upload {
+  at: ops.Insertion;
+  /** Whether an image of it was inserted already (the next goes on its own line). */
+  more: boolean;
+}
+
+/** The image formats the server accepts (it checks the bytes itself). */
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
 /** Extension points for autocomplete and the bullet menu (set up by other modules). */
 export interface EditorPlugin {
@@ -69,6 +79,8 @@ export class HermeticEditor extends HTMLElement {
   private section: HTMLElement | null = null;
   private status: HTMLElement | null = null;
   private ready = false;
+  /** Pastes and drops whose images are still being uploaded. */
+  private uploads = new Set<Upload>();
 
   connectedCallback(): void {
     whenParsed(() => void this.setup());
@@ -118,6 +130,7 @@ export class HermeticEditor extends HTMLElement {
     });
     document.documentElement.setAttribute(EDITING_ATTR, "");
     document.addEventListener(EDIT_PROPERTIES, () => this.editProperties());
+    this.acceptDrops(article);
 
     this.queue = new SaveQueue(this.api, path, payload.version, {
       text: () => serialize(this.doc!),
@@ -168,7 +181,7 @@ export class HermeticEditor extends HTMLElement {
 
   /** Whether changes are not yet stored in the file. */
   unsaved(): boolean {
-    return (this.doc !== null && !sameText(serialize(this.doc), this.stored)) || (this.queue?.dirty ?? false);
+    return this.uploads.size > 0 || (this.doc !== null && !sameText(serialize(this.doc), this.stored)) || (this.queue?.dirty ?? false);
   }
 
   // --- Header: "Today" and the save status ------------------------------------------
@@ -242,6 +255,8 @@ export class HermeticEditor extends HTMLElement {
 
   private showState(state: SaveState): void {
     if (!this.status || !this.path) return;
+    // Images still being uploaded are changes not yet saved.
+    if (state === "saved" && this.uploads.size > 0) state = "unsaved";
     this.status.dataset.state = state;
     this.status.textContent = state === "saved" ? "Saved" : state === "saving" ? "Saving…" : "Not saved";
     this.status.classList.remove("faded");
@@ -264,6 +279,8 @@ export class HermeticEditor extends HTMLElement {
     this.showPageMenu(payload);
     const before = this.doc ? flatten(this.doc).map((e) => e.node) : [];
     const activeIndex = this.active ? before.indexOf(this.active.node) : -1;
+    // Blocks images are being uploaded for, by position, like the block being edited.
+    const uploadIndex = [...this.uploads].map((u) => (u.at.node ? before.indexOf(u.at.node) : -1));
     this.doc = fromPayload(payload);
     // A journal day emptied while being written in has no file and no blocks: keep the
     // empty block being edited.
@@ -271,6 +288,9 @@ export class HermeticEditor extends HTMLElement {
     this.stored = payload.text;
     if (this.queue) this.queue.version = payload.version;
     const after = flatten(this.doc).map((e) => e.node);
+    [...this.uploads].forEach((u, i) => {
+      u.at.node = after[uploadIndex[i]!] ?? null;
+    });
     after.forEach((node, i) => {
       const li = node.anchor ? html?.querySelector(`li.block[id="${CSS.escape(node.anchor)}"]`) : null;
       const body = li?.querySelector<HTMLElement>(":scope > .block-body");
@@ -644,6 +664,7 @@ export class HermeticEditor extends HTMLElement {
       area.setAttribute("aria-label", "Block text");
       area.addEventListener("input", () => this.onInput(area));
       area.addEventListener("keydown", (e) => this.onKey(e, area));
+      area.addEventListener("paste", (e) => this.onPaste(e, area));
       area.addEventListener("blur", () => {
         // Let clicks on lists or menus that keep editing take focus back first.
         setTimeout(() => {
@@ -773,6 +794,106 @@ export class HermeticEditor extends HTMLElement {
     }
   }
 
+  // --- Images -------------------------------------------------------------------------
+
+  /** Pasting images (and no text) into the block being edited adds them at the cursor. */
+  private onPaste(e: ClipboardEvent, area: HTMLTextAreaElement): void {
+    const data = e.clipboardData;
+    if (!this.active || !data || data.files.length === 0) return;
+    // Text wins: apps that copy text also put a picture of it on the clipboard.
+    if (data.getData("text/plain").trim() !== "") return;
+    e.preventDefault();
+    this.active.node.body = area.value;
+    void this.addImages([...data.files], { node: this.active.node, offset: area.selectionStart });
+  }
+
+  /**
+   * Files dropped on a block row go into that block, and elsewhere in the page's own
+   * blocks into a new last block. Dropped anywhere else on the page they are ignored,
+   * and the browser never opens them in place of the page.
+   */
+  private acceptDrops(article: HTMLElement): void {
+    const files = (e: DragEvent) => e.dataTransfer?.types.includes("Files") ?? false;
+    const ownArea = (target: EventTarget | null): boolean => {
+      if (!(target instanceof Element) || !article.contains(target)) return false;
+      if (this.section?.contains(target)) return true;
+      // The article's own space below the blocks, not its header or other sections.
+      return target === article;
+    };
+    addEventListener("dragover", (e) => {
+      if (!files(e)) return;
+      e.preventDefault();
+      e.dataTransfer!.dropEffect = ownArea(e.target) ? "copy" : "none";
+    });
+    addEventListener("drop", (e) => {
+      if (!files(e)) return;
+      e.preventDefault();
+      if (!ownArea(e.target) || !this.doc) return;
+      const li = (e.target as Element).closest("li.block");
+      const node = li ? (this.nodes.get(li) ?? null) : null;
+      if (node && this.active?.node === node) node.body = this.active.area.value;
+      void this.addImages([...e.dataTransfer!.files], { node, offset: null });
+    });
+  }
+
+  /** Uploads the images among `files` one by one, inserting each as it is stored. */
+  private async addImages(files: File[], at: ops.Insertion): Promise<void> {
+    const images = files.filter((f) => IMAGE_TYPES.includes(f.type));
+    const problems = files
+      .filter((f) => !IMAGE_TYPES.includes(f.type))
+      .map((f) => `${f.name || "a file"}: only PNG, JPEG, GIF, and WebP images can be added`);
+    this.clearNotice("upload");
+    if (images.length > 0) {
+      const upload: Upload = { at, more: false };
+      this.uploads.add(upload);
+      this.showState("unsaved");
+      try {
+        for (const image of images) {
+          try {
+            const stored = await this.api.upload(this.path, image, image.name);
+            this.insertImage(upload, stored.markdown);
+          } catch (e) {
+            problems.push(`${image.name || "the image"}: ${uploadProblem(e)}`);
+          }
+        }
+      } finally {
+        this.uploads.delete(upload);
+      }
+      this.saveNow();
+    }
+    if (problems.length > 0) {
+      this.showNotice("upload", `Not added: ${problems.join("; ")}.`, null);
+    }
+  }
+
+  private insertImage(upload: Upload, markdown: string): void {
+    if (!this.doc) return;
+    const active = this.active;
+    const area = active?.area;
+    const [selStart, selEnd] = area ? [area.selectionStart, area.selectionEnd] : [0, 0];
+    if (active && area) active.node.body = area.value;
+    const r = ops.insertImage(this.doc, upload.at, markdown, upload.more);
+    upload.at = { node: r.node, offset: r.end };
+    upload.more = true;
+    if (active?.node === r.node && area) {
+      // Keep the cursor on the same text.
+      const shift = (i: number) => (i >= r.start ? i + (r.end - r.start) : i);
+      const focused = document.activeElement === area;
+      area.value = r.node.body;
+      area.setSelectionRange(shift(selStart), shift(selEnd));
+      autosize(area);
+      if (focused) area.focus({ preventScroll: true });
+    } else {
+      const focused = area !== undefined && document.activeElement === area;
+      this.render();
+      if (area && focused) {
+        area.focus({ preventScroll: true });
+        area.setSelectionRange(selStart, selEnd);
+      }
+    }
+    this.saveNow();
+  }
+
   // --- Saving results -------------------------------------------------------------------
 
   private onSaved(payload: Payload, text: string): void {
@@ -838,6 +959,14 @@ export class HermeticEditor extends HTMLElement {
   private clearNotice(kind: string): void {
     document.querySelector(`.edit-notice.edit-${kind}`)?.remove();
   }
+}
+
+/** Why an upload failed, for the notice. */
+function uploadProblem(e: unknown): string {
+  if (!(e instanceof Refused)) return "the server could not be reached";
+  if (e.status === 413) return "it is larger than 32 MiB";
+  if (e.status === 415) return "it is not a PNG, JPEG, GIF, or WebP image";
+  return `the server refused it (status ${e.status})`;
 }
 
 /** The marker a formatting key toggles: Ctrl/Cmd + B, I, E, or Shift+S. */

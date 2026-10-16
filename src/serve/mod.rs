@@ -328,6 +328,15 @@ fn handle(state: &State, mut stream: TcpStream) -> io::Result<()> {
         };
         return stream.write_all(&http::response(status, content_type, &body, false));
     }
+    if request.target.split(['?', '#']).next() == Some(http::ASSET_PATH) {
+        let (status, body) = asset(state, &request, &mut reader, same_machine);
+        let content_type = if status == 201 {
+            "application/json"
+        } else {
+            "text/plain"
+        };
+        return stream.write_all(&http::response(status, content_type, &body, false));
+    }
     let head = request.method == "HEAD";
     if request.method != "GET" && !head {
         return stream.write_all(&http::response(405, "text/plain", b"", false));
@@ -498,6 +507,55 @@ fn source(
     }
     commit(state);
     payload(Some(&bytes))
+}
+
+/// The edit API's image upload: stores a `POST`ed image in `assets/` for the page named
+/// by `path` and answers with the markdown that shows it (see `browser-editing`).
+fn asset(
+    state: &State,
+    request: &http::Request,
+    reader: &mut impl io::Read,
+    same_machine: bool,
+) -> (u16, Vec<u8>) {
+    if request.method != "POST" {
+        return (405, Vec::new());
+    }
+    if !same_machine || !edit::from_editor(request) {
+        return (403, Vec::new());
+    }
+    let body = match http::read_body(reader, request, edit::MAX_ASSET) {
+        Ok(body) => body,
+        Err(status) => return (status, Vec::new()),
+    };
+    let build = Arc::clone(&state.build.read().expect("build lock"));
+    let Some(page) = http::query_param(&request.target, "path")
+        .and_then(|path| edit::resolve(&build.editable, &path))
+    else {
+        return (404, b"not an editable page\n".to_vec());
+    };
+    drop(build);
+    let Some(ext) = edit::sniff_image(&body) else {
+        return (415, b"only PNG, JPEG, GIF, and WebP images\n".to_vec());
+    };
+    let stem = edit::asset_stem(request.header(edit::NAME_HEADER));
+    let millis = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis());
+
+    let _rebuilding = state.rebuilding.lock().expect("rebuild lock");
+    let file = match edit::write_new_asset(&state.notes, &stem, ext, millis, &body) {
+        Ok(file) => file,
+        Err(e) => return unsafe_status(e),
+    };
+    commit(state);
+    let name = file.file_name().unwrap_or_default().to_string_lossy();
+    let markdown = edit::asset_markdown(&edit::source_path(&page), &stem, &name);
+    let json = format!(
+        "{{\"file\":{},\"markdown\":{}}}",
+        json::string(&url_path(&file)),
+        json::string(&markdown)
+    );
+    (201, json.into_bytes())
 }
 
 /// The response for a write the edit checks refused or that failed.

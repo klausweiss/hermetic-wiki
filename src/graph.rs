@@ -18,6 +18,10 @@ pub struct PageId(pub u32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BlockId(pub u32);
 
+/// A file in the notes referenced by an image or link; see [`Graph::attachment`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct AttachmentId(pub u32);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PageKind {
     Journal(Date),
@@ -67,6 +71,8 @@ impl Page {
 pub enum RefTarget {
     Page(PageId),
     Block(BlockId),
+    /// A file in the notes that is not a note, named by an image or link.
+    Attachment(AttachmentId),
     /// Dangling block ref or markdown link to a missing file; display as broken.
     Unresolved,
 }
@@ -86,7 +92,8 @@ pub struct Ref {
     pub text: String,
     /// Byte range of the reference syntax within its location's text.
     pub range: Range<usize>,
-    /// For markdown links: byte range of the destination token within the same text.
+    /// For markdown links and attachments: byte range of the destination token within
+    /// the same text.
     pub dest: Option<Range<usize>>,
     pub location: RefLocation,
     pub target: RefTarget,
@@ -185,6 +192,9 @@ pub struct Graph {
     comentions: HashMap<(PageId, PageId), Vec<BlockId>>,
     /// Per page: co-mentioned pages.
     related: Vec<Vec<PageId>>,
+    /// Files referenced by images and links, relative to the root (they may not exist).
+    attachments: Vec<PathBuf>,
+    attachment_ids: HashMap<PathBuf, AttachmentId>,
 }
 
 impl Graph {
@@ -271,6 +281,11 @@ impl Graph {
         &self.blocks[id.0 as usize]
     }
 
+    /// Path, relative to the root, of a file referenced by an image or link.
+    pub fn attachment(&self, id: AttachmentId) -> &Path {
+        &self.attachments[id.0 as usize]
+    }
+
     /// Finds a page by name, case-insensitively.
     pub fn find_page(&self, name: &str) -> Option<PageId> {
         self.by_key.get(&NameKey::new(name)).copied()
@@ -321,7 +336,7 @@ impl Graph {
                     .refs
                     .iter()
                     .map(|r| r.target)
-                    .filter(|t| *t != RefTarget::Unresolved),
+                    .filter(|t| matches!(t, RefTarget::Page(_) | RefTarget::Block(_))),
             );
             cur = self.block(b).parent;
         }
@@ -502,8 +517,18 @@ impl Graph {
         match target {
             RefTarget::Page(p) => Some(p),
             RefTarget::Block(b) => Some(self.block(b).page),
-            RefTarget::Unresolved => None,
+            RefTarget::Attachment(_) | RefTarget::Unresolved => None,
         }
+    }
+
+    fn add_attachment(&mut self, path: PathBuf) -> AttachmentId {
+        if let Some(&id) = self.attachment_ids.get(&path) {
+            return id;
+        }
+        let id = AttachmentId(self.attachments.len() as u32);
+        self.attachments.push(path.clone());
+        self.attachment_ids.insert(path, id);
+        id
     }
 
     fn add_page(&mut self, name: &str, kind: PageKind, file: Option<PathBuf>) -> PageId {
@@ -926,6 +951,10 @@ impl Resolver<'_> {
                     RefTarget::Unresolved
                 }
             },
+            // A path that leaves the notes is shown as written.
+            RawRefKind::Attachment => {
+                RefTarget::Attachment(g.add_attachment(resolve_attachment_path(file, &raw.text)?))
+            }
             RawRefKind::MdLink => match resolve_link_path(file, &raw.text) {
                 LinkPath::Outside => {
                     self.diags.push(Diagnostic::new(
@@ -974,14 +1003,10 @@ enum LinkPath {
     Outside,
 }
 
-/// Resolves a markdown link destination found in `file` to the name of the page stored
-/// at that path.
-fn resolve_link_path(file: &Path, dest: &str) -> LinkPath {
-    let path = dest.split('#').next().unwrap_or_default();
-    let Some(path) = percent_decode(path) else {
-        // Undecodable destinations cannot name a file; report as missing.
-        return LinkPath::Page(String::new());
-    };
+/// The path, relative to the root, that a link destination found in `file` names:
+/// relative to `file`'s folder, or to the root when it starts with `/`. `None` when it
+/// leaves the root.
+fn notes_path(file: &Path, path: &str) -> Option<Vec<String>> {
     let mut parts: Vec<String> = if path.starts_with('/') {
         Vec::new()
     } else {
@@ -997,13 +1022,37 @@ fn resolve_link_path(file: &Path, dest: &str) -> LinkPath {
         match segment {
             "" | "." => {}
             ".." => {
-                if parts.pop().is_none() {
-                    return LinkPath::Outside;
-                }
+                parts.pop()?;
             }
             s => parts.push(s.to_owned()),
         }
     }
+    Some(parts)
+}
+
+/// Resolves an attachment destination found in `file` to the file it names, relative to
+/// the root. `None` when it leaves the root, names a folder, or cannot be decoded.
+fn resolve_attachment_path(file: &Path, dest: &str) -> Option<PathBuf> {
+    let path = percent_decode(dest.split('#').next().unwrap_or_default())?;
+    let last = path.rsplit('/').next().unwrap_or_default();
+    if matches!(last, "" | "." | "..") {
+        return None;
+    }
+    let parts = notes_path(file, &path)?;
+    (!parts.is_empty()).then(|| parts.iter().collect())
+}
+
+/// Resolves a markdown link destination found in `file` to the name of the page stored
+/// at that path.
+fn resolve_link_path(file: &Path, dest: &str) -> LinkPath {
+    let path = dest.split('#').next().unwrap_or_default();
+    let Some(path) = percent_decode(path) else {
+        // Undecodable destinations cannot name a file; report as missing.
+        return LinkPath::Page(String::new());
+    };
+    let Some(parts) = notes_path(file, &path) else {
+        return LinkPath::Outside;
+    };
     let inside = match parts.first().map(String::as_str) {
         Some(PAGES_DIR | JOURNALS_DIR) => parts.len() > 1,
         Some(layout::ROOT_INDEX) => parts.len() == 1,

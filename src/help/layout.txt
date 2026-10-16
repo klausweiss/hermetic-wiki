@@ -29,7 +29,10 @@ NOTES LAYOUT
   assets/, and non-markdown files in journals/ and pages/
       Attachments, such as images. They are copied unchanged to the same
       path in the site, so ![flow](auth-flow.png) in pages/auth.md shows
-      pages/auth-flow.png. Symbolic links to attachments are not copied.
+      pages/auth-flow.png. Paths are relative to the note, or to the notes
+      root when they start with / (![logo](/assets/logo.png)); images and
+      links to attachments work wherever their block is shown. Symbolic
+      links to attachments are not copied.
 
   Everything else is ignored: other files in the notes root (README.md,
   ...), and every file or directory whose name begins with a dot. Missing

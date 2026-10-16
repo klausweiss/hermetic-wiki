@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 
-import { type Doc, type Node, type Payload, flatten, fromPayload } from "./model";
-import { backspace, cycleTask, indent, insideOpenFence, move, outdent, split } from "./ops";
+import { type Doc, type Node, type Payload, flatten, fromPayload, newNode } from "./model";
+import { backspace, cycleTask, indent, insertImage, insideOpenFence, move, outdent, split, textEnd } from "./ops";
 import { serialize } from "./serialize";
 
 // Payloads written by the Rust parser (tests/edit.rs) for tests/fixtures/editing/*.md.
@@ -306,5 +306,72 @@ describe("task labels", () => {
     expect(advanceTask("TODOS for today")).toBeNull();
     expect(advanceTask("plain")).toBeNull();
     expect(advanceTask("note\nTODO not the first line")).toBeNull();
+  });
+});
+
+describe("inserting images", () => {
+  const IMG = "![a.png](../assets/a_1_0.png)";
+  const docOf = (...bodies: string[]): Doc => ({
+    roots: bodies.map((b) => newNode(b)),
+    indent: "  ",
+    head: [],
+    finalNewline: true,
+  });
+
+  test("a paste goes in at the cursor", () => {
+    const doc = docOf("see  here");
+    const node = doc.roots[0]!;
+    const r = insertImage(doc, { node, offset: 4 }, IMG, false);
+    expect(node.body).toBe(`see ${IMG} here`);
+    expect([r.node, r.start, r.end]).toEqual([node, 4, 4 + IMG.length]);
+  });
+
+  test("further images of one paste or drop go on their own lines", () => {
+    const doc = docOf("x");
+    const node = doc.roots[0]!;
+    const first = insertImage(doc, { node, offset: 1 }, IMG, false);
+    const second = insertImage(doc, { node, offset: first.end }, "![b.png](b)", true);
+    expect(node.body).toBe(`x${IMG}\n![b.png](b)`);
+    expect(second.start).toBe(first.end);
+  });
+
+  test("a drop goes at the end of the text, after a space, before property lines", () => {
+    const doc = docOf("architecture", "decided\nstatus:: accepted\nowner:: me", "", "trailing ", "a\nb");
+    const [plain, props, empty, spaced, lines] = doc.roots as [Node, Node, Node, Node, Node];
+    insertImage(doc, { node: plain, offset: null }, IMG, false);
+    expect(plain.body).toBe(`architecture ${IMG}`);
+    insertImage(doc, { node: props, offset: null }, IMG, false);
+    expect(props.body).toBe(`decided ${IMG}\nstatus:: accepted\nowner:: me`);
+    insertImage(doc, { node: empty, offset: null }, IMG, false);
+    expect(empty.body).toBe(IMG);
+    insertImage(doc, { node: spaced, offset: null }, IMG, false);
+    expect(spaced.body).toBe(`trailing ${IMG}`);
+    insertImage(doc, { node: lines, offset: null }, IMG, false);
+    expect(lines.body).toBe(`a\nb ${IMG}`);
+  });
+
+  test("without its block, an image starts a new last top-level block", () => {
+    const doc = docOf("a");
+    const gone = newNode("deleted meanwhile");
+    const r = insertImage(doc, { node: gone, offset: 3 }, IMG, false);
+    expect(doc.roots.map((n) => n.body)).toEqual(["a", IMG]);
+    expect(r.node).toBe(doc.roots[1]!);
+    const next = insertImage(doc, { node: r.node, offset: r.end }, "![b.png](b)", true);
+    expect(next.node.body).toBe(`${IMG}\n![b.png](b)`);
+    const empty = docOf();
+    insertImage(empty, { node: null, offset: null }, IMG, false);
+    expect(serialize(empty)).toBe(`- ${IMG}\n`);
+  });
+
+  test("offsets beyond the text are clamped", () => {
+    const doc = docOf("ab");
+    insertImage(doc, { node: doc.roots[0]!, offset: 99 }, IMG, false);
+    expect(doc.roots[0]!.body).toBe(`ab${IMG}`);
+  });
+
+  test("text end", () => {
+    expect(textEnd("")).toBe(0);
+    expect(textEnd("title:: x")).toBe(9);
+    expect(textEnd("a\nid:: 1")).toBe(1);
   });
 });

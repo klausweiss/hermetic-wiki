@@ -1,0 +1,3 @@
+- Note this page does not contain any link to the page in the **Related** section.
+- Neither is this the case in the opposite direction.
+- They rather are both mentioned in the same block on the [[index]] page.

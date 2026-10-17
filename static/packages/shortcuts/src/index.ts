@@ -16,14 +16,6 @@ import {
   whenParsed,
 } from "@hermetic/core";
 
-const GO_TARGETS: Readonly<Record<string, string>> = {
-  h: "index.html",
-  j: "journals.html",
-  p: "pages.html",
-  t: "tasks.html",
-  g: "graph.html",
-};
-
 interface Shortcut {
   /**
    * The keys, written `Mod+Shift+Z` (pressed together), `g h` (one after the other),
@@ -139,41 +131,78 @@ export function keycaps(keys: string): HTMLElement {
   return out;
 }
 
-/** How long after `g` the second key is accepted. */
-const CHORD_MS = 1500;
-
-/** An action of the `,` menu: pressing `,` and then its key runs it. */
+/** An action of a key menu: pressing the menu's key and then the action's key runs it. */
 interface Action {
   key: string;
   what: string;
   /** Shown after the description, e.g. what the action changes from and to. */
   detail?: () => string;
-  available: () => boolean;
+  available?: () => boolean;
   run: () => void;
+}
+
+/** A menu opened by a key, listing the actions a second key runs. */
+interface Menu {
+  key: string;
+  title: string;
+  actions: readonly Action[];
+}
+
+/** Opens a page of the site, carrying the sidebar's state (mirrored in the URL) along. */
+function go(path: string): () => void {
+  return () => {
+    location.href = carrySidebar(new URL(path, readEnv().root).href, location.href);
+  };
 }
 
 const THEMES = ["system", "light", "dark"] as const;
 
-const ACTIONS: readonly Action[] = [
+const MENUS: readonly Menu[] = [
   {
-    key: "t",
-    what: "Switch theme",
-    detail: () => {
-      const now = document.documentElement.dataset["theme"] ?? "system";
-      const next = THEMES[(THEMES.indexOf(now as (typeof THEMES)[number]) + 1) % THEMES.length];
-      return `${now} → ${next}`;
-    },
-    available: () => hasThemeButton(),
-    run: () => document.dispatchEvent(new Event(THEME_CYCLE)),
+    key: "g",
+    title: "Go to",
+    actions: [
+      { key: "h", what: "Home", run: go("index.html") },
+      { key: "j", what: "Journals", run: go("journals.html") },
+      {
+        key: "d",
+        what: "Today's journal",
+        // The editor opens (and creates) it where it runs.
+        available: () => document.querySelector("hermetic-editor") !== null,
+        run: () => document.dispatchEvent(new Event(OPEN_TODAY)),
+      },
+      { key: "p", what: "All pages", run: go("pages.html") },
+      { key: "t", what: "Open tasks", run: go("tasks.html") },
+      { key: "g", what: "Graph", run: go("graph.html") },
+    ],
+  },
+  {
+    key: ",",
+    title: "Actions",
+    actions: [
+      {
+        key: "t",
+        what: "Switch theme",
+        detail: () => {
+          const now = document.documentElement.dataset["theme"] ?? "system";
+          const next = THEMES[(THEMES.indexOf(now as (typeof THEMES)[number]) + 1) % THEMES.length];
+          return `${now} → ${next}`;
+        },
+        available: () => hasThemeButton(),
+        run: () => document.dispatchEvent(new Event(THEME_CYCLE)),
+      },
+    ],
   },
 ];
+
+const available = (menu: Menu) => menu.actions.filter((a) => a.available?.() ?? true);
 
 export class HermeticShortcuts extends HTMLElement {
   private ready = false;
   private help: HTMLDialogElement | null = null;
   private menu: HTMLDialogElement | null = null;
-  /** When `g` was pressed, to accept the second key of a `g` shortcut. */
-  private pendingG = 0;
+  /** The menu shown in `menu`. */
+  private shown: Menu | null = null;
 
   connectedCallback(): void {
     whenParsed(() => this.setup());
@@ -206,31 +235,15 @@ export class HermeticShortcuts extends HTMLElement {
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) {
       return;
     }
-    const chord = Date.now() - this.pendingG < CHORD_MS;
-    this.pendingG = 0;
-    const target = chord ? GO_TARGETS[e.key] : undefined;
-    // `g d`: today's journal, which the editor opens (and creates) where it runs.
-    if (chord && e.key === "d" && document.querySelector("hermetic-editor")) {
-      e.preventDefault();
-      document.dispatchEvent(new Event(OPEN_TODAY));
-      return;
-    }
-    if (target) {
-      e.preventDefault();
-      // The sidebar's state is mirrored in the URL; carry it along.
-      location.href = carrySidebar(new URL(target, readEnv().root).href, location.href);
+    const menu = MENUS.find((m) => m.key === e.key);
+    if (menu) {
+      if (!document.querySelector("dialog[open]") && available(menu).length > 0) {
+        e.preventDefault();
+        this.openMenu(menu);
+      }
       return;
     }
     switch (e.key) {
-      case "g":
-        this.pendingG = Date.now();
-        break;
-      case ",":
-        if (!document.querySelector("dialog[open]") && ACTIONS.some((a) => a.available())) {
-          e.preventDefault();
-          this.openMenu();
-        }
-        break;
       case "Escape":
         if (!this.help?.open) {
           document.dispatchEvent(new Event(SIDEBAR_CLOSE_TOP));
@@ -264,15 +277,23 @@ export class HermeticShortcuts extends HTMLElement {
   }
 
   /**
-   * The `,` menu: shows that `,` was pressed and lists the actions a second key runs.
-   * That key (or a click on an action) runs it; any other key, Escape, or a click
-   * outside closes the menu.
+   * A key menu (`g`, `,`): shows that its key was pressed and lists the actions a second
+   * key runs. That key (or a click on an action) runs it; any other key, Escape, or a
+   * click outside closes the menu.
    */
-  private openMenu(): void {
+  private openMenu(menu: Menu): void {
     const dialog = (this.menu ??= this.menuDialog());
-    const list = dialog.querySelector("ul")!;
-    list.replaceChildren(
-      ...ACTIONS.filter((a) => a.available()).map((a) => {
+    this.shown = menu;
+    dialog.setAttribute("aria-label", menu.title);
+    const head = dialog.querySelector(".leader-head")!;
+    const title = document.createElement("span");
+    title.className = "leader-title";
+    title.textContent = menu.title;
+    const hint = document.createElement("span");
+    hint.textContent = "then press a key";
+    head.replaceChildren(keycaps(menu.key), title, hint);
+    dialog.querySelector("ul")!.replaceChildren(
+      ...available(menu).map((a) => {
         const li = document.createElement("li");
         const button = document.createElement("button");
         button.type = "button";
@@ -302,25 +323,23 @@ export class HermeticShortcuts extends HTMLElement {
   private menuDialog(): HTMLDialogElement {
     const dialog = document.createElement("dialog");
     dialog.className = "leader-dialog";
-    dialog.setAttribute("aria-label", "Actions");
     dialog.tabIndex = -1;
     const panel = document.createElement("div");
     panel.className = "leader-panel";
     const head = document.createElement("div");
     head.className = "leader-head";
-    const hint = document.createElement("span");
-    hint.textContent = "then press a key";
-    head.append(keycaps(","), hint);
-    const list = document.createElement("ul");
-    panel.append(head, list);
+    panel.append(head, document.createElement("ul"));
     dialog.append(panel);
     dialog.addEventListener("keydown", (e) => {
+      // A key reaching the dialog after it closed (focus still on it) is the page's.
+      if (!dialog.open) return;
       if (e.key === "Escape" || e.key === "Tab" || e.ctrlKey || e.metaKey || e.altKey) return;
       if (["Shift", "Control", "Alt", "Meta", "Enter", " "].includes(e.key)) return;
       e.preventDefault();
       e.stopPropagation();
       dialog.close();
-      ACTIONS.find((a) => a.key === e.key && a.available())?.run();
+      const menu = this.shown;
+      if (menu) available(menu).find((a) => a.key === e.key)?.run();
     });
     // The dialog itself has no padding: a click on it, not on the panel, is on the backdrop.
     dialog.addEventListener("click", (e) => {

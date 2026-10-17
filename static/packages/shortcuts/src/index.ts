@@ -10,6 +10,7 @@ import {
   SIDEBAR_CLOSE_TOP,
   SIDEBAR_TOGGLE,
   carrySidebar,
+  icon,
   readEnv,
   whenParsed,
 } from "@hermetic/core";
@@ -23,6 +24,11 @@ const GO_TARGETS: Readonly<Record<string, string>> = {
 };
 
 interface Shortcut {
+  /**
+   * The keys, written `Mod+Shift+Z` (pressed together), `g h` (one after the other),
+   * `Tab / Shift+Tab` (alternatives), with `{text}` for words that are not keys.
+   * `Mod` is ⌘ on Apple platforms and Ctrl elsewhere.
+   */
   keys: string;
   what: string;
   sidebar?: true;
@@ -33,42 +39,101 @@ interface Shortcut {
   editing?: true;
 }
 
-const APPLE = /Mac|iPhone|iPad/.test(navigator.platform);
-/** Ctrl+K, or Cmd+K on Apple platforms, as the help dialog names it. */
-const MOD_K = APPLE ? "⌘ K" : "Ctrl + K";
-const MOD_ENTER = APPLE ? "⌘ Enter" : "Ctrl + Enter";
-const MOD_F = APPLE ? "⌘ F" : "Ctrl + F";
-/** The modifier for editing keys, as the help dialog writes it before a key. */
-const MOD = APPLE ? "⌘" : "Ctrl +";
+interface Group {
+  title: string;
+  shortcuts: readonly Shortcut[];
+}
 
-const HELP: readonly Shortcut[] = [
-  { keys: "g h", what: "Home" },
-  { keys: "g j", what: "Journals" },
-  { keys: "g p", what: "All pages" },
-  { keys: "g t", what: "Open tasks" },
-  { keys: "g g", what: "Graph" },
-  { keys: "g d", what: "Today's journal", editing: true },
-  { keys: "/", what: "Open search", search: true },
-  { keys: MOD_K, what: "Open or close search, even while typing", search: true },
-  { keys: MOD_F, what: "Search the graph (again: the browser's find)", graph: true },
-  { keys: "Shift + click", what: "Open a page in the sidebar", sidebar: true },
-  { keys: "Esc", what: "Close the top sidebar pane", sidebar: true },
-  { keys: "\\", what: "Show or hide the sidebar", sidebar: true },
-  { keys: "?", what: "Show these shortcuts" },
-  { keys: "p", what: "Edit the page's properties", editing: true },
-  { keys: "Click a block", what: "Edit it", editing: true },
-  { keys: "Enter", what: "New block below (Shift + Enter: line break)", editing: true },
-  { keys: "Tab / Shift + Tab", what: "Indent / outdent the block", editing: true },
-  { keys: "Alt + Shift + ↑ / ↓", what: "Move the block up / down", editing: true },
-  { keys: "Backspace at the start", what: "Join with the block above (or delete an empty one)", editing: true },
-  { keys: MOD_ENTER, what: "Cycle TODO / DOING / DONE", editing: true },
-  { keys: "[[ and ((", what: "Link a page / reference a block", editing: true },
-  { keys: `${MOD} B / ${MOD} I`, what: "Bold / italic (also on selected text)", editing: true },
-  { keys: `${MOD} Shift S / ${MOD} E`, what: "Strikethrough / inline code", editing: true },
-  { keys: `${MOD} Z / ${MOD} Shift Z`, what: "Undo / redo (across blocks, also after editing)", editing: true },
-  { keys: "Paste a URL on selected text", what: "Make the text a link", editing: true },
-  { keys: "Esc", what: "Stop editing", editing: true },
+const APPLE = /Mac|iPhone|iPad/.test(navigator.platform);
+/** How keys are labelled: Apple's symbols there, names elsewhere. */
+const KEY_LABELS: Readonly<Record<string, string>> = APPLE
+  ? { Mod: "⌘", Shift: "⇧", Alt: "⌥", Ctrl: "⌃" }
+  : { Mod: "Ctrl" };
+
+const HELP: readonly Group[] = [
+  {
+    title: "Go to",
+    shortcuts: [
+      { keys: "g h", what: "Home" },
+      { keys: "g j", what: "Journals" },
+      { keys: "g d", what: "Today's journal", editing: true },
+      { keys: "g p", what: "All pages" },
+      { keys: "g t", what: "Open tasks" },
+      { keys: "g g", what: "Graph" },
+    ],
+  },
+  {
+    title: "Search and sidebar",
+    shortcuts: [
+      { keys: "/", what: "Open search", search: true },
+      { keys: "Mod+K", what: "Open or close search, even while typing", search: true },
+      { keys: "Mod+F", what: "Search the graph (again: the browser's find)", graph: true },
+      { keys: "Shift+{click}", what: "Open a page in the sidebar", sidebar: true },
+      { keys: "Esc", what: "Close the top sidebar pane", sidebar: true },
+      { keys: "\\", what: "Show or hide the sidebar", sidebar: true },
+      { keys: "?", what: "Show these shortcuts" },
+    ],
+  },
+  {
+    title: "Editing",
+    shortcuts: [
+      { keys: "{Click a block}", what: "Edit it", editing: true },
+      { keys: "p", what: "Edit the page's properties", editing: true },
+      { keys: "Enter", what: "New block below", editing: true },
+      { keys: "Shift+Enter", what: "Line break", editing: true },
+      { keys: "Tab / Shift+Tab", what: "Indent / outdent the block", editing: true },
+      { keys: "Alt+Shift+↑ / ↓", what: "Move the block up / down", editing: true },
+      { keys: "Backspace", what: "At the start: join with the block above", editing: true },
+      { keys: "Mod+Enter", what: "Cycle TODO / DOING / DONE", editing: true },
+      { keys: "[[ / ((", what: "Link a page / reference a block", editing: true },
+      { keys: "Esc", what: "Stop editing", editing: true },
+    ],
+  },
+  {
+    title: "Formatting and history",
+    shortcuts: [
+      { keys: "Mod+B", what: "Bold", editing: true },
+      { keys: "Mod+I", what: "Italic", editing: true },
+      { keys: "Mod+Shift+S", what: "Strikethrough", editing: true },
+      { keys: "Mod+E", what: "Inline code", editing: true },
+      { keys: "Mod+V", what: "Paste a URL over selected text to link it", editing: true },
+      { keys: "Mod+Z", what: "Undo, across blocks", editing: true },
+      { keys: "Mod+Shift+Z", what: "Redo", editing: true },
+    ],
+  },
 ];
+
+/** `keys` (see Shortcut) as keycaps, with "then" and "or" between steps and choices. */
+export function keycaps(keys: string): HTMLElement {
+  const out = document.createElement("span");
+  out.className = "keys";
+  const word = (cls: string, text: string) => {
+    const span = document.createElement("span");
+    span.className = cls;
+    span.textContent = text;
+    return span;
+  };
+  keys.split(" / ").forEach((choice, i) => {
+    if (i > 0) out.append(word("keys-sep", "or"));
+    // Spaces inside {text} do not separate steps.
+    (choice.match(/(?:\{[^}]*\}|[^\s{])+/g) ?? []).forEach((step, j) => {
+      if (j > 0) out.append(word("keys-sep", "then"));
+      const chord = document.createElement("span");
+      chord.className = "chord";
+      for (const part of step.match(/\{[^}]*\}|[^+{]+|\+(?=\+|$)/g) ?? []) {
+        if (part.startsWith("{")) {
+          chord.append(word("keys-text", part.slice(1, -1)));
+        } else {
+          const kbd = document.createElement("kbd");
+          kbd.textContent = KEY_LABELS[part] ?? part;
+          chord.append(kbd);
+        }
+      }
+      out.append(chord);
+    });
+  });
+  return out;
+}
 
 /** How long after `g` the second key is accepted. */
 const CHORD_MS = 1500;
@@ -155,6 +220,7 @@ export class HermeticShortcuts extends HTMLElement {
         e.preventDefault();
         this.help ??= this.helpDialog();
         this.help.showModal();
+        this.help.focus();
         break;
     }
   }
@@ -163,26 +229,50 @@ export class HermeticShortcuts extends HTMLElement {
     const withSidebar = readEnv().interactive && document.querySelector("hermetic-sidebar") !== null;
     const withEditing = readEnv().interactive && document.querySelector("hermetic-editor") !== null;
     const withGraph = document.querySelector("main hermetic-graph[data-ready]") !== null;
+    const shown = (s: Shortcut) =>
+      !((s.sidebar && !withSidebar) || (s.search && !hasSearch()) || (s.editing && !withEditing) || (s.graph && !withGraph));
     const dialog = document.createElement("dialog");
     dialog.className = "shortcuts";
+    dialog.setAttribute("aria-labelledby", "shortcuts-title");
+    // Focusable itself, to take the focus on opening instead of its close button.
+    dialog.tabIndex = -1;
+    const header = document.createElement("header");
     const title = document.createElement("h2");
+    title.id = "shortcuts-title";
     title.textContent = "Keyboard shortcuts";
-    const list = document.createElement("dl");
-    for (const s of HELP) {
-      if ((s.sidebar && !withSidebar) || (s.search && !hasSearch()) || (s.editing && !withEditing) || (s.graph && !withGraph)) {
-        continue;
-      }
-      const dt = document.createElement("dt");
-      dt.textContent = s.keys;
-      const dd = document.createElement("dd");
-      dd.textContent = s.what;
-      list.append(dt, dd);
-    }
     const close = document.createElement("button");
     close.type = "button";
-    close.textContent = "Close";
+    close.className = "shortcuts-close";
+    close.setAttribute("aria-label", "Close");
+    close.append(icon("x"));
     close.addEventListener("click", () => dialog.close());
-    dialog.append(title, list, close);
+    header.append(title, close);
+    const groups = document.createElement("div");
+    groups.className = "shortcut-groups";
+    for (const group of HELP) {
+      const items = group.shortcuts.filter(shown);
+      if (items.length === 0) continue;
+      const section = document.createElement("section");
+      const heading = document.createElement("h3");
+      heading.textContent = group.title;
+      const list = document.createElement("dl");
+      for (const s of items) {
+        const row = document.createElement("div");
+        const dt = document.createElement("dt");
+        dt.textContent = s.what;
+        const dd = document.createElement("dd");
+        dd.append(keycaps(s.keys));
+        row.append(dt, dd);
+        list.append(row);
+      }
+      section.append(heading, list);
+      groups.append(section);
+    }
+    // A click on the backdrop (the dialog element itself, outside its content) closes it.
+    dialog.addEventListener("click", (e) => {
+      if (e.target === dialog) dialog.close();
+    });
+    dialog.append(header, groups);
     this.append(dialog);
     return dialog;
   }

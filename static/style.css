@@ -475,15 +475,52 @@ hermetic-timeline.show-timeline > h2, hermetic-timeline.show-timeline > ul.days 
 
 /* Keyboard shortcut help */
 
+/* The dialog itself has no padding, so a click on it (not its content) is a backdrop click. */
 dialog.shortcuts {
-  border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text);
-  padding: 1rem 1.5rem; max-width: min(28rem, 90vw);
+  border: 1px solid var(--border); border-radius: 10px; background: var(--elevated); color: var(--text);
+  padding: 0; width: min(46rem, calc(100vw - 2rem)); max-height: calc(100vh - 4rem);
+  font-size: 0.85rem; line-height: 1.4; box-shadow: 0 12px 40px rgb(0 0 0 / 0.18);
 }
 dialog.shortcuts::backdrop { background: rgb(0 0 0 / 0.35); }
-dialog.shortcuts h2 { margin-top: 0; }
-dialog.shortcuts dl { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 1rem; }
-dialog.shortcuts dt { font-family: "JetBrains Mono", monospace; font-size: 0.85rem; }
-dialog.shortcuts dd { margin: 0; }
+dialog.shortcuts:focus { outline: none; }
+dialog.shortcuts header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.9rem 1rem 0.6rem 1.5rem; border-bottom: 1px solid var(--border);
+}
+dialog.shortcuts h2 { margin: 0; font-size: 1rem; font-weight: 600; }
+.shortcuts-close {
+  display: grid; place-items: center; width: 1.9rem; height: 1.9rem; padding: 0;
+  border: none; border-radius: 6px; background: none; color: var(--muted); cursor: pointer;
+}
+.shortcuts-close:hover, .shortcuts-close:focus-visible { background: var(--surface); color: var(--text); }
+.shortcuts-close .icon { width: 16px; height: 16px; }
+/* Groups flow into two balanced columns where there is room. */
+.shortcut-groups { columns: 2 18rem; column-gap: 2.5rem; padding: 0.4rem 1.5rem 1.25rem; }
+.shortcut-groups section { break-inside: avoid; padding-top: 0.75rem; }
+.shortcut-groups h3 {
+  margin: 0 0 0.3rem; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted);
+}
+.shortcut-groups dl { margin: 0; }
+.shortcut-groups dl > div {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.3rem 0; border-bottom: 1px solid var(--border);
+}
+.shortcut-groups dl > div:last-child { border-bottom: none; }
+.shortcut-groups dt { min-width: 0; }
+.shortcut-groups dd { margin: 0; flex-shrink: 0; }
+.keys { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 0.3rem; }
+.keys .chord { display: inline-flex; align-items: center; gap: 0.15rem; }
+.keys-sep, .keys-text { color: var(--muted); font-size: 0.75rem; }
+/* A keycap: raised above the dialog in both themes (mixed from the text colour), with a
+   deeper bottom edge, and the label sitting above that edge. */
+.keys kbd {
+  display: inline-block; min-width: 1.6em; padding: 0 0.35rem 3px; box-sizing: border-box;
+  font-family: "JetBrains Mono", monospace; font-size: 0.72rem; line-height: 1.45; text-align: center;
+  color: var(--text); background: color-mix(in srgb, var(--text) 6%, var(--elevated));
+  border: 1px solid color-mix(in srgb, var(--text) 18%, var(--elevated)); border-radius: 5px;
+  box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--text) 14%, var(--elevated));
+}
 
 /* Search (shown only when the script runs over http): a header button opening a dialog
    in the upper part of the window, with the field and the results as you type. */

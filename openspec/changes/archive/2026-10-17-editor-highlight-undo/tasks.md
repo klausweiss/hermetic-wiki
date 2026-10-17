@@ -5,7 +5,7 @@
 - [x] 1.1 Add `highlight(body)` in `static/packages/editor/src/highlight.ts` covering every part listed in "Syntax colouring while editing", with nested and combined emphasis. Verify with `highlight.test.ts` (segments join back to the input; references, tags, URLs, emphasis, code, escapes, tasks, properties, fences) and `make -C static/packages/editor test`
 - [x] 1.2 Add `highlighted(area)` (mirror element, `value` setter override, `input` listener) and place the wrapper instead of the textarea in `element.ts`. Verify by typing, completing a `[[` link, and pressing Ctrl+B in `hermetic serve`: the colouring follows each change
 - [x] 1.3 Add the mirror styles, the `"Inter Upright"` face, and synthetic italic in `static/style.css`; remove the focus outline. Verify in the browser that `***both***` is bold and slanted and that the edited block has no blue border
-- [ ] 1.4 Check caret alignment by hand in Firefox and Chromium: click between letters on long wrapped lines with bold, italic, links, and code, and select across them. Fix any wrapping property that differs
+- [x] 1.4 Check caret alignment by hand in Firefox and Chromium: click between letters on long wrapped lines with bold, italic, links, and code, and select across them. Fix any wrapping property that differs
 
 ## 2. Pasting a link over a selection
 
@@ -23,4 +23,4 @@
 
 ## 4. Integration check
 
-- [ ] 4.1 Run `make -C static test check build` and `cargo test`, then commit `static/dist/app.js` with the sources. Run `openspec validate editor-highlight-undo --strict`
+- [x] 4.1 Run `make -C static test check build` and `cargo test`, then commit `static/dist/app.js` with the sources. Run `openspec validate editor-highlight-undo --strict`

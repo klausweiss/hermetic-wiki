@@ -56,6 +56,29 @@ export function toggle(value: string, start: number, end: number, marker: string
   return { start: s, end: e, text: marker + inner + marker, selStart: s + n, selEnd: e + n };
 }
 
+/** Brackets that, typed over a selection, wrap it in their pair. */
+export const PAIRS: Record<string, [string, string]> = {
+  "(": ["(", ")"],
+  ")": ["(", ")"],
+  "[": ["[", "]"],
+  "]": ["[", "]"],
+  "<": ["<", ">"],
+  ">": ["<", ">"],
+};
+
+/**
+ * Wraps the selection in `open`..`close`, keeping it selected, so typing `[` twice over
+ * text makes it `[[text]]`. Surrounding whitespace stays outside, as with markers.
+ */
+export function wrap(value: string, start: number, end: number, open: string, close: string): Edit {
+  const selected = value.slice(start, end);
+  const s = start + (selected.length - selected.trimStart().length);
+  const e = end - (selected.length - selected.trimEnd().length);
+  if (s >= e) return { start, end, text: open + selected + close, selStart: start + open.length, selEnd: end + open.length };
+  const inner = value.slice(s, e);
+  return { start: s, end: e, text: open + inner + close, selStart: s + open.length, selEnd: e + open.length };
+}
+
 /**
  * Pasting a web link over selected text makes the text a markdown link to it. Null when
  * the paste is not a single http(s) URL, or the selection is empty, spans lines, or is

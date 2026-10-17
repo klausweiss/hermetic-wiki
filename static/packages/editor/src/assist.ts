@@ -171,7 +171,8 @@ async function choose(editor: HermeticEditor, area: HTMLTextAreaElement, i: numb
 
 addPlugin({
   input(editor, area) {
-    const t = trigger(area.value.slice(0, area.selectionStart));
+    // Not while text is selected, as after wrapping it in `[[`..`]]`.
+    const t = area.selectionStart === area.selectionEnd ? trigger(area.value.slice(0, area.selectionStart)) : null;
     clearTimeout(timer);
     if (!t) {
       close();

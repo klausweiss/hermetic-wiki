@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { MARKERS, applied, linkSelection, toggle } from "./format";
+import { MARKERS, PAIRS, applied, linkSelection, toggle, wrap } from "./format";
 
 /** Applies a toggle to text with `[` `]` marking the selection (or `|` the cursor). */
 function press(marked: string, marker: string): string {
@@ -80,5 +80,33 @@ describe("pasting a link over a selection", () => {
     expect(paste("abc", "b", "https://x.dev two")).toBeNull();
     expect(paste("a\nb", "a\nb", "https://x.dev")).toBeNull();
     expect(paste("https://old.dev", "https://old.dev", "https://x.dev")).toBeNull();
+  });
+});
+
+describe("typing a bracket over a selection", () => {
+  /** Types `key` over text with `«` `»` marking the selection. */
+  function type(marked: string, key: string): string {
+    const start = marked.indexOf("«");
+    const end = marked.indexOf("»") - 1;
+    const value = marked.replace(/[«»]/g, "");
+    const [open, close] = PAIRS[key]!;
+    const edit = wrap(value, start, end, open, close);
+    const out = applied(value, edit);
+    return `${out.slice(0, edit.selStart)}«${out.slice(edit.selStart, edit.selEnd)}»${out.slice(edit.selEnd)}`;
+  }
+
+  test("Either bracket of a pair wraps the selection in both", () => {
+    expect(type("a «b» c", "(")).toBe("a («b») c");
+    expect(type("a «b» c", ")")).toBe("a («b») c");
+    expect(type("a «b» c", "]")).toBe("a [«b»] c");
+    expect(type("a «b» c", ">")).toBe("a <«b»> c");
+  });
+
+  test("Typing [ twice makes a page reference", () => {
+    expect(type(type("see «New page» now", "["), "[")).toBe("see [[«New page»]] now");
+  });
+
+  test("Whitespace around a selection stays outside", () => {
+    expect(type("say« hello »there", "[")).toBe("say [«hello»] there");
   });
 });

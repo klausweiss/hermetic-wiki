@@ -7,7 +7,7 @@ import { EDITING_ATTR, EDIT_PROPERTIES, OPEN_TODAY, PAGES_CHANGED, carrySidebar,
 
 import { Conflict, Refused, SaveQueue, type SaveState, SourceApi } from "./api";
 import { type Doc, type Node, type Payload, flatten, fromPayload, newNode } from "./model";
-import { type Edit, MARKERS, applied, linkSelection, toggle } from "./format";
+import { type Edit, MARKERS, PAIRS, applied, linkSelection, toggle, wrap } from "./format";
 import { highlighted, sameLine } from "./highlight";
 import { type Entry, History, type Typing, type Where, historyKey } from "./history";
 import * as ops from "./ops";
@@ -826,6 +826,12 @@ export class HermeticEditor extends HTMLElement {
     if (marker) {
       e.preventDefault();
       format(area, marker);
+      return;
+    }
+    const pair = PAIRS[e.key];
+    if (pair && !collapsed && !(mod && !e.altKey)) {
+      e.preventDefault();
+      replace(area, wrap(area.value, start, area.selectionEnd, pair[0], pair[1]));
       return;
     }
     if (e.key === "Enter" && mod && !e.altKey && !e.shiftKey) {

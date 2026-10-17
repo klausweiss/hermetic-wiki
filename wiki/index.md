@@ -17,11 +17,11 @@
 - ## Usage
   - ### Writing wiki
     - 1. Create a folder for storing project wiki, then run `hermetic serve WIKI_PATH`
-      - you just ran [[commands/serve]]
+      - you just ran the [serve]([[commands/serve]]) command
     - 2. Open the reported URL in the wiki.
       - The wiki is open in [[edit mode]]. You can now interact with and change it. Press `?` to show [[keyboard shortcuts]].
       - The files are saved as you change the contents.
   - ### Reading wiki
     - You can either use the [[edit mode]] for reading,
-    - or render a read-only HTML version of the wiki using the [[commands/build]] command with `hermetic build WIKI_PATH`.
+    - or render a read-only HTML version of the wiki using the [build]([[commands/build]]) command with `hermetic build WIKI_PATH`.
     - The HTML version is a static website that can be hosted using most HTTP serves or hosting providers (e.g. [[GitHub Pages]]).

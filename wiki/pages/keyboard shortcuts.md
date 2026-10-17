@@ -1,0 +1,1 @@
+- In [[edit mode]] you can invoke a modal that shows keyboard shortcuts by pressing `?`, when no block is being edited.

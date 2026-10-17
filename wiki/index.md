@@ -5,3 +5,14 @@
 - ## Intended use-case
   - Documenting project implementation, as well as decisions made along the way.
   - Should help get the overview of what's the current state of the project.
+- ## Usage
+  - ### Writing wiki
+    - 1. Create a folder for storing project wiki, then run `hermetic serve WIKI_PATH`
+      - you just ran [[commands/serve]]
+    - 2. Open the reported URL in the wiki.
+      - The wiki is open in [[edit mode]]. You can now interact with and change it. Press `?` to show [[keyboard shortcuts]].
+      - The files are saved as you change the contents.
+  - ### Reading wiki
+    - You can either use the [[edit mode]] for reading,
+    - or render a read-only HTML version of the wiki using the [[commands/build]] command with `hermetic build WIKI_PATH`.
+    - The HTML version is a static website that can be hosted using most HTTP serves or hosting providers (e.g. [[GitHub Pages]]).

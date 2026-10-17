@@ -323,8 +323,6 @@ export class HermeticEditor extends HTMLElement {
     if (this.doc.roots.length === 0 && this.active) this.doc.roots.push(newNode());
     // Undo goes back through this tab's own changes, not over changes made elsewhere.
     if (!sameText(payload.text, this.baseText)) this.history.clear();
-    this.base = this.snapshot();
-    this.baseText = serialize(this.doc);
     this.stored = payload.text;
     if (this.queue) this.queue.version = payload.version;
     const after = flatten(this.doc).map((e) => e.node);
@@ -341,6 +339,9 @@ export class HermeticEditor extends HTMLElement {
       const old = before[i] ? this.rendered.get(before[i]!) : undefined;
       if (old && old.body === node.body) this.rendered.set(node, old);
     });
+    // Taken once the blocks have their renderings, so undoing back to it keeps them.
+    this.base = this.snapshot();
+    this.baseText = serialize(this.doc);
     if (this.active) {
       const node = after[Math.min(activeIndex, after.length - 1)];
       if (node && activeIndex >= 0) {

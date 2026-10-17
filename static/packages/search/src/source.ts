@@ -23,7 +23,7 @@ export type Term = [term: string, stem: string, postings: string];
 /** `search/d/<n>.json`: documents with their pages. */
 export interface Chunk {
   pages: [path: string, name: string][];
-  /** [page index, anchor ("" for page documents), parent delta, preview] */
+  /** [page index, anchor ("" for page documents), parent delta, preview (for a page: the alias, or "")] */
   docs: [number, string, number, string][];
 }
 

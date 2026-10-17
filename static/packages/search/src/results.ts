@@ -12,6 +12,8 @@ export interface Result {
   anchor: string;
   /** The page's name. */
   name: string;
+  /** For a page found by one of its aliases: that alias, else "". */
+  alias: string;
   title: string;
   breadcrumb: string[];
   preview: string;
@@ -73,6 +75,7 @@ export async function resolve(source: IndexSource, meta: Meta, hits: Hit[]): Pro
         path: e.path,
         anchor: e.anchor,
         name: e.name,
+        alias: e.anchor === "" ? e.preview : "",
         title: title(e.name),
         breadcrumb,
         preview: e.preview,

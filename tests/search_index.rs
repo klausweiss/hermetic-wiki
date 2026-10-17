@@ -169,6 +169,10 @@ fn aliases_are_page_names() {
         docs.contains(r#""pages":[["pages/auth.html","auth"]]"#),
         "{docs}"
     );
-    // The page's own document and the alias's both belong to the page.
-    assert!(docs.contains(r#"[0,"",0,""],[0,"",0,""]"#), "{docs}");
+    // The page's own document and the alias's both belong to the page; the alias's
+    // preview is the alias.
+    assert!(
+        docs.contains(r#"[0,"",0,""],[0,"",0,"authentication"]"#),
+        "{docs}"
+    );
 }

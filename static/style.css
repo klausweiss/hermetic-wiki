@@ -181,6 +181,8 @@ li.block:target > .block-body { background: var(--surface); border-radius: 4px; 
 .block-body { padding: 0.05rem 0; }
 .block-content > :first-child { margin-top: 0; }
 .block-content > :last-child { margin-bottom: 0; }
+/* Indented like child blocks, so a block's children line up with its list items' text. */
+.block-content :is(ol, ul) { padding-left: 1.25rem; }
 li.task-done > .block-body .block-content { color: var(--muted); text-decoration: line-through; }
 
 .props { display: grid; gap: 0.1rem; margin: 0.2rem 0 0.3rem; font-size: 0.85rem; }

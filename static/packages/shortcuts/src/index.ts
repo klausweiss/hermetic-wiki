@@ -166,7 +166,7 @@ const MENUS: readonly Menu[] = [
     ],
   },
   {
-    key: ",",
+    key: ".",
     title: "Actions",
     actions: [
       {
@@ -286,7 +286,7 @@ export class HermeticShortcuts extends HTMLElement {
   }
 
   /**
-   * A key menu (`g`, `,`): shows that its key was pressed and lists the actions a second
+   * A key menu (`g`, `.`): shows that its key was pressed and lists the actions a second
    * key runs. That key (or a click on an action) runs it; any other key, Escape, or a
    * click outside closes the menu.
    */

@@ -10,7 +10,8 @@
 //! `postings` is a string of numbers packed with [`pack`]: for each document containing
 //! the term, `doc_delta, tf * 2 + field, field_length`. `parent_delta` is the distance
 //! back to the document of the block's parent (0 for top-level blocks and pages), from
-//! which breadcrumbs are built.
+//! which breadcrumbs are built. A page document's preview is "" for its own name and
+//! the alias for an alias's document.
 //! Documents are pages (field 0: the name, then one more document per alias) and
 //! blocks (field 1: the text), in scan order, so journal blocks come first and in date
 //! order. A shard holds the terms
@@ -98,7 +99,7 @@ pub fn build(g: &Graph, site: &SiteInfo) -> BTreeMap<PathBuf, Vec<u8>> {
                     page,
                     anchor: String::new(),
                     parent: None,
-                    preview: String::new(),
+                    preview: alias.clone(),
                 },
                 FIELD_NAME,
                 alias,

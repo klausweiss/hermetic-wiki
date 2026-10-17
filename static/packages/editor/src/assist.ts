@@ -61,8 +61,12 @@ async function pageItems(editor: HermeticEditor, query: string): Promise<Item[]>
   const typed = query.trim();
   if (!typed) return [];
   const pages = (await find(editor, typed, 40).catch(() => [])).filter((r) => r.kind === "page").slice(0, ITEMS);
-  const items: Item[] = pages.map((r) => ({ label: r.name, detail: "", text: async () => `[[${r.name}]]` }));
-  if (!pages.some((r) => r.name.toLowerCase() === typed.toLowerCase())) {
+  // A page found by an alias links by that alias, marked as one.
+  const items: Item[] = pages.map((r) => {
+    const name = r.alias || r.name;
+    return { label: name, detail: r.alias ? `Alias of ${r.name}` : "", text: async () => `[[${name}]]` };
+  });
+  if (!pages.some((r) => (r.alias || r.name).toLowerCase() === typed.toLowerCase())) {
     items.push({ label: typed, detail: "New page", text: async () => `[[${typed}]]` });
   }
   return items;

@@ -15,11 +15,11 @@
 ## 3. Undo and redo
 
 - [x] 3.1 Add `History` and `historyKey` in `history.ts`. Verify with `history.test.ts` (typing runs, cursor move / pause / kind switch, other changes, redo dropped after a new change)
-- [ ] 3.2 End the typing group on pointer down in the text field and on navigation keys (arrows, Home, End, PageUp, PageDown), so that deselecting at the caret starts a new step. Verify with the "Deselecting starts a new step" scenario in the browser
+- [x] 3.2 End the typing group on pointer down in the text field and on navigation keys (arrows, Home, End, PageUp, PageDown), so that deselecting at the caret starts a new step. Verify with the "Deselecting starts a new step" scenario in the browser
 - [x] 3.3 Snapshot and commit in `element.ts` (`commit` from input, `changed`, `saveNow`; cursor noted on keydown, `beforeinput`, paste, image insert, and task label clicks), restore with the cursor, and the textarea, `beforeinput`, and window key handling. Verify the "Undo after a save", "Across blocks", "Outliner operations", and "Redo" scenarios in `hermetic serve`
 - [x] 3.4 Clear the history in `resync` when the page text changed elsewhere. Verify the "Changed elsewhere" scenario by editing the file in another program
-- [ ] 3.5 List "Undo / redo" (`MOD Z` / `MOD Shift Z`) and "Paste a URL over selected text: link it" in the editing section of `static/packages/shortcuts/src/index.ts`. Verify by opening the shortcuts dialog with `?` in edit mode
-- [ ] 3.6 Mention undo across blocks and link pasting in the edit-mode paragraph of `src/help/commands.txt`. Verify with `cargo test --test help`
+- [x] 3.5 List "Undo / redo" (`MOD Z` / `MOD Shift Z`) and "Paste a URL over selected text: link it" in the editing section of `static/packages/shortcuts/src/index.ts`. Verify by opening the shortcuts dialog with `?` in edit mode
+- [x] 3.6 Mention undo across blocks and link pasting in the edit-mode paragraph of `src/help/commands.txt`. Verify with `cargo test --test help`
 
 ## 4. Integration check
 

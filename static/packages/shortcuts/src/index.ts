@@ -65,6 +65,8 @@ const HELP: readonly Shortcut[] = [
   { keys: "[[ and ((", what: "Link a page / reference a block", editing: true },
   { keys: `${MOD} B / ${MOD} I`, what: "Bold / italic (also on selected text)", editing: true },
   { keys: `${MOD} Shift S / ${MOD} E`, what: "Strikethrough / inline code", editing: true },
+  { keys: `${MOD} Z / ${MOD} Shift Z`, what: "Undo / redo (across blocks, also after editing)", editing: true },
+  { keys: "Paste a URL on selected text", what: "Make the text a link", editing: true },
   { keys: "Esc", what: "Stop editing", editing: true },
 ];
 

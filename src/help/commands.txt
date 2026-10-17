@@ -31,10 +31,13 @@ COMMANDS
       In a browser on the same machine, pages can be edited in place: click
       a block to edit its markdown; Enter starts a new block, Tab and
       Shift+Tab indent and outdent, [[ and (( complete page and block
-      references. Edits are saved to the note files automatically; a save
-      is refused if the file changed on disk since the page loaded it.
-      Paste or drop PNG, JPEG, GIF, or WebP images into a block: they are
-      stored in assets/ and linked relative to the note, as Logseq does.
+      references, and pasting a URL over selected text links it. Ctrl+Z
+      and Ctrl+Shift+Z undo and redo every change to the page, across
+      blocks, also after editing ended. Edits are saved to the note files
+      automatically; a save is refused if the file changed on disk since
+      the page loaded it. Paste or drop PNG, JPEG, GIF, or WebP images
+      into a block: they are stored in assets/ and linked relative to the
+      note, as Logseq does.
       "Today" opens today's journal. A journal day's file is created with
       its first content and deleted once it is emptied again (nothing
       but one empty block); files left empty otherwise go after an hour.

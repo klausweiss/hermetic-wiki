@@ -51,6 +51,9 @@ interface Upload {
   more: boolean;
 }
 
+/** Keys that move the cursor (or extend the selection): they end a run of typing. */
+const NAVIGATION_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
+
 /** The image formats the server accepts (it checks the bytes itself). */
 const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
@@ -695,6 +698,8 @@ export class HermeticEditor extends HTMLElement {
       area.spellcheck = true;
       area.setAttribute("aria-label", "Block text");
       area.addEventListener("beforeinput", (e) => this.onBeforeInput(e, area));
+      // Clicking or selecting in the text ends a run of typing, even where it left the cursor.
+      area.addEventListener("pointerdown", () => this.history.close());
       area.addEventListener("input", () => this.onInput(area));
       area.addEventListener("keydown", (e) => this.onKey(e, area));
       area.addEventListener("paste", (e) => this.onPaste(e, area));
@@ -800,6 +805,7 @@ export class HermeticEditor extends HTMLElement {
       return;
     }
     this.pre = this.where(area);
+    if (NAVIGATION_KEYS.has(e.key)) this.history.close();
     for (const p of plugins) {
       if (p.key?.(this, e, area)) return;
     }

@@ -71,6 +71,21 @@ Every page SHALL include a header whose site title links to the home page and wh
 - **WHEN** `pages/Project X/Auth Flow.html` is inspected
 - **THEN** it contains `<meta name="hermetic-root" content="../..">`
 
+### Requirement: Link previews
+Every page SHALL declare its title, the site title, and its type as Open Graph metadata (`og:title`, `og:site_name`, `og:type` of `website`), and a `twitter:card` of `summary`, so that other sites and apps can show a preview of a link to it. A note's page SHALL also have a description, given both as `<meta name="description">` and as `og:description`: the page's `description` property, with link brackets removed, when it has one, or else the plain text of its first block with any text, in document order, not counting the page's properties. The description SHALL have its whitespace collapsed and, when longer than 200 characters, SHALL be cut at a word boundary and end with "…". Pages with nothing to describe, such as the site-wide lists and continuation files, SHALL have no description. Pages SHALL NOT declare `og:url` or `og:image`, which must be absolute URLs, as the site's address is not known.
+
+#### Scenario: Description from the first block
+- **WHEN** `pages/a.md` is `source:: x`, followed by an empty block whose child reads `see [[b]]`
+- **THEN** `pages/a.html` contains `<meta name="description" content="see b">` and `<meta property="og:description" content="see b">`
+
+#### Scenario: Description property
+- **WHEN** `pages/b.md` has the page property `description:: about [[a]]`
+- **THEN** `pages/b.html` contains `<meta name="description" content="about a">`
+
+#### Scenario: No description on lists
+- **WHEN** `journals.html` is inspected
+- **THEN** it contains `<meta property="og:title" content="Journals">` and no description
+
 ### Requirement: Page content
 A page SHALL show its title, its blocks as a nested list in document order, and, for namespaced pages, links to each namespace ancestor and a list of its namespace children. Block content SHALL be rendered as CommonMark with tables, strikethrough, task lists, and footnotes. Block properties other than `id` SHALL be shown as key/value pairs. The page's `alias` property SHALL be shown as its alias names separated by commas, as plain text without link syntax. Task blocks SHALL show their state (`TODO`, `DOING`, `DONE`) distinctly from their content. An implicit page SHALL state that it has no content of its own.
 

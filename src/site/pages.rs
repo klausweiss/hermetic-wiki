@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use super::html::{document, esc};
+use super::html::{description, document, esc, unescape};
 use super::paths::{href, refs_continuation_path, tasks_continuation_path};
 use super::render::{Mode, Site, task_badge};
 use crate::graph::{BlockId, LinkedRef, PageId};
@@ -52,7 +52,13 @@ pub fn page_files(site: &Site, page: PageId) -> Vec<OutFile> {
     main.push_str("</article>\n");
 
     let mut files = vec![OutFile {
-        html: document(&site.title, &path, &title, &main),
+        html: document(
+            &site.title,
+            &path,
+            &title,
+            &page_description(site, &path, page),
+            &main,
+        ),
         path: path.clone(),
     }];
     for (i, chunk) in chunks.iter().enumerate().skip(1) {
@@ -73,12 +79,34 @@ pub fn page_files(site: &Site, page: PageId) -> Vec<OutFile> {
                 &site.title,
                 &file,
                 &format!("{title} — references {n}"),
+                "",
                 &main,
             ),
             path: file,
         });
     }
     files
+}
+
+/// The page's description: its `description` property, or else the text of its first
+/// block with any, in document order. "" when it has neither.
+fn page_description(site: &Site, from: &Path, page: PageId) -> String {
+    let props = site.g.page_props(page);
+    if let Some(p) = props.iter().find(|p| p.key == "description") {
+        return description(&p.value.replace("[[", "").replace("]]", ""));
+    }
+    let mut stack: Vec<BlockId> = site.g.page(page).roots.iter().rev().copied().collect();
+    while let Some(b) = stack.pop() {
+        let block = site.g.block(b);
+        if !block.holds_page_props() {
+            let text = unescape(&site.plain(from, b));
+            if !text.trim().is_empty() {
+                return description(&text);
+            }
+        }
+        stack.extend(block.children.iter().rev());
+    }
+    String::new()
 }
 
 fn page_header(site: &Site, from: &Path, page: PageId) -> String {
@@ -208,6 +236,7 @@ pub fn blank_day(site_title: &str, date: Date, days: &[Date]) -> OutFile {
             site_title,
             &path,
             &format!("{date} {}", date.weekday()),
+            "",
             &main,
         ),
         path,
@@ -445,7 +474,7 @@ fn journal_list(site: &Site, path: PathBuf, view: &str, footer: &str) -> OutFile
     main.push_str(footer);
     main.push_str("</article>\n");
     OutFile {
-        html: document(&site.title, &path, "Journals", &main),
+        html: document(&site.title, &path, "Journals", "", &main),
         path,
     }
 }
@@ -461,7 +490,7 @@ pub fn search_page(site: &Site) -> OutFile {
         Run <code>hermetic serve</code> in the notes folder, or host the site on a web server.</p>\n\
         </article>\n";
     OutFile {
-        html: document(&site.title, &path, "Search", main),
+        html: document(&site.title, &path, "Search", "", main),
         path,
     }
 }
@@ -495,7 +524,7 @@ pub fn all_pages(site: &Site) -> OutFile {
     }
     main.push_str("</ul>\n</article>\n");
     OutFile {
-        html: document(&site.title, &path, "All pages", &main),
+        html: document(&site.title, &path, "All pages", "", &main),
         path,
     }
 }
@@ -538,7 +567,7 @@ pub fn task_files(site: &Site) -> Vec<OutFile> {
         main.push_str(&pager(&path, n, &paths));
         main.push_str("</article>\n");
         files.push(OutFile {
-            html: document(&site.title, &path, "Open tasks", &main),
+            html: document(&site.title, &path, "Open tasks", "", &main),
             path,
         });
     }

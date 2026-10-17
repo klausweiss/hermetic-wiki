@@ -849,3 +849,39 @@ fn link_through_an_alias_goes_to_the_page() {
     let auth = main_of(&out, "pages/auth.html");
     assert!(auth.contains("2026-10-12"), "{auth}");
 }
+
+#[test]
+fn page_descriptions() {
+    let long = "word ".repeat(60);
+    let (_n, _h, out, _) = built(&[
+        (
+            "pages/a.md",
+            "source:: x\n\n- \n  - see [[b]] & \"c\" < d\n- later",
+        ),
+        ("pages/b.md", "description:: about [[a]]\n\n- body"),
+        ("pages/long.md", &format!("- {long}")),
+    ]);
+    let a = read(&out, "pages/a.html");
+    assert!(
+        a.contains(r#"<meta name="description" content="see b &amp; &quot;c&quot; &lt; d">"#),
+        "{a}"
+    );
+    assert!(a.contains(
+        r#"<meta property="og:description" content="see b &amp; &quot;c&quot; &lt; d">"#
+    ));
+    assert!(a.contains(r#"<meta property="og:title" content="a">"#));
+    assert!(a.contains(r#"<meta name="twitter:card" content="summary">"#));
+    let b = read(&out, "pages/b.html");
+    assert!(
+        b.contains(r#"<meta name="description" content="about a">"#),
+        "{b}"
+    );
+    let long = read(&out, "pages/long.html");
+    let expected = format!("{}…", "word ".repeat(40).trim_end());
+    assert!(long.contains(&format!(
+        r#"<meta name="description" content="{expected}">"#
+    )));
+    let journals = read(&out, "journals.html");
+    assert!(!journals.contains(r#"name="description""#));
+    assert!(journals.contains(r#"<meta property="og:title" content="Journals">"#));
+}

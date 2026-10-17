@@ -35,6 +35,40 @@ pub fn strip_tags(html: &str) -> String {
     out.trim().to_owned()
 }
 
+/// Reverses [`esc`] and the escaping of rendered markdown, giving back plain text.
+pub fn unescape(s: &str) -> String {
+    s.replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&amp;", "&")
+}
+
+/// Longest page description, in characters, before it is cut at a word boundary.
+const DESCRIPTION_LEN: usize = 200;
+
+/// Plain text as a page description: whitespace collapsed, and cut at a word boundary
+/// with "…" when longer than [`DESCRIPTION_LEN`].
+pub fn description(text: &str) -> String {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let mut out = String::new();
+    for (i, word) in words.iter().enumerate() {
+        let len = out.chars().count() + usize::from(i > 0) + word.chars().count();
+        if len > DESCRIPTION_LEN {
+            if out.is_empty() {
+                out.extend(word.chars().take(DESCRIPTION_LEN));
+            }
+            out.push('…');
+            break;
+        }
+        if i > 0 {
+            out.push(' ');
+        }
+        out.push_str(word);
+    }
+    out
+}
+
 pub const STYLESHEET: &str = "_hermetic/style.css";
 pub const SCRIPT: &str = "_hermetic/app.js";
 pub const FAVICON: &str = "_hermetic/favicon.svg";
@@ -61,8 +95,27 @@ pub fn root_path(path: &Path) -> String {
 /// it they are inert and render nothing. The number of open tasks is not part of the
 /// document: `<hermetic-task-count>` loads it, so that a change to it alone changes no
 /// page but the task lists.
-pub fn document(site_title: &str, path: &Path, title: &str, main: &str) -> String {
+///
+/// `description` is the page's summary in plain text, for search results and link
+/// previews in other sites and apps; "" leaves it out. The Open Graph tags carry no URL
+/// or image, which must be absolute, and the site's address is not known.
+pub fn document(
+    site_title: &str,
+    path: &Path,
+    title: &str,
+    description: &str,
+    main: &str,
+) -> String {
     let to = |target: &str| esc(&href(path, Path::new(target), None));
+    let description = if description.is_empty() {
+        String::new()
+    } else {
+        let d = esc(description);
+        format!(
+            "<meta name=\"description\" content=\"{d}\">\n\
+             <meta property=\"og:description\" content=\"{d}\">\n"
+        )
+    };
     format!(
         "<!doctype html>\n\
          <html lang=\"en\">\n\
@@ -71,6 +124,11 @@ pub fn document(site_title: &str, path: &Path, title: &str, main: &str) -> Strin
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
          <meta name=\"hermetic-root\" content=\"{root}\">\n\
          <title>{title} · {site}</title>\n\
+         {description}\
+         <meta property=\"og:title\" content=\"{title}\">\n\
+         <meta property=\"og:site_name\" content=\"{site}\">\n\
+         <meta property=\"og:type\" content=\"website\">\n\
+         <meta name=\"twitter:card\" content=\"summary\">\n\
          <link rel=\"icon\" href=\"{icon}\" type=\"image/svg+xml\">\n\
          <link rel=\"apple-touch-icon\" href=\"{touch_icon}\">\n\
          <link rel=\"stylesheet\" href=\"{css}\">\n\
@@ -139,7 +197,7 @@ mod tests {
 
     #[test]
     fn shell_links_are_relative() {
-        let root = document("notes", Path::new("index.html"), "Journals", "x");
+        let root = document("notes", Path::new("index.html"), "Journals", "", "x");
         assert!(root.contains(r#"href="_hermetic/style.css""#));
         let nav = |html: &str| {
             let start = html.find("<nav").unwrap();
@@ -151,7 +209,7 @@ mod tests {
             if COMMIT.is_empty() { String::new() } else { format!(" <code>{COMMIT}</code>") }
         )));
 
-        let page = document("notes", Path::new("pages/a.html"), "a", "x");
+        let page = document("notes", Path::new("pages/a.html"), "a", "", "x");
         assert!(page.contains(r#"href="../_hermetic/style.css""#));
         assert!(
             page.contains(
@@ -167,6 +225,7 @@ mod tests {
             "notes",
             Path::new("pages/Project X/Auth Flow.html"),
             "A & B",
+            "",
             "x",
         );
         assert!(nested.contains(r#"<a class="site-title" href="../../index.html">notes</a>"#));

@@ -43,7 +43,7 @@ pub fn maintenance_page(site_title: &str) -> OutFile {
     }
     main.push_str("</ul>\n</article>\n");
     OutFile {
-        html: document(site_title, &path, "Maintenance", &main),
+        html: document(site_title, &path, "Maintenance", "", &main),
         path,
     }
 }
@@ -60,7 +60,7 @@ pub fn unused_assets_page(site_title: &str) -> OutFile {
         esc(&href(&path, Path::new(MAINTENANCE_PAGE), None))
     );
     OutFile {
-        html: document(site_title, &path, "Unused assets", &main),
+        html: document(site_title, &path, "Unused assets", "", &main),
         path,
     }
 }

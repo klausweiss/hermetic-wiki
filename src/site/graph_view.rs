@@ -38,7 +38,7 @@ pub fn graph_page(site: &Site) -> OutFile {
     }
     main.push_str("</article>\n");
     OutFile {
-        html: document(&site.title, &path, "Graph", &main),
+        html: document(&site.title, &path, "Graph", "", &main),
         path,
     }
 }

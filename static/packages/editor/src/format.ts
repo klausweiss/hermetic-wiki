@@ -56,6 +56,24 @@ export function toggle(value: string, start: number, end: number, marker: string
   return { start: s, end: e, text: marker + inner + marker, selStart: s + n, selEnd: e + n };
 }
 
+/**
+ * Pasting a web link over selected text makes the text a markdown link to it. Null when
+ * the paste is not a single http(s) URL, or the selection is empty, spans lines, or is
+ * itself a URL (the paste then replaces it as usual).
+ */
+export function linkSelection(value: string, start: number, end: number, pasted: string): Edit | null {
+  const url = pasted.trim();
+  if (!/^https?:\/\/\S+$/.test(url)) return null;
+  const selected = value.slice(start, end);
+  const s = start + (selected.length - selected.trimStart().length);
+  const e = end - (selected.length - selected.trimEnd().length);
+  const label = value.slice(s, e);
+  if (s >= e || label.includes("\n") || /^https?:\/\//.test(label)) return null;
+  const target = /[()<>]/.test(url) ? `<${url.replace(/[<>]/g, encodeURIComponent)}>` : url;
+  const text = `[${label.replace(/[[\]]/g, "\\$&")}](${target})`;
+  return { start: s, end: e, text, selStart: s + text.length, selEnd: s + text.length };
+}
+
 /** The text after applying an edit. */
 export function applied(value: string, edit: Edit): string {
   return value.slice(0, edit.start) + edit.text + value.slice(edit.end);

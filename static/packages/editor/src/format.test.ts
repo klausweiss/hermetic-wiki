@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { MARKERS, applied, toggle } from "./format";
+import { MARKERS, applied, linkSelection, toggle } from "./format";
 
 /** Applies a toggle to text with `[` `]` marking the selection (or `|` the cursor). */
 function press(marked: string, marker: string): string {
@@ -54,5 +54,31 @@ describe("formatting keys", () => {
 
   test("Multi-line selections wrap as a whole", () => {
     expect(press("[one\ntwo]", MARKERS.italic)).toBe("*[one\ntwo]*");
+  });
+});
+
+describe("pasting a link over a selection", () => {
+  const paste = (value: string, selected: string, pasted: string) => {
+    const start = value.indexOf(selected);
+    const edit = linkSelection(value, start, start + selected.length, pasted);
+    return edit && applied(value, edit);
+  };
+
+  test("The selected text becomes the link's text", () => {
+    expect(paste("see the docs here", "the docs", "https://x.dev/a\n")).toBe("see [the docs](https://x.dev/a) here");
+  });
+
+  test("Surrounding spaces stay outside, brackets are escaped, parentheses kept", () => {
+    expect(paste("see the docs here", " the docs ", "https://x.dev")).toBe("see [the docs](https://x.dev) here");
+    expect(paste("a [b] c", "[b]", "https://x.dev")).toBe("a [\\[b\\]](https://x.dev) c");
+    expect(paste("wiki", "wiki", "https://w.org/A_(b)")).toBe("[wiki](<https://w.org/A_(b)>)");
+  });
+
+  test("Ordinary paste otherwise", () => {
+    expect(paste("abc", "", "https://x.dev")).toBeNull();
+    expect(paste("abc", "b", "not a url")).toBeNull();
+    expect(paste("abc", "b", "https://x.dev two")).toBeNull();
+    expect(paste("a\nb", "a\nb", "https://x.dev")).toBeNull();
+    expect(paste("https://old.dev", "https://old.dev", "https://x.dev")).toBeNull();
   });
 });

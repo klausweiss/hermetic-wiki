@@ -7,7 +7,7 @@ import { EDITING_ATTR, EDIT_PROPERTIES, OPEN_TODAY, PAGES_CHANGED, carrySidebar,
 
 import { Conflict, Refused, SaveQueue, type SaveState, SourceApi } from "./api";
 import { type Doc, type Node, type Payload, flatten, fromPayload, newNode } from "./model";
-import { MARKERS, applied, toggle } from "./format";
+import { type Edit, MARKERS, applied, linkSelection, toggle } from "./format";
 import { highlighted } from "./highlight";
 import * as ops from "./ops";
 import { pageProps, setPageProps } from "./props";
@@ -802,7 +802,14 @@ export class HermeticEditor extends HTMLElement {
   /** Pasting images (and no text) into the block being edited adds them at the cursor. */
   private onPaste(e: ClipboardEvent, area: HTMLTextAreaElement): void {
     const data = e.clipboardData;
-    if (!this.active || !data || data.files.length === 0) return;
+    if (!this.active || !data) return;
+    const link = linkSelection(area.value, area.selectionStart, area.selectionEnd, data.getData("text/plain"));
+    if (link) {
+      e.preventDefault();
+      replace(area, link);
+      return;
+    }
+    if (data.files.length === 0) return;
     // Text wins: apps that copy text also put a picture of it on the clipboard.
     if (data.getData("text/plain").trim() !== "") return;
     e.preventDefault();
@@ -978,13 +985,17 @@ function formatMarker(key: string, shift: boolean): string | null {
   return key === "b" ? MARKERS.bold : key === "i" ? MARKERS.italic : key === "e" ? MARKERS.code : null;
 }
 
+/** Toggles `marker` around the selection. */
+function format(area: HTMLTextAreaElement, marker: string): void {
+  replace(area, toggle(area.value, area.selectionStart, area.selectionEnd, marker));
+}
+
 /**
- * Toggles `marker` around the selection. The change goes through the browser's text
+ * Applies `edit` to the area's text. The change goes through the browser's text
  * insertion, so its own undo (Ctrl+Z) reverts it; where that is unavailable the text is
  * replaced directly (without undo).
  */
-function format(area: HTMLTextAreaElement, marker: string): void {
-  const edit = toggle(area.value, area.selectionStart, area.selectionEnd, marker);
+function replace(area: HTMLTextAreaElement, edit: Edit): void {
   const expected = applied(area.value, edit);
   area.setSelectionRange(edit.start, edit.end);
   const inserted =

@@ -2,7 +2,7 @@
 // in the browser. `applyStoredTheme()` must run before the page is painted. The button
 // is an icon in the top-right corner, next to the sidebar's control (see style.css).
 
-import { type IconName, icon, whenParsed } from "@hermetic/core";
+import { type IconName, THEME_CYCLE, icon, whenParsed } from "@hermetic/core";
 
 type Theme = "system" | "light" | "dark";
 
@@ -45,7 +45,7 @@ export function applyStoredTheme(): void {
   apply(load());
 }
 
-/** A button that cycles system → light → dark. Renders nothing until defined. */
+/** A button (and the `THEME_CYCLE` event) cycling system → light → dark. Renders nothing until defined. */
 export class HermeticThemeToggle extends HTMLElement {
   private button: HTMLButtonElement | null = null;
 
@@ -70,12 +70,14 @@ export class HermeticThemeToggle extends HTMLElement {
       button.replaceChildren(icon(ICONS[theme]));
     };
     show();
-    button.addEventListener("click", () => {
+    const cycle = (): void => {
       theme = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length] ?? "system";
       apply(theme);
       save(theme);
       show();
-    });
+    };
+    button.addEventListener("click", cycle);
+    document.addEventListener(THEME_CYCLE, cycle);
     this.button = button;
     this.append(button);
   }

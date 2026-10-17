@@ -1,6 +1,6 @@
 // @hermetic/core: logic shared by hermetic's components. No UI, no custom elements.
 
-export { EDITING_ATTR, EDIT_PROPERTIES, OPEN_TODAY, PAGES_CHANGED, SEARCH_FOCUS, SEARCH_TOGGLE, SIDEBAR_CLOSE_TOP, SIDEBAR_TOGGLE, whenParsed } from "./dom";
+export { EDITING_ATTR, EDIT_PROPERTIES, OPEN_TODAY, PAGES_CHANGED, SEARCH_FOCUS, SEARCH_TOGGLE, SIDEBAR_CLOSE_TOP, SIDEBAR_TOGGLE, THEME_CYCLE, whenParsed } from "./dom";
 export { type Env, readEnv } from "./env";
 export { type FetchedPage, TARGET_ATTR, fetchPage } from "./fetchpage";
 export { type Anchor, type Link, type PageLink, absolutize, anchorHref, classify, isSafePagePath } from "./links";

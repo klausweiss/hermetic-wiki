@@ -9,6 +9,7 @@ import {
   SEARCH_TOGGLE,
   SIDEBAR_CLOSE_TOP,
   SIDEBAR_TOGGLE,
+  THEME_CYCLE,
   carrySidebar,
   icon,
   readEnv,
@@ -35,6 +36,8 @@ interface Shortcut {
   search?: true;
   /** Listed only on the graph page. */
   graph?: true;
+  /** Listed only where the theme button is. */
+  theme?: true;
   /** Listed only where editing is available (hermetic serve, same machine). */
   editing?: true;
 }
@@ -63,7 +66,7 @@ const HELP: readonly Group[] = [
     ],
   },
   {
-    title: "Search and sidebar",
+    title: "Search and view",
     shortcuts: [
       { keys: "/", what: "Open search", search: true },
       { keys: "Mod+K", what: "Open or close search, even while typing", search: true },
@@ -71,6 +74,7 @@ const HELP: readonly Group[] = [
       { keys: "Shift+{click}", what: "Open a page in the sidebar", sidebar: true },
       { keys: "Esc", what: "Close the top sidebar pane", sidebar: true },
       { keys: "\\", what: "Show or hide the sidebar", sidebar: true },
+      { keys: ", t", what: "Switch theme: system, light, dark", theme: true },
       { keys: "?", what: "Show these shortcuts" },
     ],
   },
@@ -138,9 +142,37 @@ export function keycaps(keys: string): HTMLElement {
 /** How long after `g` the second key is accepted. */
 const CHORD_MS = 1500;
 
+/** An action of the `,` menu: pressing `,` and then its key runs it. */
+interface Action {
+  key: string;
+  what: string;
+  /** Shown after the description, e.g. what the action changes from and to. */
+  detail?: () => string;
+  available: () => boolean;
+  run: () => void;
+}
+
+const THEMES = ["system", "light", "dark"] as const;
+
+const ACTIONS: readonly Action[] = [
+  {
+    key: "t",
+    what: "Switch theme",
+    detail: () => {
+      const now = document.documentElement.dataset["theme"] ?? "system";
+      const next = THEMES[(THEMES.indexOf(now as (typeof THEMES)[number]) + 1) % THEMES.length];
+      return `${now} → ${next}`;
+    },
+    available: () => hasThemeButton(),
+    run: () => document.dispatchEvent(new Event(THEME_CYCLE)),
+  },
+];
+
 export class HermeticShortcuts extends HTMLElement {
   private ready = false;
   private help: HTMLDialogElement | null = null;
+  private menu: HTMLDialogElement | null = null;
+  /** When `g` was pressed, to accept the second key of a `g` shortcut. */
   private pendingG = 0;
 
   connectedCallback(): void {
@@ -193,6 +225,12 @@ export class HermeticShortcuts extends HTMLElement {
       case "g":
         this.pendingG = Date.now();
         break;
+      case ",":
+        if (!document.querySelector("dialog[open]") && ACTIONS.some((a) => a.available())) {
+          e.preventDefault();
+          this.openMenu();
+        }
+        break;
       case "Escape":
         if (!this.help?.open) {
           document.dispatchEvent(new Event(SIDEBAR_CLOSE_TOP));
@@ -225,12 +263,86 @@ export class HermeticShortcuts extends HTMLElement {
     }
   }
 
+  /**
+   * The `,` menu: shows that `,` was pressed and lists the actions a second key runs.
+   * That key (or a click on an action) runs it; any other key, Escape, or a click
+   * outside closes the menu.
+   */
+  private openMenu(): void {
+    const dialog = (this.menu ??= this.menuDialog());
+    const list = dialog.querySelector("ul")!;
+    list.replaceChildren(
+      ...ACTIONS.filter((a) => a.available()).map((a) => {
+        const li = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "leader-action";
+        const what = document.createElement("span");
+        what.className = "leader-what";
+        what.textContent = a.what;
+        button.append(keycaps(a.key), what);
+        if (a.detail) {
+          const detail = document.createElement("span");
+          detail.className = "leader-detail";
+          detail.textContent = a.detail();
+          button.append(detail);
+        }
+        button.addEventListener("click", () => {
+          dialog.close();
+          a.run();
+        });
+        li.append(button);
+        return li;
+      }),
+    );
+    dialog.showModal();
+    dialog.focus();
+  }
+
+  private menuDialog(): HTMLDialogElement {
+    const dialog = document.createElement("dialog");
+    dialog.className = "leader-dialog";
+    dialog.setAttribute("aria-label", "Actions");
+    dialog.tabIndex = -1;
+    const panel = document.createElement("div");
+    panel.className = "leader-panel";
+    const head = document.createElement("div");
+    head.className = "leader-head";
+    const hint = document.createElement("span");
+    hint.textContent = "then press a key";
+    head.append(keycaps(","), hint);
+    const list = document.createElement("ul");
+    panel.append(head, list);
+    dialog.append(panel);
+    dialog.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" || e.key === "Tab" || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (["Shift", "Control", "Alt", "Meta", "Enter", " "].includes(e.key)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      dialog.close();
+      ACTIONS.find((a) => a.key === e.key && a.available())?.run();
+    });
+    // The dialog itself has no padding: a click on it, not on the panel, is on the backdrop.
+    dialog.addEventListener("click", (e) => {
+      if (e.target === dialog) dialog.close();
+    });
+    this.append(dialog);
+    return dialog;
+  }
+
   private helpDialog(): HTMLDialogElement {
     const withSidebar = readEnv().interactive && document.querySelector("hermetic-sidebar") !== null;
     const withEditing = readEnv().interactive && document.querySelector("hermetic-editor") !== null;
     const withGraph = document.querySelector("main hermetic-graph[data-ready]") !== null;
+    const withTheme = hasThemeButton();
     const shown = (s: Shortcut) =>
-      !((s.sidebar && !withSidebar) || (s.search && !hasSearch()) || (s.editing && !withEditing) || (s.graph && !withGraph));
+      !(
+        (s.sidebar && !withSidebar) ||
+        (s.search && !hasSearch()) ||
+        (s.editing && !withEditing) ||
+        (s.graph && !withGraph) ||
+        (s.theme && !withTheme)
+      );
     const dialog = document.createElement("dialog");
     dialog.className = "shortcuts";
     dialog.setAttribute("aria-labelledby", "shortcuts-title");
@@ -276,6 +388,10 @@ export class HermeticShortcuts extends HTMLElement {
     this.append(dialog);
     return dialog;
   }
+}
+
+function hasThemeButton(): boolean {
+  return document.querySelector("hermetic-theme-toggle .theme-button") !== null;
 }
 
 /** The search button renders only where search can work (over http). */

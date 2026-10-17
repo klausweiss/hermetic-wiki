@@ -179,3 +179,32 @@ export function highlighted(area: HTMLTextAreaElement): HTMLElement {
   area.addEventListener("input", sync);
   return wrap;
 }
+
+/** Where the character at `offset` of the mirror's text is drawn. */
+function charRect(mirror: Element, offset: number): DOMRect | null {
+  const walker = document.createTreeWalker(mirror, NodeFilter.SHOW_TEXT);
+  for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+    const length = text.textContent!.length;
+    if (offset < length) {
+      const range = document.createRange();
+      range.setStart(text, offset);
+      range.setEnd(text, offset + 1);
+      return range.getBoundingClientRect();
+    }
+    offset -= length;
+  }
+  return null;
+}
+
+/**
+ * Whether the characters at offsets `a` and `b` of a highlighted area's text are drawn
+ * on the same line, counting lines the text wraps onto. `wrap` is what `highlighted` returned.
+ */
+export function sameLine(wrap: HTMLElement, a: number, b: number): boolean {
+  if (a === b) return true;
+  const mirror = wrap.querySelector(".block-editor-mirror");
+  const ra = mirror && charRect(mirror, a);
+  const rb = mirror && charRect(mirror, b);
+  if (!ra || !rb) return true;
+  return ra.top < rb.bottom && rb.top < ra.bottom;
+}

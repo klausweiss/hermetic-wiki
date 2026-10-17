@@ -8,7 +8,7 @@ import { EDITING_ATTR, EDIT_PROPERTIES, OPEN_TODAY, PAGES_CHANGED, carrySidebar,
 import { Conflict, Refused, SaveQueue, type SaveState, SourceApi } from "./api";
 import { type Doc, type Node, type Payload, flatten, fromPayload, newNode } from "./model";
 import { type Edit, MARKERS, applied, linkSelection, toggle } from "./format";
-import { highlighted } from "./highlight";
+import { highlighted, sameLine } from "./highlight";
 import { type Entry, History, type Typing, type Where, historyKey } from "./history";
 import * as ops from "./ops";
 import { pageProps, setPageProps } from "./props";
@@ -850,8 +850,14 @@ export class HermeticEditor extends HTMLElement {
       }
     } else if ((e.key === "ArrowUp" || e.key === "ArrowDown") && collapsed && !e.altKey && !e.shiftKey && !mod) {
       const up = e.key === "ArrowUp";
-      const lineStart = area.value.lastIndexOf("\n", start - 1) + 1;
-      const onEdge = up ? lineStart === 0 : area.value.indexOf("\n", start) < 0;
+      const text = area.value;
+      const lineStart = text.lastIndexOf("\n", start - 1) + 1;
+      const lineEnd = text.indexOf("\n", start);
+      // Only past the first (last) line the text is drawn on, wrapped or not.
+      const wrap = this.active!.wrap;
+      const onEdge = up
+        ? lineStart === 0 && (start === 0 || sameLine(wrap, Math.min(start, (lineEnd < 0 ? text.length : lineEnd) - 1), 0))
+        : lineEnd < 0 && (start === text.length || sameLine(wrap, start, text.length - 1));
       const other = onEdge ? ops.neighbor(doc, node, up ? -1 : 1) : null;
       if (other) {
         e.preventDefault();

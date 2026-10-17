@@ -4,7 +4,7 @@
   - opinionated, not many knobs to turns, intended to work for my use-case
 - ## Intended use-case
   - Documenting project implementation, as well as decisions made along the way.
-  - Should help get the overview of what's the current state of the project.
+  - Should help to get the overview of what's the current state of the project.
 - ## Usage
   - ### Writing wiki
     - 1. Create a folder for storing project wiki, then run `hermetic serve WIKI_PATH`

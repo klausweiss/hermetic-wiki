@@ -14,6 +14,15 @@
   font-style: italic;
   font-display: swap;
 }
+/* The block editor's font: Inter without its italic face, so italic text is slanted by the
+   browser from the upright letters and keeps their widths (see .block-editor-mirror). */
+@font-face {
+  font-family: "Inter Upright";
+  src: url("fonts/InterVariable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 @font-face {
   font-family: "JetBrains Mono";
   src: url("fonts/JetBrainsMono-Regular.woff2") format("woff2");
@@ -544,12 +553,30 @@ dialog.search-dialog::backdrop { background: rgb(0 0 0 / 0.5); }
 .edit-status:empty { display: none; }
 .edit-status.faded { opacity: 0; transition: opacity 0.4s ease; }
 html[data-hermetic-editing] section.content li.block > .block-body { cursor: text; }
+.block-editor-wrap { position: relative; margin: 0 -0.25rem; border-radius: 4px; background: var(--surface); }
+/* The textarea's text is transparent: the mirror behind it shows the same text coloured.
+   Both must lay text out identically, so styles in the mirror never change glyph widths. */
+.block-editor, .block-editor-mirror {
+  display: block; width: 100%; box-sizing: border-box; margin: 0; border: none; padding: 0.05rem 0.25rem;
+  font: inherit; font-family: "Inter Upright", sans-serif; font-synthesis: style;
+  line-height: inherit; letter-spacing: inherit; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; tab-size: 4;
+}
 .block-editor {
-  display: block; width: 100%; box-sizing: border-box; resize: none; overflow: hidden;
-  font: inherit; line-height: inherit; color: var(--text); background: var(--surface);
-  border: none; border-radius: 4px; padding: 0.05rem 0.25rem; margin: 0 -0.25rem;
+  position: relative; resize: none; overflow: hidden; background: transparent;
+  color: transparent; caret-color: var(--text);
 }
 .block-editor:focus { outline: none; }
+.block-editor::selection { color: transparent; background: color-mix(in srgb, var(--link) 25%, transparent); }
+.block-editor-mirror { position: absolute; inset: 0; color: var(--text); pointer-events: none; overflow: hidden; }
+.block-editor-mirror .hl-mark, .block-editor-mirror .hl-prop { color: var(--muted); }
+.block-editor-mirror .hl-ref, .block-editor-mirror .hl-link { color: var(--link); }
+.block-editor-mirror .hl-code { color: var(--muted); background: var(--bg); border-radius: 3px; }
+.block-editor-mirror .hl-strong { -webkit-text-stroke: 0.04em currentColor; }
+.block-editor-mirror .hl-em { font-style: italic; }
+.block-editor-mirror .hl-strike { text-decoration: line-through; color: var(--muted); }
+.block-editor-mirror .hl-todo { color: var(--todo); }
+.block-editor-mirror .hl-doing { color: var(--doing); }
+.block-editor-mirror .hl-done { color: var(--done); }
 .block-body.pending { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
 .editor-start { cursor: text; }
 .edit-notice {

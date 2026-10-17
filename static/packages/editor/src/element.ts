@@ -8,6 +8,7 @@ import { EDITING_ATTR, EDIT_PROPERTIES, OPEN_TODAY, PAGES_CHANGED, carrySidebar,
 import { Conflict, Refused, SaveQueue, type SaveState, SourceApi } from "./api";
 import { type Doc, type Node, type Payload, flatten, fromPayload, newNode } from "./model";
 import { MARKERS, applied, toggle } from "./format";
+import { highlighted } from "./highlight";
 import * as ops from "./ops";
 import { pageProps, setPageProps } from "./props";
 import { editProperties } from "./propsdialog";
@@ -32,6 +33,8 @@ interface Rendered {
 interface Active {
   node: Node;
   area: HTMLTextAreaElement;
+  /** The area with its syntax-coloured mirror, as placed in the page. */
+  wrap: HTMLElement;
 }
 
 /** Images of one paste or drop, inserted one by one as their uploads finish. */
@@ -373,7 +376,7 @@ export class HermeticEditor extends HTMLElement {
       if (fresh && node.anchor) li.id = node.anchor;
       if (this.active?.node === node) {
         li.classList.add("editing");
-        li.append(this.active.area);
+        li.append(this.active.wrap);
       } else if (fresh) {
         li.append(r.el);
       } else {
@@ -673,7 +676,7 @@ export class HermeticEditor extends HTMLElement {
           }
         }, 150);
       });
-      this.active = { node, area };
+      this.active = { node, area, wrap: highlighted(area) };
     }
     this.active.node = node;
     this.active.area.value = node.body;

@@ -9,10 +9,11 @@ import {
   SEARCH_TOGGLE,
   SIDEBAR_CLOSE_TOP,
   SIDEBAR_TOGGLE,
-  THEME_CYCLE,
+  THEME_SWITCH,
   carrySidebar,
   icon,
   readEnv,
+  shownTheme,
   whenParsed,
 } from "@hermetic/core";
 
@@ -145,8 +146,6 @@ function go(path: string): () => void {
 /** How long a menu's key waits for the second key before showing the menu. */
 const MENU_DELAY_MS = 300;
 
-const THEMES = ["system", "light", "dark"] as const;
-
 const MENUS: readonly Menu[] = [
   {
     key: "g",
@@ -172,14 +171,10 @@ const MENUS: readonly Menu[] = [
     actions: [
       {
         key: "t",
-        what: "Switch theme",
-        detail: () => {
-          const now = document.documentElement.dataset["theme"] ?? "system";
-          const next = THEMES[(THEMES.indexOf(now as (typeof THEMES)[number]) + 1) % THEMES.length];
-          return `${now} → ${next}`;
-        },
+        what: "Dark / light theme",
+        detail: () => (shownTheme() === "dark" ? "dark → light" : "light → dark"),
         available: () => hasThemeButton(),
-        run: () => document.dispatchEvent(new Event(THEME_CYCLE)),
+        run: () => document.dispatchEvent(new Event(THEME_SWITCH)),
       },
     ],
   },

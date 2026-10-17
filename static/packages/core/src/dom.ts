@@ -41,8 +41,15 @@ export const EDITING_ATTR = "data-hermetic-editing";
 /** Dispatched on `document` (by the `g d` shortcut) to open today's journal. */
 export const OPEN_TODAY = "hermetic-open-today";
 
-/** Dispatched on `document` (by the `t t` shortcut) to switch to the next theme. */
-export const THEME_CYCLE = "hermetic-theme-cycle";
+/** Dispatched on `document` (by the `, t` shortcut) to switch between light and dark. */
+export const THEME_SWITCH = "hermetic-theme-switch";
+
+/** The theme the page shows: the chosen one, or the system's when none is chosen. */
+export function shownTheme(): "light" | "dark" {
+  const chosen = document.documentElement.dataset["theme"];
+  if (chosen === "light" || chosen === "dark") return chosen;
+  return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
 /** Dispatched on `document` (by the `p` shortcut) to edit the page's properties. */
 export const EDIT_PROPERTIES = "hermetic-edit-properties";

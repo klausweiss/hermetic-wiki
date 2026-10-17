@@ -19,6 +19,8 @@ pub const EDITOR_TAG: &str = "<hermetic-editor></hermetic-editor>";
 pub const SOURCE_PATH: &str = "/_hermetic/source";
 /// The edit API's image upload, by the site path of the page the image is for.
 pub const ASSET_PATH: &str = "/_hermetic/asset";
+/// The maintenance API: the attachments nothing uses, and moving them to the trash.
+pub const UNUSED_ASSETS_PATH: &str = "/_hermetic/unused-assets";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Request {

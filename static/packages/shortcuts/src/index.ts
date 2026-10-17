@@ -10,8 +10,10 @@ import {
   SIDEBAR_CLOSE_TOP,
   SIDEBAR_TOGGLE,
   THEME_SWITCH,
+  type PageAction,
   carrySidebar,
   icon,
+  pageActions,
   readEnv,
   shownTheme,
   whenParsed,
@@ -120,20 +122,13 @@ export function keycaps(keys: string): HTMLElement {
 }
 
 /** An action of a key menu: pressing the menu's key and then the action's key runs it. */
-interface Action {
-  key: string;
-  what: string;
-  /** Shown after the description, e.g. what the action changes from and to. */
-  detail?: () => string;
-  available?: () => boolean;
-  run: () => void;
-}
+type Action = PageAction;
 
 /** A menu opened by a key, listing the actions a second key runs. */
 interface Menu {
   key: string;
   title: string;
-  actions: readonly Action[];
+  actions: () => readonly Action[];
 }
 
 /** Opens a page of the site, carrying the sidebar's state (mirrored in the URL) along. */
@@ -150,7 +145,7 @@ const MENUS: readonly Menu[] = [
   {
     key: "g",
     title: "Go to",
-    actions: [
+    actions: () => [
       { key: "h", what: "Home", run: go("index.html") },
       { key: "j", what: "Journals", run: go("journals.html") },
       {
@@ -166,9 +161,9 @@ const MENUS: readonly Menu[] = [
     ],
   },
   {
-    key: ".",
-    title: "Actions",
-    actions: [
+    key: ",",
+    title: "Settings",
+    actions: () => [
       {
         key: "t",
         what: "Dark / light theme",
@@ -178,9 +173,11 @@ const MENUS: readonly Menu[] = [
       },
     ],
   },
+  // Offered by the elements on the page (see `addPageAction`).
+  { key: ".", title: "This page", actions: pageActions },
 ];
 
-const available = (menu: Menu) => menu.actions.filter((a) => a.available?.() ?? true);
+const available = (menu: Menu) => menu.actions().filter((a) => a.available?.() ?? true);
 
 export class HermeticShortcuts extends HTMLElement {
   private ready = false;
@@ -286,7 +283,7 @@ export class HermeticShortcuts extends HTMLElement {
   }
 
   /**
-   * A key menu (`g`, `.`): shows that its key was pressed and lists the actions a second
+   * A key menu (`g`, `,`, `.`): shows that its key was pressed and lists the actions a second
    * key runs. That key (or a click on an action) runs it; any other key, Escape, or a
    * click outside closes the menu.
    */
@@ -459,7 +456,11 @@ function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false;
   }
-  return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+  if (target instanceof HTMLInputElement) {
+    // Checkboxes and buttons take no text: keys still work while they have the focus.
+    return !["checkbox", "radio", "button", "submit", "reset"].includes(target.type);
+  }
+  return target.isContentEditable || ["TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
 export function define(name = "hermetic-shortcuts"): void {

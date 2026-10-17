@@ -17,3 +17,4 @@ export {
   writePanes,
 } from "./state";
 export { type IconName, icon } from "./icons";
+export { type PageAction, addPageAction, pageActions } from "./pageactions";

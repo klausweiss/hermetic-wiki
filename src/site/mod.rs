@@ -4,12 +4,15 @@ mod assets;
 mod graph_layout;
 mod graph_view;
 mod html;
+mod maintenance;
 mod pages;
 mod paths;
 mod render;
 
 /// hermetic's project page, the one external link hermetic writes itself (in the footer).
 pub use html::PROJECT_URL;
+/// The maintenance pages, for `hermetic serve`.
+pub use maintenance::{MAINTENANCE_PAGE, UNUSED_ASSETS_PAGE, maintenance_page, unused_assets_page};
 /// The page of a journal day that is not in the site, for `hermetic serve`.
 pub use pages::blank_day;
 /// Percent-encodes one path segment the way generated links do.

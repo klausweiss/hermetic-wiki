@@ -14,6 +14,7 @@
         "@hermetic/editor": "workspace:*",
         "@hermetic/graph": "workspace:*",
         "@hermetic/live-reload": "workspace:*",
+        "@hermetic/maintenance": "workspace:*",
         "@hermetic/search": "workspace:*",
         "@hermetic/shortcuts": "workspace:*",
         "@hermetic/sidebar": "workspace:*",
@@ -41,6 +42,12 @@
     },
     "packages/live-reload": {
       "name": "@hermetic/live-reload",
+      "dependencies": {
+        "@hermetic/core": "workspace:*",
+      },
+    },
+    "packages/maintenance": {
+      "name": "@hermetic/maintenance",
       "dependencies": {
         "@hermetic/core": "workspace:*",
       },
@@ -92,6 +99,8 @@
     "@hermetic/graph": ["@hermetic/graph@workspace:packages/graph"],
 
     "@hermetic/live-reload": ["@hermetic/live-reload@workspace:packages/live-reload"],
+
+    "@hermetic/maintenance": ["@hermetic/maintenance@workspace:packages/maintenance"],
 
     "@hermetic/search": ["@hermetic/search@workspace:packages/search"],
 

@@ -44,8 +44,13 @@ COMMANDS
       "Delete page" moves a page's file to .trash/ in the notes folder
       (move it back to restore it). The trash is never emptied
       automatically; git ignores it through the .trash/.gitignore
-      written with it, unless that file already exists. Other devices
-      and other websites can never edit, also with --host or --public.
+      written with it, unless that file already exists.
+      "Maintenance" in the footer lists housekeeping actions. "Unused
+      assets" lists the files in journals/, pages/, and assets/ that no
+      note links to, shows, or names (e.g. images pasted and then
+      removed); choose some or all of them to move them to .trash/.
+      Other devices and other websites can never edit or see these
+      pages, also with --host or --public.
 
       --port <n>        Use exactly this port; fail if it is taken.
       --host <address>  Listen on this address instead of 127.0.0.1.

@@ -114,6 +114,7 @@ export class HermeticEditor extends HTMLElement {
     this.root = env.root;
     this.api = new SourceApi(env.root);
     this.addHeaderControls();
+    this.addFooterLink();
     this.watchTaskLists();
     document.addEventListener(OPEN_TODAY, () => this.openTodayNow());
 
@@ -234,6 +235,17 @@ export class HermeticEditor extends HTMLElement {
     this.status.setAttribute("role", "status");
     nav.prepend(today);
     nav.querySelector("hermetic-search")?.before(this.status);
+  }
+
+  /** "Maintenance" in the site footer, after "All pages": only where editing is available. */
+  private addFooterLink(): void {
+    const footer = document.querySelector(".site-footer");
+    if (!footer || footer.querySelector(".maintenance-link")) return;
+    const link = document.createElement("a");
+    link.className = "maintenance-link";
+    link.textContent = "Maintenance";
+    link.href = new URL("maintenance.html", this.root).href;
+    footer.querySelector(":scope > a")?.after(link);
   }
 
   /** On the default home page: "Write a home page" creates the root `index.md`. */

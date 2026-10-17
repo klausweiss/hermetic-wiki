@@ -751,3 +751,36 @@ dialog.page-props .error { color: var(--todo); font-size: 0.85rem; }
 .dialog-buttons { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
 button.danger { color: var(--bg); background: var(--todo); border-color: var(--todo); }
 button.danger:hover { color: var(--bg); background: var(--todo); filter: brightness(1.1); }
+button.danger:disabled { opacity: 0.5; filter: none; cursor: default; }
+
+/* Maintenance (hermetic serve, same machine only): the actions, and the unused assets. */
+ul.maintenance-actions { list-style: none; padding-left: 0; }
+ul.maintenance-actions > li { margin: 0.5rem 0; padding: 0.6rem 0.9rem; background: var(--surface); border-radius: 6px; }
+ul.maintenance-actions > li > a { font-weight: 600; }
+ul.maintenance-actions > li > p { margin: 0.2rem 0 0; font-size: 0.9rem; color: var(--muted); }
+.maintenance-unavailable[hidden] { display: none; }
+.unused-assets { display: block; }
+.unused-summary { color: var(--muted); }
+.unused-result:empty { display: none; }
+.unused-result { padding: 0.5rem 0.9rem; border-radius: 6px; background: var(--surface); font-size: 0.9rem; }
+.unused-result p, .unused-result ul { margin: 0.2rem 0; }
+.unused-toolbar {
+  position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 0.5rem; padding: 0.5rem 0; background: var(--bg); border-bottom: 1px solid var(--border);
+}
+.unused-toolbar[hidden], .unused-list[hidden] { display: none; }
+.unused-select-all { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer; }
+.unused-list { list-style: none; padding-left: 0; margin: 0; }
+.unused-list > li {
+  display: grid; grid-template-columns: auto 3rem minmax(0, 1fr) auto; align-items: center; gap: 0.75rem;
+  padding: 0.35rem 0; border-bottom: 1px solid var(--border);
+}
+.unused-preview { width: 3rem; height: 3rem; border-radius: 4px; background: var(--surface); overflow: hidden; }
+.unused-preview img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.unused-path { font-family: "JetBrains Mono", monospace; font-size: 0.85rem; overflow-wrap: anywhere; }
+.unused-size { font-size: 0.85rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+dialog.confirm-trash .confirm-files {
+  max-height: 12rem; overflow-y: auto; margin: 0; padding: 0.4rem 0.6rem; list-style: none;
+  background: var(--surface); border-radius: 6px; font-size: 0.85rem;
+}
+dialog.confirm-trash .confirm-files code { background: none; padding: 0; overflow-wrap: anywhere; }

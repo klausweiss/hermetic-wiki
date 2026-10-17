@@ -1,0 +1,8 @@
+{
+  "name": "@hermetic/maintenance",
+  "private": true,
+  "type": "module",
+  "description": "<hermetic-unused-assets>: the list of unused assets on the maintenance page of hermetic serve, to move them to the trash.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@hermetic/core": "workspace:*" }
+}

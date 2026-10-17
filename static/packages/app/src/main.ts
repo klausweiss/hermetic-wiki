@@ -6,6 +6,7 @@
 import { define as defineEditor } from "@hermetic/editor";
 import { define as defineGraph } from "@hermetic/graph";
 import { define as defineLiveReload } from "@hermetic/live-reload";
+import { define as defineMaintenance } from "@hermetic/maintenance";
 import { define as defineSearch } from "@hermetic/search";
 import { define as defineShortcuts } from "@hermetic/shortcuts";
 import { applyInitialLayout, define as defineSidebar } from "@hermetic/sidebar";
@@ -25,3 +26,4 @@ defineShortcuts();
 defineLiveReload();
 defineSearch();
 defineEditor();
+defineMaintenance();

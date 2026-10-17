@@ -454,3 +454,41 @@ fn change_served_within_two_seconds_at_5000_pages() {
     eprintln!("change served after {took:?}");
     assert!(took.is_some_and(|t| t < Duration::from_secs(2)), "{took:?}");
 }
+
+#[test]
+fn maintenance_pages_only_for_the_same_machine() {
+    let notes = Notes::new(&[("pages/a.md", "- a")]);
+    let server = serve::start(serve::Options {
+        notes: notes.path().to_path_buf(),
+        bind: Bind::Host("127.0.0.1".parse().unwrap()),
+        port: Some(0),
+        title: None,
+        timing: fast(),
+    })
+    .expect("server starts");
+    let lan = format!("192.168.1.23:{}", server.addr.port());
+    for (target, title) in [
+        ("/maintenance.html", "<title>Maintenance · "),
+        ("/maintenance/unused-assets.html", "<title>Unused assets · "),
+    ] {
+        let r = get(server.addr, target);
+        assert_eq!(r.status, 200, "{target}");
+        let html = String::from_utf8(r.body).unwrap();
+        assert!(html.contains(title), "{html}");
+        assert!(html.contains("<hermetic-editor></hermetic-editor>\n</body>"));
+        assert_eq!(
+            request(server.addr, "GET", target, Some(&lan)).status,
+            404,
+            "{target}"
+        );
+    }
+}
+
+#[test]
+fn builds_have_no_maintenance_pages() {
+    let (_h, built, _) = build_site(Path::new(FIXTURE));
+    assert!(!built.join("maintenance.html").exists());
+    assert!(!built.join("maintenance").exists());
+    let index = fs::read_to_string(built.join("index.html")).unwrap();
+    assert!(!index.contains("maintenance"));
+}

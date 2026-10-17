@@ -3,9 +3,10 @@
 
 pub mod edit;
 pub mod http;
+mod maintenance;
 pub mod watch;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 use std::fs;
 use std::io::{self, BufReader, Write};
@@ -76,6 +77,8 @@ struct Build {
     attachments: BTreeMap<PathBuf, (u64, Option<SystemTime>)>,
     /// Pages the editor may change, by site path.
     editable: edit::EditMap,
+    /// Every file an image or link in the notes resolves to, relative to the notes.
+    referenced: HashSet<PathBuf>,
 }
 
 struct State {
@@ -201,6 +204,7 @@ fn build_site(notes: &Path, title: &str) -> io::Result<(Build, usize, Vec<Diagno
         files: rendered.files,
         attachments,
         editable: edit::editable_pages(&graph),
+        referenced: graph.attachments().map(Path::to_path_buf).collect(),
     };
     Ok((build, rendered.pages, diagnostics))
 }
@@ -339,6 +343,16 @@ fn handle(state: &State, mut stream: TcpStream) -> io::Result<()> {
         stream.write_all(&http::response(status, content_type, &body, false))?;
         return close_after_body(&stream, &mut reader);
     }
+    if request.target.split(['?', '#']).next() == Some(http::UNUSED_ASSETS_PATH) {
+        let (status, body) = unused_assets(state, &request, &mut reader, same_machine);
+        let content_type = if status == 200 {
+            "application/json"
+        } else {
+            "text/plain"
+        };
+        stream.write_all(&http::response(status, content_type, &body, false))?;
+        return close_after_body(&stream, &mut reader);
+    }
     let head = request.method == "HEAD";
     if request.method != "GET" && !head {
         return stream.write_all(&http::response(405, "text/plain", b"", false));
@@ -350,7 +364,9 @@ fn handle(state: &State, mut stream: TcpStream) -> io::Result<()> {
     let path = http::decoded_path(&request.target);
     let found = path.as_deref().and_then(|p| http::lookup(&build.files, p));
     let blank = match (&found, path.as_deref()) {
-        (None, Some(p)) if same_machine => blank_day(state, &build, p),
+        (None, Some(p)) if same_machine => {
+            maintenance_page(state, p).or_else(|| blank_day(state, &build, p))
+        }
         _ => None,
     };
     if let Some(html) = blank {
@@ -408,6 +424,16 @@ fn close_after_body(stream: &TcpStream, reader: &mut impl io::Read) -> io::Resul
         &mut io::sink(),
     );
     Ok(())
+}
+
+/// The maintenance page at site path `path`, if it is one; these are never part of the
+/// build (see `maintenance`).
+fn maintenance_page(state: &State, path: &str) -> Option<String> {
+    match path {
+        site::MAINTENANCE_PAGE => Some(site::maintenance_page(&state.title).html),
+        site::UNUSED_ASSETS_PAGE => Some(site::unused_assets_page(&state.title).html),
+        _ => None,
+    }
 }
 
 /// The page of a journal day at site path `path` that has no page in the build, so that
@@ -575,6 +601,78 @@ fn asset(
     (201, json.into_bytes())
 }
 
+/// The maintenance API: `GET` lists the attachments nothing uses, `POST` moves the
+/// listed ones of them to one trash folder (see `maintenance`).
+fn unused_assets(
+    state: &State,
+    request: &http::Request,
+    reader: &mut impl io::Read,
+    same_machine: bool,
+) -> (u16, Vec<u8>) {
+    let post = request.method == "POST";
+    if !post && request.method != "GET" {
+        return (405, Vec::new());
+    }
+    if !same_machine || (post && !edit::from_editor(request)) {
+        return (403, Vec::new());
+    }
+    if !post {
+        let build = Arc::clone(&state.build.read().expect("build lock"));
+        return (
+            200,
+            maintenance::list_json(&current_unused(state, &build)).into_bytes(),
+        );
+    }
+    let body = match http::read_body(reader, request, maintenance::MAX_BODY) {
+        Ok(body) => body,
+        Err(status) => return (status, Vec::new()),
+    };
+    let Some(paths) = std::str::from_utf8(&body)
+        .ok()
+        .and_then(maintenance::parse_paths)
+    else {
+        return (400, b"expected {\"paths\":[...]}\n".to_vec());
+    };
+
+    let _rebuilding = state.rebuilding.lock().expect("rebuild lock");
+    let build = Arc::clone(&state.build.read().expect("build lock"));
+    // Only paths on the list computed now are touched; a requested path is never
+    // joined to the notes folder.
+    let unused: HashSet<String> = current_unused(state, &build)
+        .iter()
+        .map(|u| url_path(&u.path))
+        .collect();
+    drop(build);
+    let dir = edit::trash_dir(&state.notes);
+    let mut trashed = Vec::new();
+    let mut skipped = Vec::new();
+    for path in paths {
+        if !unused.contains(&path) || trashed.contains(&path) {
+            skipped.push((path, "not an unused asset".to_owned()));
+            continue;
+        }
+        match edit::trash_attachment(&state.notes, Path::new(&path), &dir) {
+            Ok(_) => trashed.push(path),
+            Err(edit::Unsafe::Outside) => skipped.push((path, "outside the notes".to_owned())),
+            Err(edit::Unsafe::Io(e)) => skipped.push((path, e.to_string())),
+        }
+    }
+    if !trashed.is_empty() {
+        commit(state);
+    }
+    (
+        200,
+        maintenance::trash_json(&trashed, &url_path(&dir), &skipped).into_bytes(),
+    )
+}
+
+/// The attachments of `build` that nothing uses, judged against the notes as they are now.
+fn current_unused(state: &State, build: &Build) -> Vec<maintenance::Unused> {
+    let files = build.editable.values().filter_map(|p| p.file.as_deref());
+    let texts = maintenance::note_texts(&state.notes, files);
+    maintenance::unused_assets(&build.files, &build.referenced, &texts)
+}
+
 /// The response for a write the edit checks refused or that failed.
 fn unsafe_status(e: edit::Unsafe) -> (u16, Vec<u8>) {
     match e {
@@ -671,6 +769,7 @@ mod tests {
                 .collect(),
             attachments: BTreeMap::new(),
             editable: edit::EditMap::new(),
+            referenced: HashSet::new(),
         }
     }
 

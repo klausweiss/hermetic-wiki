@@ -7,6 +7,7 @@
     "@hermetic/editor": "workspace:*",
     "@hermetic/graph": "workspace:*",
     "@hermetic/live-reload": "workspace:*",
+    "@hermetic/maintenance": "workspace:*",
     "@hermetic/search": "workspace:*",
     "@hermetic/shortcuts": "workspace:*",
     "@hermetic/sidebar": "workspace:*",

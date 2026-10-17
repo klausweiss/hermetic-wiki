@@ -23,6 +23,7 @@ Pasting images (change `paste-images`) stores every image in `assets/`, and the 
 
 ### Modified Capabilities
 - `serve-mode`: HTTP behavior allows `POST` to the maintenance API and serves the maintenance pages, which are not part of the build.
+- `reader-ui`: the key menus become `,` for settings (the theme) and `.` for actions the current page offers; `.` then `a` selects all and `.` then `d` moves the selected files to the trash (after confirming) on the unused-assets page. Keys work while a checkbox has the focus.
 - `browser-editing`: request authenticity covers the maintenance API. Safe writes allow moving an unused attachment to the trash, which covers files under `assets/` as well as `journals/` and `pages/`.
 
 ## Impact

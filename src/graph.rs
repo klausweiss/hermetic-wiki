@@ -286,6 +286,11 @@ impl Graph {
         &self.attachments[id.0 as usize]
     }
 
+    /// Paths, relative to the root, of every file referenced by an image or link.
+    pub fn attachments(&self) -> impl Iterator<Item = &Path> {
+        self.attachments.iter().map(PathBuf::as_path)
+    }
+
     /// Finds a page by name, case-insensitively.
     pub fn find_page(&self, name: &str) -> Option<PageId> {
         self.by_key.get(&NameKey::new(name)).copied()

@@ -24,7 +24,7 @@ The server SHALL serve a maintenance page at `/maintenance.html` where editing i
 ### Requirement: Unused assets
 An attachment (see "Attachments" in `static-site-output`) SHALL be unused when both of these hold:
 - No inline markdown image or link in a block's content or a property value of any note resolves to it. Resolution SHALL follow "Attachment links" in `static-site-output`, ignoring any `#fragment`.
-- Its file name does not appear in the text of any note file, neither as written nor percent-encoded. This keeps files that raw HTML or reference-style links use.
+- Its file name does not appear in the text of any note file as a whole name (not as part of a longer name such as `used.png` for `d.png`), neither as written nor percent-encoded. This keeps files that raw HTML or reference-style links use.
 
 Attachments that the build skips (symbolic links, and files whose path a generated page takes) SHALL NOT be listed. The rule SHALL apply to attachments in `journals/`, `pages/`, and `assets/` alike.
 
@@ -44,6 +44,10 @@ Attachments that the build skips (symbolic links, and files whose path a generat
 - **WHEN** a page contains `<img src="../assets/diagram.svg">` and nothing else names `assets/diagram.svg`
 - **THEN** `assets/diagram.svg` is not unused, because its file name appears in the note
 
+#### Scenario: Part of a longer name
+- **WHEN** `assets/d.png` exists and the only note text containing `d.png` is `![u](../assets/used.png)`
+- **THEN** `assets/d.png` is unused
+
 #### Scenario: Name with spaces
 - **WHEN** `assets/my shot.png` exists and a note contains only the text `my%20shot.png` in an HTML attribute
 - **THEN** `assets/my shot.png` is not unused
@@ -56,7 +60,7 @@ Attachments that the build skips (symbolic links, and files whose path a generat
 
 Above the list it SHALL show the number of unused assets and their total size. With no unused assets, it SHALL say so instead of showing an empty list.
 
-Each entry SHALL have a checkbox. A "Select all" checkbox SHALL select or clear every entry, and SHALL show a mixed state when only some are selected. Shift+click on an entry's checkbox SHALL set every entry between it and the previously clicked one to the clicked one's new state. A "Move to trash" button SHALL show the number of selected entries, and SHALL be disabled when none is selected.
+Each entry SHALL have a checkbox. A "Select all" checkbox SHALL select or clear every entry, and SHALL show a mixed state when only some are selected. Shift+click on an entry's checkbox SHALL set every entry between it and the previously clicked one to the clicked one's new state. `.` then `a` (see the page menu in `reader-ui`) SHALL select every entry, or clear them all when all are selected. `.` then `d` SHALL do what "Move to trash" does, when at least one entry is selected. A "Move to trash" button SHALL show the number of selected entries, and SHALL be disabled when none is selected.
 
 Choosing "Move to trash" SHALL ask for confirmation in a dialog. The dialog SHALL state the number of files and their total size, list their paths, and say that they are moved to `.trash/` in the notes folder. Nothing SHALL change unless the author confirms. After a confirmed move, the page SHALL report how many files were moved and the trash folder they were moved to. It SHALL name any file that was not moved and the reason, and show the updated list. When the notes change (live reload), the list SHALL be updated, keeping the selection of entries still listed.
 
@@ -71,6 +75,14 @@ Choosing "Move to trash" SHALL ask for confirmation in a dialog. The dialog SHAL
 #### Scenario: Select all
 - **WHEN** the page lists 12 unused assets and the author checks "Select all"
 - **THEN** all 12 are selected and the button reads "Move to trash (12)"
+
+#### Scenario: Select all from the keyboard
+- **WHEN** the page lists 3 unused assets, none selected, and the author presses `.` then `a`, then `.` then `a` again
+- **THEN** all 3 are selected after the first press and none after the second, also while a checkbox has the focus
+
+#### Scenario: Move to trash from the keyboard
+- **WHEN** two entries are selected and the author presses `.` then `d`
+- **THEN** the confirmation for those 2 files opens, and nothing is moved until the author confirms
 
 #### Scenario: Range selection
 - **WHEN** the author checks the 2nd entry and then Shift+clicks the 6th

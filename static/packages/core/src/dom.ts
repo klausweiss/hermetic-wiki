@@ -41,7 +41,7 @@ export const EDITING_ATTR = "data-hermetic-editing";
 /** Dispatched on `document` (by the `g d` shortcut) to open today's journal. */
 export const OPEN_TODAY = "hermetic-open-today";
 
-/** Dispatched on `document` (by the `, t` shortcut) to switch between light and dark. */
+/** Dispatched on `document` (by the `, t` shortcut, in the settings menu) to switch between light and dark. */
 export const THEME_SWITCH = "hermetic-theme-switch";
 
 /** The theme the page shows: the chosen one, or the system's when none is chosen. */

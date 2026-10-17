@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "files": ["../../types/bun-test.d.ts"],
+  "include": ["src"]
+}

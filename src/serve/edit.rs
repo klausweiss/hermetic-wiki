@@ -386,16 +386,61 @@ pub fn move_to_trash(root: &Path, path: &Path) -> Result<PathBuf, Unsafe> {
     if !allowed(root, path) {
         return Err(Unsafe::Outside);
     }
-    let rel = path.strip_prefix(root).map_err(|_| Unsafe::Outside)?;
+    move_into_trash(root, path, &trash_dir(root))
+}
+
+/// A folder of the trash, relative to `root`, that does not exist yet:
+/// `.trash/<timestamp>`, or `.trash/<timestamp>-<n>` when that is taken.
+pub fn trash_dir(root: &Path) -> PathBuf {
     let stamp = timestamp(std::time::SystemTime::now());
-    let mut trashed = PathBuf::from(TRASH_DIR).join(&stamp).join(rel);
+    let mut dir = PathBuf::from(TRASH_DIR).join(&stamp);
     let mut n = 1;
-    while root.join(&trashed).exists() {
+    while fs::symlink_metadata(root.join(&dir)).is_ok() {
         n += 1;
-        trashed = PathBuf::from(TRASH_DIR)
-            .join(format!("{stamp}-{n}"))
-            .join(rel);
+        dir = PathBuf::from(TRASH_DIR).join(format!("{stamp}-{n}"));
     }
+    dir
+}
+
+/// Moves the unused attachment `rel` (relative to the canonical notes `root`) into the
+/// trash folder `dir` (see [`trash_dir`]), keeping its relative path. It must be a
+/// regular file under `journals/`, `pages/`, or `assets/` with symbolic links resolved,
+/// and not a note. Returns its path in the trash, relative to `root`.
+pub fn trash_attachment(root: &Path, rel: &Path, dir: &Path) -> Result<PathBuf, Unsafe> {
+    if rel.components().any(|c| !matches!(c, Component::Normal(_))) {
+        return Err(Unsafe::Outside);
+    }
+    let path = root.join(rel);
+    if fs::canonicalize(&path)? != path || !fs::symlink_metadata(&path)?.is_file() {
+        return Err(Unsafe::Outside);
+    }
+    if !allowed_attachment(root, &path) {
+        return Err(Unsafe::Outside);
+    }
+    move_into_trash(root, &path, dir)
+}
+
+fn allowed_attachment(root: &Path, path: &Path) -> bool {
+    let Ok(rel) = path.strip_prefix(root) else {
+        return false;
+    };
+    let mut parts = rel.components();
+    let name = rel.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+    match (parts.next(), parts.next()) {
+        (Some(Component::Normal(first)), Some(_)) => {
+            (first == JOURNALS_DIR || first == PAGES_DIR || first == ASSETS_DIR)
+                && !layout::is_markdown(name)
+        }
+        _ => false,
+    }
+}
+
+/// Moves `path` (checked by the caller) to `dir/<its path relative to root>`, then
+/// removes directories under `pages/` that this left empty. Returns the trash path
+/// relative to `root`.
+fn move_into_trash(root: &Path, path: &Path, dir: &Path) -> Result<PathBuf, Unsafe> {
+    let rel = path.strip_prefix(root).map_err(|_| Unsafe::Outside)?;
+    let trashed = dir.join(rel);
     // `.trash` must not lead out of the notes (e.g. as a symbolic link): checked before
     // anything is created in it, and again after.
     let trash = root.join(TRASH_DIR);
@@ -403,9 +448,12 @@ pub fn move_to_trash(root: &Path, path: &Path) -> Result<PathBuf, Unsafe> {
         return Err(Unsafe::Outside);
     }
     let dest = root.join(&trashed);
-    let dir = dest.parent().ok_or(Unsafe::Outside)?;
-    fs::create_dir_all(dir)?;
-    if !fs::canonicalize(dir)?.starts_with(root) {
+    if fs::symlink_metadata(&dest).is_ok() {
+        return Err(io::Error::from(io::ErrorKind::AlreadyExists).into());
+    }
+    let parent = dest.parent().ok_or(Unsafe::Outside)?;
+    fs::create_dir_all(parent)?;
+    if !fs::canonicalize(parent)?.starts_with(root) {
         return Err(Unsafe::Outside);
     }
     ignore_trash(&trash);
@@ -482,7 +530,7 @@ fn ignore_trash(trash: &Path) {
 }
 
 const TRASH_GITIGNORE: &str = "\
-# Pages deleted in the browser by `hermetic serve`; never emptied automatically.
+# Pages and files deleted in the browser by `hermetic serve`; never emptied automatically.
 # To track the trash in git, empty this file instead of deleting it.
 *
 ";

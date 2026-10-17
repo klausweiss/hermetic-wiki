@@ -10,12 +10,16 @@ use std::path::Path;
 use std::time::Duration;
 
 use common::Notes;
-use hermetic::serve::{self, Bind, Running, watch::Timing};
+use hermetic::serve::{self, Bind, Running, edit, watch::Timing};
 
 fn start(notes: &Path) -> Running {
+    start_on(notes, Bind::Loopback)
+}
+
+fn start_on(notes: &Path, bind: Bind) -> Running {
     serve::start(serve::Options {
         notes: notes.to_path_buf(),
-        bind: Bind::Loopback,
+        bind,
         port: Some(0),
         title: None,
         timing: Timing {
@@ -47,7 +51,7 @@ fn send(
     for (name, value) in headers {
         head.push_str(&format!("{name}: {value}\r\n"));
     }
-    if method == "PUT" {
+    if method == "PUT" || method == "POST" {
         head.push_str(&format!("Content-Length: {}\r\n", body.len()));
     }
     head.push_str("\r\n");
@@ -979,4 +983,243 @@ fn uploads_stay_in_the_notes() {
     let server = start(notes.path());
     assert_eq!(upload(server.addr, "pages/auth.html", None, PNG).0, 403);
     assert!(common::tree(outside.path()).is_empty());
+}
+
+#[test]
+fn attachments_share_one_trash_folder() {
+    let notes = Notes::new(&[("pages/auth.md", "- a\n")]);
+    notes.write("assets/a.png", PNG);
+    notes.write("pages/sub/b.png", PNG);
+    let root = fs::canonicalize(notes.path()).unwrap();
+    let dir = edit::trash_dir(&root);
+    let a = edit::trash_attachment(&root, Path::new("assets/a.png"), &dir).unwrap();
+    let b = edit::trash_attachment(&root, Path::new("pages/sub/b.png"), &dir).unwrap();
+    assert_eq!(a, dir.join("assets/a.png"));
+    assert_eq!(b, dir.join("pages/sub/b.png"));
+    assert!(root.join(&a).is_file() && root.join(&b).is_file());
+    // `pages/sub/` was left empty and is pruned; `assets/` stays even when empty.
+    assert!(!root.join("pages/sub").exists());
+    assert!(root.join("assets").is_dir());
+    assert!(root.join(".trash/.gitignore").is_file());
+    // The next batch gets a folder of its own.
+    assert_ne!(edit::trash_dir(&root), dir);
+}
+
+#[test]
+fn only_attachments_are_trashed_as_such() {
+    let notes = Notes::new(&[("pages/auth.md", "- a\n"), ("index.md", "- home\n")]);
+    notes.write("assets/a.png", PNG);
+    notes.write("other/x.png", PNG);
+    let root = fs::canonicalize(notes.path()).unwrap();
+    let dir = edit::trash_dir(&root);
+    for rel in [
+        "pages/auth.md",
+        "index.md",
+        "other/x.png",
+        "assets/../pages/auth.md",
+        "/etc/passwd",
+        "assets",
+        "assets/missing.png",
+    ] {
+        assert!(
+            edit::trash_attachment(&root, Path::new(rel), &dir).is_err(),
+            "{rel}"
+        );
+    }
+    assert!(!root.join(".trash").exists());
+    assert!(root.join("pages/auth.md").is_file() && root.join("other/x.png").is_file());
+}
+
+#[cfg(unix)]
+#[test]
+fn attachments_behind_links_are_not_trashed() {
+    let outside = Notes::empty();
+    outside.write("x.png", PNG);
+    let notes = Notes::new(&[("pages/auth.md", "- a\n")]);
+    notes.write("assets/a.png", PNG);
+    std::os::unix::fs::symlink(
+        outside.path().join("x.png"),
+        notes.path().join("assets/link.png"),
+    )
+    .unwrap();
+    std::os::unix::fs::symlink(outside.path(), notes.path().join("pages/out")).unwrap();
+    let root = fs::canonicalize(notes.path()).unwrap();
+    let dir = edit::trash_dir(&root);
+    for rel in ["assets/link.png", "pages/out/x.png"] {
+        assert!(
+            edit::trash_attachment(&root, Path::new(rel), &dir).is_err(),
+            "{rel}"
+        );
+    }
+    assert!(outside.path().join("x.png").is_file());
+}
+
+const UNUSED: &str = "/_hermetic/unused-assets";
+
+/// The headers hermetic's maintenance page sends with a request to move files.
+fn maintenance_headers(addr: SocketAddr) -> Vec<(&'static str, String)> {
+    vec![
+        ("Origin", format!("http://127.0.0.1:{}", addr.port())),
+        ("X-Hermetic-Edit", "1".to_owned()),
+    ]
+}
+
+fn trash(addr: SocketAddr, body: &str) -> Response {
+    send(addr, "POST", UNUSED, &maintenance_headers(addr), body)
+}
+
+#[test]
+fn unused_assets_are_listed() {
+    let notes = Notes::new(&[("pages/auth.md", "- ![flow](auth-flow.png)\n")]);
+    notes.write("pages/auth-flow.png", PNG);
+    notes.write("assets/a.png", &[0; 2048]);
+    let server = start(notes.path());
+    let r = send(server.addr, "GET", UNUSED, &[], "");
+    assert_eq!(r.status, 200);
+    assert_eq!(
+        r.body,
+        r#"{"assets":[{"path":"assets/a.png","size":2048}]}"#
+    );
+}
+
+#[test]
+fn unused_assets_are_moved_to_one_trash_folder() {
+    let notes = Notes::new(&[("pages/auth.md", "- ![flow](auth-flow.png)\n")]);
+    notes.write("pages/auth-flow.png", PNG);
+    notes.write("assets/a.png", PNG);
+    notes.write("pages/sub/b.png", PNG);
+    let server = start(notes.path());
+    let r = trash(
+        server.addr,
+        r#"{"paths":["assets/a.png","pages/sub/b.png","pages/auth-flow.png","pages/auth.md"]}"#,
+    );
+    assert_eq!(r.status, 200, "{}", r.body);
+    let dir = field(&r.body, "trash");
+    assert!(dir.starts_with(".trash/"), "{}", r.body);
+    assert!(
+        r.body
+            .starts_with(r#"{"trashed":["assets/a.png","pages/sub/b.png"]"#),
+        "{}",
+        r.body
+    );
+    assert!(
+        r.body.ends_with(
+            r#""skipped":[{"path":"pages/auth-flow.png","reason":"not an unused asset"},{"path":"pages/auth.md","reason":"not an unused asset"}]}"#
+        ),
+        "{}",
+        r.body
+    );
+    let root = notes.path();
+    assert!(root.join(&dir).join("assets/a.png").is_file());
+    assert!(root.join(&dir).join("pages/sub/b.png").is_file());
+    assert!(!root.join("assets/a.png").exists() && !root.join("pages/sub").exists());
+    assert!(root.join("pages/auth-flow.png").is_file() && root.join("pages/auth.md").is_file());
+    // Answered after the rebuild: the files are no longer served or listed.
+    assert_eq!(
+        send(server.addr, "GET", "/assets/a.png", &[], "").status,
+        404
+    );
+    assert_eq!(
+        send(server.addr, "GET", UNUSED, &[], "").body,
+        r#"{"assets":[]}"#
+    );
+}
+
+#[test]
+fn unused_assets_path_tricks() {
+    let outside = Notes::empty();
+    outside.write("x.png", PNG);
+    let notes = Notes::new(&[("pages/auth.md", "- a\n")]);
+    notes.write("assets/a.png", PNG);
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(
+        outside.path().join("x.png"),
+        notes.path().join("assets/link.png"),
+    )
+    .unwrap();
+    let server = start(notes.path());
+    let r = trash(
+        server.addr,
+        r#"{"paths":["assets/../pages/auth.md","/etc/passwd","assets/link.png","./assets/a.png","assets//a.png"]}"#,
+    );
+    assert_eq!(r.status, 200);
+    assert!(r.body.starts_with(r#"{"trashed":[]"#), "{}", r.body);
+    assert_eq!(
+        r.body.matches("not an unused asset").count(),
+        5,
+        "{}",
+        r.body
+    );
+    assert!(!notes.path().join(".trash").exists());
+    assert!(notes.path().join("assets/a.png").is_file());
+    assert!(outside.path().join("x.png").is_file());
+}
+
+#[test]
+fn unused_assets_bad_requests() {
+    let notes = Notes::new(&[("pages/auth.md", "- a\n")]);
+    notes.write("assets/a.png", PNG);
+    let server = start(notes.path());
+    let addr = server.addr;
+    for body in ["", "paths=assets/a.png", r#"{"paths":"assets/a.png"}"#] {
+        assert_eq!(trash(addr, body).status, 400, "{body}");
+    }
+    let big = format!(r#"{{"paths":["{}"]}}"#, "a".repeat(1024 * 1024));
+    let r = send_bytes(
+        addr,
+        "POST",
+        UNUSED,
+        &maintenance_headers(addr),
+        big.as_bytes(),
+        None,
+    );
+    assert_eq!(r.0, 413);
+    for method in ["DELETE", "PUT"] {
+        let r = send_bytes(addr, method, UNUSED, &maintenance_headers(addr), b"", None);
+        assert_eq!(r.0, 405, "{method}");
+    }
+    assert!(notes.path().join("assets/a.png").is_file());
+}
+
+#[test]
+fn unused_assets_need_the_same_machine_and_the_editor() {
+    let notes = Notes::new(&[("pages/auth.md", "- a\n")]);
+    notes.write("assets/a.png", PNG);
+    let body = r#"{"paths":["assets/a.png"]}"#;
+    let server = start(notes.path());
+    let addr = server.addr;
+    let forged = [
+        vec![
+            ("Origin", "https://evil.example".to_owned()),
+            ("X-Hermetic-Edit", "1".to_owned()),
+        ],
+        vec![("Origin", format!("http://127.0.0.1:{}", addr.port()))],
+        vec![("X-Hermetic-Edit", "1".to_owned())],
+    ];
+    for headers in &forged {
+        assert_eq!(
+            send(addr, "POST", UNUSED, headers, body).status,
+            403,
+            "{headers:?}"
+        );
+    }
+    // A request naming another host: refused by the loopback binding.
+    let rebinding = [("Host", format!("evil.example:{}", addr.port()))];
+    assert_eq!(send(addr, "GET", UNUSED, &rebinding, "").status, 403);
+    drop(server);
+
+    // Another device, on a server listening beyond loopback.
+    let server = start_on(notes.path(), Bind::Host("127.0.0.1".parse().unwrap()));
+    let addr = server.addr;
+    let lan = format!("192.168.1.23:{}", addr.port());
+    assert_eq!(
+        send(addr, "GET", UNUSED, &[("Host", lan.clone())], "").status,
+        403
+    );
+    let mut headers = maintenance_headers(addr);
+    headers.push(("Host", lan.clone()));
+    headers[0].1 = format!("http://{lan}");
+    assert_eq!(send(addr, "POST", UNUSED, &headers, body).status, 403);
+    assert!(notes.path().join("assets/a.png").is_file());
+    assert!(!notes.path().join(".trash").exists());
 }

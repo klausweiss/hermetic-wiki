@@ -228,7 +228,7 @@ export class HermeticEditor extends HTMLElement {
     today.addEventListener("click", (e) => {
       if (e.button !== 0 || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
       e.preventDefault();
-      void this.openToday(path);
+      this.openToday(path);
     });
     this.status = document.createElement("span");
     this.status.className = "edit-status";
@@ -280,18 +280,12 @@ export class HermeticEditor extends HTMLElement {
 
   /** Opens today's journal (the "Today" control and the `g d` keys). */
   openTodayNow(): void {
-    void this.openToday(`journals/${localDate(new Date())}.html`);
+    this.openToday(`journals/${localDate(new Date())}.html`);
   }
 
-  private async openToday(path: string): Promise<void> {
-    try {
-      // Start writing only in a day without content; otherwise just show it. A day
-      // without a file gets one with the first save that has content.
-      const p = await this.api.get(path);
-      if (p.blocks.every((b) => b.body.trim() === "")) startAfterLoad(path);
-    } catch {
-      // Open it anyway; the page tells what is wrong.
-    }
+  private openToday(path: string): void {
+    // The day opens without editing (Return starts it); a day without a file gets one
+    // with the first save that has content.
     location.href = carrySidebar(new URL(path, this.root).href, location.href);
   }
 

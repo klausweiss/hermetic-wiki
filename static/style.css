@@ -437,9 +437,10 @@ hermetic-timeline.show-timeline > h2, hermetic-timeline.show-timeline > ul.days 
   display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem calc(2 * var(--corner-size) + var(--corner-gap) + var(--corner-inset) + 0.5rem) 0.6rem 1rem;
   border-bottom: 1px solid var(--border); font-size: 0.85rem; color: var(--muted);
 }
-/* The title is as tall as the "Close all" button, so the bar keeps its height (and its
-   border its distance from the corner buttons) while no pane is open and that is hidden. */
-.sidebar-bar span { margin-right: auto; font-weight: 600; padding: 0.1rem 0; border-block: 1px solid transparent; }
+/* "Close all" only turns invisible while no pane is open, so the bar keeps its height (and
+   its border its distance from the corner buttons). */
+.sidebar-bar button { margin-left: auto; }
+.sidebar-bar button[hidden] { display: block; visibility: hidden; }
 .panes { overflow-y: auto; flex: 1; padding: 0 1rem 2rem; }
 
 /* The site footer: after the page's content without the script (its parent,
@@ -453,7 +454,7 @@ hermetic-timeline.show-timeline > h2, hermetic-timeline.show-timeline > ul.days 
 .site-footer code { font-size: 1em; background: none; padding: 0; }
 .sidebar .site-footer { max-width: none; width: 100%; margin: 0; padding: 0.6rem 1rem; flex: none; }
 .sidebar-placeholder { margin: 1.5rem 1rem; color: var(--muted); font-size: 0.85rem; }
-.sidebar-placeholder[hidden], .sidebar-bar button[hidden] { display: none; }
+.sidebar-placeholder[hidden] { display: none; }
 .pane {
   border-bottom: 1px solid var(--border); padding: 0.5rem 0 1rem;
   /* Off-screen panes are neither laid out nor painted. */

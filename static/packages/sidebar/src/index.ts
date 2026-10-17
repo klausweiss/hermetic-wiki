@@ -130,10 +130,8 @@ export class HermeticSidebar extends HTMLElement {
     aside.setAttribute("aria-label", "Sidebar");
     const bar = document.createElement("div");
     bar.className = "sidebar-bar";
-    const label = document.createElement("span");
-    label.textContent = "Sidebar";
     this.closeAllButton = button("Close all", "Close every pane", () => this.closeAll());
-    bar.append(label, this.closeAllButton);
+    bar.append(this.closeAllButton);
 
     this.placeholder = document.createElement("p");
     this.placeholder.className = "sidebar-placeholder";

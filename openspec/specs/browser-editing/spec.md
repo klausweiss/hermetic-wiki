@@ -275,14 +275,14 @@ A save SHALL change only the lines of blocks that were edited, added, moved, or 
 - **THEN** the page has blocks `a` and `b`
 
 ### Requirement: Creating journal days and pages
-When editing is available, every page SHALL show a "Today" control in the header. It, and the keys `g` then `d`, SHALL open the journal day of the browser's current date without creating its file. Editing SHALL start in its first block only when the day has no content (no block with text); otherwise the day opens without editing. On a browser on the same machine, the server SHALL show a journal day (`journals/YYYY-MM-DD.html` with a valid date) that is not in the site as a day without content, with its links to the nearest earlier and later days, ready to write in; for other requests it SHALL stay 404. Saving a page that has no file, such as one that is only referenced, SHALL create its file at the path given by the `source-layout` name encoding (journal days at `journals/YYYY-MM-DD.md`), creating namespace directories as needed. Existing files SHALL never be replaced by a create. The page `index` is the home page: its file is the root `index.md`, never `pages/index.md`. When the notes root has no `index.md`, the home page SHALL offer "Write a home page" instead of its hint about `index.md`; choosing it SHALL create the root `index.md` with one empty block and start editing it there.
+When editing is available, every page SHALL show a "Today" control in the header. It, and the keys `g` then `d`, SHALL open the journal day of the browser's current date without creating its file, and without starting to edit it (Return starts editing, as on any page). On a browser on the same machine, the server SHALL show a journal day (`journals/YYYY-MM-DD.html` with a valid date) that is not in the site as a day without content, with its links to the nearest earlier and later days, ready to write in; for other requests it SHALL stay 404. Saving a page that has no file, such as one that is only referenced, SHALL create its file at the path given by the `source-layout` name encoding (journal days at `journals/YYYY-MM-DD.md`), creating namespace directories as needed. Existing files SHALL never be replaced by a create. The page `index` is the home page: its file is the root `index.md`, never `pages/index.md`. When the notes root has no `index.md`, the home page SHALL offer "Write a home page" instead of its hint about `index.md`; choosing it SHALL create the root `index.md` with one empty block and start editing it there.
 
 #### Scenario: Today without a file
 - **WHEN** the author clicks "Today" on 2026-10-13 and `journals/2026-10-13.md` does not exist
-- **THEN** the journal day opens with its first block being edited, and `journals/2026-10-13.md` still does not exist
+- **THEN** the journal day opens with no block being edited, and `journals/2026-10-13.md` still does not exist
 
 #### Scenario: First content
-- **WHEN** the author then types `standup` into that block
+- **WHEN** the author then presses Return and types `standup`
 - **THEN** `journals/2026-10-13.md` exists and contains `- standup`
 
 #### Scenario: Today with content

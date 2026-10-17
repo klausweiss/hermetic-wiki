@@ -28,8 +28,6 @@ interface Shortcut {
   search?: true;
   /** Listed only on the graph page. */
   graph?: true;
-  /** Listed only where the theme button is. */
-  theme?: true;
   /** Listed only where editing is available (hermetic serve, same machine). */
   editing?: true;
 }
@@ -45,18 +43,8 @@ const KEY_LABELS: Readonly<Record<string, string>> = APPLE
   ? { Mod: "⌘", Shift: "⇧", Alt: "⌥", Ctrl: "⌃" }
   : { Mod: "Ctrl" };
 
+// Formatting before editing: the two columns then come out about even.
 const HELP: readonly Group[] = [
-  {
-    title: "Go to",
-    shortcuts: [
-      { keys: "g h", what: "Home" },
-      { keys: "g j", what: "Journals" },
-      { keys: "g d", what: "Today's journal", editing: true },
-      { keys: "g p", what: "All pages" },
-      { keys: "g t", what: "Open tasks" },
-      { keys: "g g", what: "Graph" },
-    ],
-  },
   {
     title: "Search and view",
     shortcuts: [
@@ -66,8 +54,19 @@ const HELP: readonly Group[] = [
       { keys: "Shift+{click}", what: "Open a page in the sidebar", sidebar: true },
       { keys: "Esc", what: "Close the top sidebar pane", sidebar: true },
       { keys: "\\", what: "Show or hide the sidebar", sidebar: true },
-      { keys: ", t", what: "Switch theme: system, light, dark", theme: true },
       { keys: "?", what: "Show these shortcuts" },
+    ],
+  },
+  {
+    title: "Formatting and history",
+    shortcuts: [
+      { keys: "Mod+B", what: "Bold", editing: true },
+      { keys: "Mod+I", what: "Italic", editing: true },
+      { keys: "Mod+Shift+S", what: "Strikethrough", editing: true },
+      { keys: "Mod+E", what: "Inline code", editing: true },
+      { keys: "Mod+V", what: "Paste a URL over selected text to link it", editing: true },
+      { keys: "Mod+Z", what: "Undo, across blocks", editing: true },
+      { keys: "Mod+Shift+Z", what: "Redo", editing: true },
     ],
   },
   {
@@ -83,18 +82,6 @@ const HELP: readonly Group[] = [
       { keys: "Mod+Enter", what: "Cycle TODO / DOING / DONE", editing: true },
       { keys: "[[ / ((", what: "Link a page / reference a block", editing: true },
       { keys: "Esc", what: "Stop editing", editing: true },
-    ],
-  },
-  {
-    title: "Formatting and history",
-    shortcuts: [
-      { keys: "Mod+B", what: "Bold", editing: true },
-      { keys: "Mod+I", what: "Italic", editing: true },
-      { keys: "Mod+Shift+S", what: "Strikethrough", editing: true },
-      { keys: "Mod+E", what: "Inline code", editing: true },
-      { keys: "Mod+V", what: "Paste a URL over selected text to link it", editing: true },
-      { keys: "Mod+Z", what: "Undo, across blocks", editing: true },
-      { keys: "Mod+Shift+Z", what: "Redo", editing: true },
     ],
   },
 ];
@@ -155,6 +142,9 @@ function go(path: string): () => void {
   };
 }
 
+/** How long a menu's key waits for the second key before showing the menu. */
+const MENU_DELAY_MS = 300;
+
 const THEMES = ["system", "light", "dark"] as const;
 
 const MENUS: readonly Menu[] = [
@@ -203,6 +193,8 @@ export class HermeticShortcuts extends HTMLElement {
   private menu: HTMLDialogElement | null = null;
   /** The menu shown in `menu`. */
   private shown: Menu | null = null;
+  /** A menu whose key was just pressed, shown only if no second key follows soon. */
+  private pendingMenu: { menu: Menu; timer: number } | null = null;
 
   connectedCallback(): void {
     whenParsed(() => this.setup());
@@ -235,11 +227,28 @@ export class HermeticShortcuts extends HTMLElement {
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) {
       return;
     }
+    // The second key of a menu pressed before the menu shows: run its action at once.
+    if (this.pendingMenu) {
+      if (["Shift", "Control", "Alt", "Meta"].includes(e.key)) return;
+      const { menu } = this.pendingMenu;
+      this.cancelMenu();
+      const action = available(menu).find((a) => a.key === e.key);
+      if (action || e.key === "Escape") {
+        e.preventDefault();
+        action?.run();
+        return;
+      }
+    }
     const menu = MENUS.find((m) => m.key === e.key);
     if (menu) {
       if (!document.querySelector("dialog[open]") && available(menu).length > 0) {
         e.preventDefault();
-        this.openMenu(menu);
+        // Shown after a pause, so that typing both keys from memory does not flash it.
+        const timer = window.setTimeout(() => {
+          this.pendingMenu = null;
+          if (!document.querySelector("dialog[open]")) this.openMenu(menu);
+        }, MENU_DELAY_MS);
+        this.pendingMenu = { menu, timer };
       }
       return;
     }
@@ -274,6 +283,11 @@ export class HermeticShortcuts extends HTMLElement {
         this.help.focus();
         break;
     }
+  }
+
+  private cancelMenu(): void {
+    if (this.pendingMenu) clearTimeout(this.pendingMenu.timer);
+    this.pendingMenu = null;
   }
 
   /**
@@ -353,14 +367,12 @@ export class HermeticShortcuts extends HTMLElement {
     const withSidebar = readEnv().interactive && document.querySelector("hermetic-sidebar") !== null;
     const withEditing = readEnv().interactive && document.querySelector("hermetic-editor") !== null;
     const withGraph = document.querySelector("main hermetic-graph[data-ready]") !== null;
-    const withTheme = hasThemeButton();
     const shown = (s: Shortcut) =>
       !(
         (s.sidebar && !withSidebar) ||
         (s.search && !hasSearch()) ||
         (s.editing && !withEditing) ||
-        (s.graph && !withGraph) ||
-        (s.theme && !withTheme)
+        (s.graph && !withGraph)
       );
     const dialog = document.createElement("dialog");
     dialog.className = "shortcuts";
@@ -378,6 +390,36 @@ export class HermeticShortcuts extends HTMLElement {
     close.append(icon("x"));
     close.addEventListener("click", () => dialog.close());
     header.append(title, close);
+    // The key menus first, set apart: each its key and title, then its actions' keys.
+    const menus = document.createElement("div");
+    menus.className = "shortcut-menus";
+    for (const menu of MENUS) {
+      const actions = available(menu);
+      if (actions.length === 0) continue;
+      const card = document.createElement("section");
+      card.className = "shortcut-menu";
+      const heading = document.createElement("h3");
+      const key = keycaps(menu.key);
+      key.classList.add("menu-key");
+      const title = document.createElement("span");
+      title.textContent = menu.title;
+      const hint = document.createElement("span");
+      hint.className = "keys-sep";
+      hint.textContent = "then";
+      heading.append(key, title, hint);
+      const list = document.createElement("dl");
+      for (const a of actions) {
+        const row = document.createElement("div");
+        const dt = document.createElement("dt");
+        dt.append(keycaps(a.key));
+        const dd = document.createElement("dd");
+        dd.textContent = a.what;
+        row.append(dt, dd);
+        list.append(row);
+      }
+      card.append(heading, list);
+      menus.append(card);
+    }
     const groups = document.createElement("div");
     groups.className = "shortcut-groups";
     for (const group of HELP) {
@@ -403,7 +445,7 @@ export class HermeticShortcuts extends HTMLElement {
     dialog.addEventListener("click", (e) => {
       if (e.target === dialog) dialog.close();
     });
-    dialog.append(header, groups);
+    dialog.append(header, ...(menus.childElementCount > 0 ? [menus] : []), groups);
     this.append(dialog);
     return dialog;
   }

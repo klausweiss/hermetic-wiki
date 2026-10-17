@@ -495,7 +495,7 @@ dialog.shortcuts h2 { margin: 0; font-size: 1rem; font-weight: 600; }
 .shortcuts-close:hover, .shortcuts-close:focus-visible { background: var(--surface); color: var(--text); }
 .shortcuts-close .icon { width: 16px; height: 16px; }
 /* Groups flow into two balanced columns where there is room. */
-.shortcut-groups { columns: 2 18rem; column-gap: 2.5rem; padding: 0.4rem 1.5rem 1.25rem; }
+.shortcut-groups { columns: 2 18rem; column-gap: 2.5rem; padding: 0.25rem 1.5rem 1rem; }
 .shortcut-groups section { break-inside: avoid; padding-top: 0.75rem; }
 .shortcut-groups h3 {
   margin: 0 0 0.3rem; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em;
@@ -504,11 +504,27 @@ dialog.shortcuts h2 { margin: 0; font-size: 1rem; font-weight: 600; }
 .shortcut-groups dl { margin: 0; }
 .shortcut-groups dl > div {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  padding: 0.3rem 0; border-bottom: 1px solid var(--border);
+  padding: 0.22rem 0; border-bottom: 1px solid var(--border);
 }
 .shortcut-groups dl > div:last-child { border-bottom: none; }
 .shortcut-groups dt { min-width: 0; }
 .shortcut-groups dd { margin: 0; flex-shrink: 0; }
+/* Key menus, set apart above the other shortcuts: a card each, side by side. */
+.shortcut-menus {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.75rem 1rem;
+  padding: 0.9rem 1.5rem; border-bottom: 1px solid var(--border);
+}
+.shortcut-menu { padding: 0.6rem 0.8rem 0.5rem; border: 1px solid var(--border); border-radius: 8px; }
+.shortcut-menu h3 { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.4rem; font-size: 0.85rem; font-weight: 600; }
+.shortcut-menu dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.15rem 1rem; margin: 0; }
+.shortcut-menu dl > div { display: flex; align-items: center; gap: 0.5rem; padding: 0.15rem 0; }
+.shortcut-menu dt, .shortcut-menu dd { margin: 0; }
+/* The menu's own key: the size of the others, in the link colour. */
+.keys.menu-key kbd {
+  color: var(--link); background: color-mix(in srgb, var(--link) 8%, var(--elevated));
+  border-color: color-mix(in srgb, var(--link) 40%, var(--elevated));
+  box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--link) 25%, var(--elevated));
+}
 .keys { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 0.3rem; }
 .keys .chord { display: inline-flex; align-items: center; gap: 0.15rem; }
 .keys-sep, .keys-text { color: var(--muted); font-size: 0.75rem; }

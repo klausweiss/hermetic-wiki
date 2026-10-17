@@ -26,6 +26,7 @@ Serve options:
   --host <address>  Listen on this address instead of 127.0.0.1
   --public          Listen on all interfaces and show the local-network URL.
                     Anyone on your network can then read the notes.
+  --open            Open the wiki in the default browser once it is served
 ";
 
 fn main() -> ExitCode {
@@ -62,7 +63,7 @@ fn main() -> ExitCode {
             Err(msg) => usage_error(&msg),
         },
         ["serve", rest @ ..] => match parse_serve(rest) {
-            Ok(options) => serve(options),
+            Ok((options, open)) => serve(options, open),
             Err(msg) => usage_error(&msg),
         },
         _ => {
@@ -119,11 +120,13 @@ fn build(notes: &str, out: &str, title: Option<&str>) -> ExitCode {
     }
 }
 
-fn parse_serve(args: &[&str]) -> Result<serve::Options, String> {
+/// Parses `serve` arguments into the server options and whether to open a browser.
+fn parse_serve(args: &[&str]) -> Result<(serve::Options, bool), String> {
     let mut notes: Option<PathBuf> = None;
     let mut port = None;
     let mut host: Option<IpAddr> = None;
     let mut public = false;
+    let mut open = false;
     let mut title = None;
     let mut args = args.iter();
     while let Some(&arg) = args.next() {
@@ -142,6 +145,7 @@ fn parse_serve(args: &[&str]) -> Result<serve::Options, String> {
                 host = Some(v.parse().map_err(|_| format!("invalid address `{v}`"))?);
             }
             "--public" => public = true,
+            "--open" => open = true,
             "--title" => title = Some(value("--title")?.to_owned()),
             flag if flag.starts_with("--") => return Err(format!("unknown option `{flag}`")),
             dir if notes.is_none() => notes = Some(PathBuf::from(dir)),
@@ -154,16 +158,17 @@ fn parse_serve(args: &[&str]) -> Result<serve::Options, String> {
         (None, true) => Bind::Public,
         (None, false) => Bind::Loopback,
     };
-    Ok(serve::Options {
+    let options = serve::Options {
         notes: notes.unwrap_or_else(|| PathBuf::from(".")),
         bind,
         port,
         title,
         timing: serve::watch::Timing::default(),
-    })
+    };
+    Ok((options, open))
 }
 
-fn serve(options: serve::Options) -> ExitCode {
+fn serve(options: serve::Options, open: bool) -> ExitCode {
     let notes = options.notes.clone();
     match serve::start(options) {
         Ok(running) => {
@@ -183,6 +188,12 @@ fn serve(options: serve::Options) -> ExitCode {
             for network in urls {
                 eprintln!("  On your network:  {network}");
             }
+            if open
+                && let Some(local) = running.urls.first()
+                && let Err(e) = open_in_browser(local)
+            {
+                eprintln!("warning: cannot open a browser: {e}");
+            }
             running.wait();
             ExitCode::SUCCESS
         }
@@ -191,4 +202,27 @@ fn serve(options: serve::Options) -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// Opens `url` in the default browser with the platform's opener, without waiting for it.
+fn open_in_browser(url: &str) -> std::io::Result<()> {
+    use std::process::{Command, Stdio};
+    let mut command = if cfg!(target_os = "macos") {
+        Command::new("open")
+    } else if cfg!(windows) {
+        let mut c = Command::new("cmd");
+        c.args(["/C", "start", ""]);
+        c
+    } else {
+        Command::new("xdg-open")
+    };
+    let mut child = command
+        .arg(url)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+    // Reap the opener when it exits so it does not linger as a zombie.
+    std::thread::spawn(move || child.wait());
+    Ok(())
 }

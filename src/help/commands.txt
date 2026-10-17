@@ -21,7 +21,7 @@ COMMANDS
                         tab. Defaults to the notes directory's name.
 
   hermetic serve [<notes-dir>] [--port <n>] [--host <address>] [--public]
-                 [--title <name>]
+                 [--open] [--title <name>]
       Serve the notes as a live site at http://127.0.0.1:8000/ (or the next
       free port up to 8099). The notes directory defaults to the current
       one. The site itself is never written to disk. When a note changes,
@@ -57,6 +57,7 @@ COMMANDS
       --public          Listen on all interfaces and also print the
                         local-network URL. Anyone on your network can then
                         read the notes. Not combinable with --host.
+      --open            Open the served wiki in the default browser.
       --title <name>    Site title, as for build.
 
   hermetic help [<topic>]

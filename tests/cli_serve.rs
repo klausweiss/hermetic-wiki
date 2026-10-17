@@ -19,13 +19,16 @@ struct Server {
 
 impl Server {
     fn start(cwd: &Path, args: &[&str]) -> Server {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_hermetic"))
-            .arg("serve")
-            .args(args)
-            .current_dir(cwd)
-            .stderr(Stdio::piped())
-            .spawn()
-            .expect("runs");
+        Server::spawn(
+            Command::new(env!("CARGO_BIN_EXE_hermetic"))
+                .arg("serve")
+                .args(args)
+                .current_dir(cwd),
+        )
+    }
+
+    fn spawn(command: &mut Command) -> Server {
+        let mut child = command.stderr(Stdio::piped()).spawn().expect("runs");
         let stderr = child.stderr.take().unwrap();
         let (tx, lines) = mpsc::channel();
         std::thread::spawn(move || {
@@ -210,4 +213,36 @@ fn errors_and_usage() {
         assert_eq!(code, Some(2), "{args:?}: {err}");
         assert!(err.contains("Usage:"), "{args:?}");
     }
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn open_launches_the_browser_on_the_local_url() {
+    use std::os::unix::fs::PermissionsExt;
+    let notes = Notes::new(&[("pages/a.md", "- a")]);
+    // A fake `xdg-open` that records the URL it was given.
+    let bin = notes.path().join(".bin");
+    std::fs::create_dir(&bin).unwrap();
+    let opened = bin.join("opened");
+    let opener = bin.join("xdg-open");
+    std::fs::write(
+        &opener,
+        format!("#!/bin/sh\necho \"$1\" > '{}'\n", opened.display()),
+    )
+    .unwrap();
+    std::fs::set_permissions(&opener, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let server = Server::spawn(
+        Command::new(env!("CARGO_BIN_EXE_hermetic"))
+            .args(["serve", "--open"])
+            .current_dir(notes.path())
+            .env("PATH", &bin),
+    );
+    let url = server.url("Local:");
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    while !std::fs::read_to_string(&opened).is_ok_and(|s| s.ends_with('\n')) {
+        assert!(std::time::Instant::now() < deadline, "browser not opened");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(std::fs::read_to_string(&opened).unwrap().trim(), url);
 }

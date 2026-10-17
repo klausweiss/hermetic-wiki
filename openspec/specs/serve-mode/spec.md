@@ -7,7 +7,7 @@ Lets the author read the notes as a live wiki while writing them: `hermetic serv
 ## Requirements
 
 ### Requirement: Serve command
-`hermetic serve [<dir>] [--port <n>] [--host <address>] [--public]` SHALL build the notes directory `<dir>` (default: the current directory) and serve the result over HTTP until interrupted. The served site SHALL have the same files and content as `hermetic build` would produce for the same notes, except that served HTML pages additionally contain the live-reload element and, for requests from the same machine, the editor element. It SHALL NOT write the site to disk, and SHALL write nothing else except note files saved through browser editing and files it moves to `.trash/` when a page is deleted, along with `.trash/.gitignore` when that does not exist yet (see `browser-editing`). Diagnostics SHALL be printed as for `build`. When `<dir>` is not a directory, or an option is invalid, it SHALL print an error and exit with status 1 (status 2 for usage errors) without serving.
+`hermetic serve [<dir>] [--port <n>] [--host <address>] [--public] [--open]` SHALL build the notes directory `<dir>` (default: the current directory) and serve the result over HTTP until interrupted. The served site SHALL have the same files and content as `hermetic build` would produce for the same notes, except that served HTML pages additionally contain the live-reload element and, for requests from the same machine, the editor element. It SHALL NOT write the site to disk, and SHALL write nothing else except note files saved through browser editing and files it moves to `.trash/` when a page is deleted, along with `.trash/.gitignore` when that does not exist yet (see `browser-editing`). Diagnostics SHALL be printed as for `build`. When `<dir>` is not a directory, or an option is invalid, it SHALL print an error and exit with status 1 (status 2 for usage errors) without serving.
 
 #### Scenario: Serve the current directory
 - **WHEN** the user runs `hermetic serve` inside a notes directory
@@ -106,7 +106,7 @@ Pages served by `hermetic serve` SHALL receive, after every rebuild, the list of
 - **THEN** its pages make no live-reload connections
 
 ### Requirement: Network binding
-By default the server SHALL listen on `127.0.0.1`, on port 8000 or, if that port is taken, the next free port up to 8099, and SHALL print the URL it serves. `--port <n>` SHALL use exactly that port and fail with status 1 if it is taken. `--host <address>` SHALL listen on the given address. `--public` SHALL listen on all interfaces and print both the local URL and a URL using this machine's local-network address. Unless `--host` or `--public` is given, the server SHALL reject requests whose `Host` header names anything other than `localhost`, `127.0.0.1`, or `[::1]` (with the port), so that other websites cannot read the notes through DNS rebinding. `--host` and `--public` SHALL NOT be combined.
+By default the server SHALL listen on `127.0.0.1`, on port 8000 or, if that port is taken, the next free port up to 8099, and SHALL print the URL it serves. `--port <n>` SHALL use exactly that port and fail with status 1 if it is taken. `--host <address>` SHALL listen on the given address. `--public` SHALL listen on all interfaces and print both the local URL and a URL using this machine's local-network address. Unless `--host` or `--public` is given, the server SHALL reject requests whose `Host` header names anything other than `localhost`, `127.0.0.1`, or `[::1]` (with the port), so that other websites cannot read the notes through DNS rebinding. `--host` and `--public` SHALL NOT be combined. `--open` SHALL, once the server listens, open the first printed URL in the default browser; when no browser can be started it SHALL print a warning and keep serving.
 
 #### Scenario: Default binding
 - **WHEN** the user runs `hermetic serve` while port 8000 is in use
@@ -115,6 +115,10 @@ By default the server SHALL listen on `127.0.0.1`, on port 8000 or, if that port
 #### Scenario: Public
 - **WHEN** the user runs `hermetic serve --public` on a machine whose local-network address is 192.168.1.23
 - **THEN** it prints `http://localhost:8000/` and `http://192.168.1.23:8000/`, and another device on the network can open the latter
+
+#### Scenario: Open in the browser
+- **WHEN** the user runs `hermetic serve --open` and the server listens on `127.0.0.1:8000`
+- **THEN** the default browser opens `http://127.0.0.1:8000/`
 
 #### Scenario: Rebinding protection
 - **WHEN** the server runs with default binding and receives a request with `Host: evil.example:8000`

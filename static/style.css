@@ -206,7 +206,8 @@ li.task-done > .block-body .block-content { color: var(--muted); text-decoration
 .page-ref::before { content: "[["; color: var(--muted); opacity: 0.5; }
 .page-ref::after { content: "]]"; color: var(--muted); opacity: 0.5; }
 .tag { color: var(--tag); }
-.block-ref { border-bottom: 1px dashed var(--border); }
+.block-ref { border-bottom: 1px dashed var(--muted); }
+.block-ref > .task-marker { margin-right: 0.3rem; }
 .block-ref-link { margin-left: 0.2rem; font-size: 0.85em; }
 .broken { color: var(--broken); text-decoration: underline wavy; }
 /* Links leaving the wiki; page links are always relative. Icon: Lucide "external-link". */

@@ -141,7 +141,8 @@ impl<'g> Site<'g> {
                     let link = esc(&self.block_href(from, target));
                     let html = match mode {
                         Mode::Expand => format!(
-                            "<span class=\"block-ref\">{}<a class=\"block-ref-link\" href=\"{link}\" title=\"Go to block\">↗</a></span>",
+                            "<span class=\"block-ref\">{}{}<a class=\"block-ref-link\" href=\"{link}\" title=\"Go to block\">↗</a></span>",
+                            self.g.block(target).task.map(task_badge).unwrap_or_default(),
                             self.content(from, target, Mode::Nested)
                         ),
                         Mode::Nested => {

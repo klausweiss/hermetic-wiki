@@ -67,6 +67,16 @@ fn block_reference_shows_target_content() {
 }
 
 #[test]
+fn block_reference_shows_target_task_marker() {
+    let (_n, _h, out, _) = built(&[
+        ("pages/a.md", "- TODO fix it\n  id:: t"),
+        ("pages/b.md", "- see ((t))"),
+    ]);
+    let html = main_of(&out, "pages/b.html");
+    assert!(html.contains(r#"<span class="block-ref"><span class="task-marker task-todo">TODO</span>fix it<a"#), "{html}");
+}
+
+#[test]
 fn self_referencing_block_refs_do_not_loop() {
     let (_n, _h, out, _) = built(&[(
         "pages/a.md",

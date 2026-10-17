@@ -12,11 +12,13 @@ pub const PREVIEW_CHARS: usize = 240;
 /// Longest text of one breadcrumb step, in characters.
 pub const CRUMB_CHARS: usize = 40;
 
-/// Text with references replaced: page links and tags by their names, block references
-/// removed. Markdown links stay as markdown and become their link text below.
+/// Text with references replaced: labeled ones by their labels, page links and tags by
+/// their names, block references removed. Markdown links stay as markdown and become
+/// their link text below.
 fn substitute<'r>(text: &str, refs: impl Iterator<Item = &'r Ref>) -> String {
     let mut edits: Vec<(Range<usize>, &str)> = refs
         .filter_map(|r| match r.kind {
+            _ if let Some(label) = r.label.clone() => Some((r.range.clone(), &text[label])),
             RawRefKind::Page | RawRefKind::Tag => Some((r.range.clone(), r.text.as_str())),
             RawRefKind::Block => Some((r.range.clone(), "")),
             RawRefKind::MdLink | RawRefKind::Attachment => None,
@@ -108,6 +110,27 @@ mod tests {
         assert_eq!(markdown_text("line one\nline two"), "line one line two");
         assert_eq!(markdown_text("```\nfn main() {}\n```"), "fn main() {}");
         assert_eq!(markdown_text("<b>raw</b> html"), "raw html");
+    }
+
+    #[test]
+    fn labeled_refs_are_searched_by_label() {
+        let text = "met [Bartka]([[Bertek]]) and [[Ola]]";
+        let refs: Vec<Ref> = crate::parse::scan_refs(text)
+            .into_iter()
+            .map(|r| Ref {
+                kind: r.kind,
+                text: r.text,
+                range: r.range,
+                dest: r.dest,
+                label: r.label,
+                location: RefLocation::Content,
+                target: crate::graph::RefTarget::Unresolved,
+            })
+            .collect();
+        assert_eq!(
+            markdown_text(&substitute(text, refs.iter())),
+            "met Bartka and Ola"
+        );
     }
 
     #[test]

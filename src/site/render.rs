@@ -106,6 +106,24 @@ impl<'g> Site<'g> {
             }
             let original = &text[r.range.clone()];
             match (r.kind, r.target) {
+                (RawRefKind::Page, RefTarget::Page(p)) if let Some(label) = r.label.clone() => {
+                    let html = format!(
+                        "<a class=\"page-ref\" href=\"{}\">{}</a>",
+                        esc(&self.page_href(from, p)),
+                        unwrap_paragraph(&markdown(&text[label]))
+                    );
+                    edits.push((r.range.clone(), placeholder(html)));
+                }
+                (RawRefKind::Block, RefTarget::Block(target))
+                    if let Some(label) = r.label.clone() =>
+                {
+                    let html = format!(
+                        "<a class=\"block-ref-link\" href=\"{}\">{}</a>",
+                        esc(&self.block_href(from, target)),
+                        unwrap_paragraph(&markdown(&text[label]))
+                    );
+                    edits.push((r.range.clone(), placeholder(html)));
+                }
                 (RawRefKind::MdLink, RefTarget::Page(p)) => {
                     let Some(dest) = r.dest.clone() else { continue };
                     let mut url = self.page_href(from, p);
@@ -142,7 +160,11 @@ impl<'g> Site<'g> {
                     let html = match mode {
                         Mode::Expand => format!(
                             "<span class=\"block-ref\">{}{}<a class=\"block-ref-link\" href=\"{link}\" title=\"Go to block\">↗</a></span>",
-                            self.g.block(target).task.map(task_badge).unwrap_or_default(),
+                            self.g
+                                .block(target)
+                                .task
+                                .map(task_badge)
+                                .unwrap_or_default(),
                             self.content(from, target, Mode::Nested)
                         ),
                         Mode::Nested => {

@@ -73,6 +73,9 @@ pub struct RawRef {
     /// For markdown links and attachments: byte range of the destination token
     /// (including any `<>`).
     pub dest: Option<Range<usize>>,
+    /// For page links and block refs written as `[label]([[name]])` or
+    /// `[label](((id)))`: byte range of the label shown in their place.
+    pub label: Option<Range<usize>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -519,6 +522,13 @@ fn scan_chunk(s: &str, base: usize, out: &mut Vec<RawRef>) {
                     None => i += 1,
                 }
             }
+            b'[' if let Some((kind, text, label, end)) = labeled_ref(s, i) => {
+                // The label is shown in place of the reference, so it is not scanned.
+                let mut r = raw(kind, text, base + i..base + end);
+                r.label = label.map(|l| base + l.start..base + l.end);
+                out.push(r);
+                i = end;
+            }
             b'[' => match inline_link(s, i) {
                 Some(link) => {
                     if is_note_link(&link.dest) {
@@ -543,6 +553,7 @@ fn raw(kind: RawRefKind, text: &str, range: Range<usize>) -> RawRef {
         text: text.to_owned(),
         range,
         dest: None,
+        label: None,
     }
 }
 
@@ -626,8 +637,28 @@ struct InlineLink {
     end: usize,
 }
 
-/// Parses an inline link `[text](dest "title")` starting at the `[` at `i`.
-fn inline_link(s: &str, i: usize) -> Option<InlineLink> {
+/// `[label]([[name]])` or `[label](((id)))` starting at the `[` at `i`: the kind, the
+/// page name or block id, the label's range (none when blank), and the index after the
+/// closing `)`.
+fn labeled_ref(s: &str, i: usize) -> Option<(RawRefKind, &str, Option<Range<usize>>, usize)> {
+    let j = link_text_end(s, i)?;
+    let label = Some(i + 1..j).filter(|l| !s[l.clone()].trim().is_empty());
+    let b = s.as_bytes();
+    let k = skip_ws(b, j + 2);
+    let (kind, (text, end)) = if s[k..].starts_with("[[") {
+        (RawRefKind::Page, wikilink(s, k)?)
+    } else if s[k..].starts_with("((") {
+        (RawRefKind::Block, block_ref(s, k)?)
+    } else {
+        return None;
+    };
+    let end = skip_ws(b, end);
+    (b.get(end) == Some(&b')')).then_some((kind, text, label, end + 1))
+}
+
+/// The index of the `]` closing link text that starts with the `[` at `i`, if it is
+/// followed by `(`.
+fn link_text_end(s: &str, i: usize) -> Option<usize> {
     let b = s.as_bytes();
     let mut j = i + 1;
     let mut depth = 1;
@@ -649,9 +680,13 @@ fn inline_link(s: &str, i: usize) -> Option<InlineLink> {
             _ => j += 1,
         }
     }
-    if j >= b.len() || b.get(j + 1) != Some(&b'(') {
-        return None;
-    }
+    (j < b.len() && b.get(j + 1) == Some(&b'(')).then_some(j)
+}
+
+/// Parses an inline link `[text](dest "title")` starting at the `[` at `i`.
+fn inline_link(s: &str, i: usize) -> Option<InlineLink> {
+    let b = s.as_bytes();
+    let j = link_text_end(s, i)?;
     let text_end = j;
     let mut k = skip_ws(b, j + 2);
     let dest;
@@ -1033,6 +1068,34 @@ mod tests {
         );
         assert!(refs("((two words))").is_empty());
         assert!(refs("`((x))`").is_empty());
+    }
+
+    #[test]
+    fn labeled_refs() {
+        let text = "met [Bartka]([[Bertek]]) and [**him**](((t1)))";
+        let r = scan_refs(text);
+        assert_eq!(
+            refs(text),
+            vec![
+                (RawRefKind::Page, "Bertek".into()),
+                (RawRefKind::Block, "t1".into())
+            ]
+        );
+        assert_eq!(&text[r[0].range.clone()], "[Bartka]([[Bertek]])");
+        assert_eq!(&text[r[0].label.clone().unwrap()], "Bartka");
+        assert_eq!(&text[r[1].label.clone().unwrap()], "**him**");
+        assert_eq!(scan_refs("[[a]]")[0].label, None);
+        assert_eq!(
+            refs("[x]([[Project X]])"),
+            one(RawRefKind::Page, "Project X")
+        );
+        // Refs in the label are part of it; malformed ones fall back to plain refs.
+        assert_eq!(refs("[see #a]([[b]])"), one(RawRefKind::Page, "b"));
+        assert_eq!(scan_refs("[x]( [[b]] )")[0].label, Some(1..2));
+        assert_eq!(scan_refs("[ ]([[b]])")[0].label, None);
+        assert_eq!(scan_refs("[ ]([[b]])")[0].range, 0..10);
+        assert_eq!(scan_refs(r"\[x]([[b]])")[0].label, None);
+        assert!(refs("`[x]([[b]])`").is_empty());
     }
 
     #[test]

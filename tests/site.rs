@@ -73,7 +73,12 @@ fn block_reference_shows_target_task_marker() {
         ("pages/b.md", "- see ((t))"),
     ]);
     let html = main_of(&out, "pages/b.html");
-    assert!(html.contains(r#"<span class="block-ref"><span class="task-marker task-todo">TODO</span>fix it<a"#), "{html}");
+    assert!(
+        html.contains(
+            r#"<span class="block-ref"><span class="task-marker task-todo">TODO</span>fix it<a"#
+        ),
+        "{html}"
+    );
 }
 
 #[test]
@@ -858,6 +863,25 @@ fn link_through_an_alias_goes_to_the_page() {
     assert!(!out.join("pages/login.html").exists());
     let auth = main_of(&out, "pages/auth.html");
     assert!(auth.contains("2026-10-12"), "{auth}");
+}
+
+#[test]
+fn labeled_links_show_their_label() {
+    let (_n, _h, out, diags) = built(&[
+        ("pages/Bertek.md", "- hi\n  id:: b1"),
+        (
+            "journals/2026-10-12.md",
+            "- met [Bartka]([[Bertek]]) and [*him*](((b1)))",
+        ),
+    ]);
+    assert!(diags.is_empty(), "{diags:?}");
+    let html = main_of(&out, "journals/2026-10-12.html");
+    assert!(
+        html.contains(r#"met <a class="page-ref" href="../pages/Bertek.html">Bartka</a> and <a class="block-ref-link" href="../pages/Bertek.html#id-b1"><em>him</em></a>"#),
+        "{html}"
+    );
+    let bertek = main_of(&out, "pages/Bertek.html");
+    assert!(bertek.contains("2026-10-12"), "{bertek}");
 }
 
 #[test]

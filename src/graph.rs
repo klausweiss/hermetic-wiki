@@ -95,6 +95,9 @@ pub struct Ref {
     /// For markdown links and attachments: byte range of the destination token within
     /// the same text.
     pub dest: Option<Range<usize>>,
+    /// For page links and block refs written as `[label](...)`: byte range of the label
+    /// within the same text.
+    pub label: Option<Range<usize>>,
     pub location: RefLocation,
     pub target: RefTarget,
 }
@@ -996,6 +999,7 @@ impl Resolver<'_> {
             text: raw.text,
             range: raw.range,
             dest: raw.dest,
+            label: raw.label,
             location,
             target,
         })

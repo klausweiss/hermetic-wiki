@@ -88,6 +88,9 @@ SYNTAX
       ((id))            A block reference: shows the block with that id
                         inline and also links its page. An unknown id is
                         reported and shown as broken.
+      [text]([[name]])  A page link shown as text instead of the name.
+      [text](((id)))    A link to the block with that id, shown as text
+                        instead of its content.
 
   Web links
       A URL starting with http:// or https:// becomes a link as written; a

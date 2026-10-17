@@ -71,6 +71,8 @@ export class HermeticSidebar extends HTMLElement {
   /** Top pane first. */
   private views: PaneView[] = [];
   private sidebarHidden = initiallyHidden();
+  /** Hidden only because the window became narrow; shown again when it widens. */
+  private hiddenByNarrowing = false;
 
   connectedCallback(): void {
     whenParsed(() => this.setup());
@@ -116,6 +118,16 @@ export class HermeticSidebar extends HTMLElement {
 
   toggleHidden(): void {
     this.setHidden(!this.sidebarHidden);
+  }
+
+  /** On narrow screens the sidebar would cover the page, so narrowing the window hides it. */
+  private onWidthChange(narrow: boolean): void {
+    if (narrow && !this.sidebarHidden) {
+      this.setHidden(true);
+      this.hiddenByNarrowing = true;
+    } else if (!narrow && this.hiddenByNarrowing) {
+      this.setHidden(false);
+    }
   }
 
   private setup(): void {
@@ -170,6 +182,7 @@ export class HermeticSidebar extends HTMLElement {
 
     document.addEventListener(SIDEBAR_CLOSE_TOP, () => this.closeTop());
     document.addEventListener(SIDEBAR_TOGGLE, () => this.toggleHidden());
+    matchMedia(NARROW).addEventListener("change", (e) => this.onWidthChange(e.matches));
     document.addEventListener(PAGES_CHANGED, (e) => {
       const detail = (e as CustomEvent<{ changed: string[]; removed: string[] }>).detail;
       this.onPagesChanged(detail.changed, detail.removed);
@@ -309,6 +322,7 @@ export class HermeticSidebar extends HTMLElement {
 
   private setHidden(hidden: boolean): void {
     this.sidebarHidden = hidden;
+    this.hiddenByNarrowing = false;
     this.render();
     this.persist();
   }

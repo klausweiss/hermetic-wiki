@@ -1,3 +1,3 @@
 - AI-generated content is something not intended to live in the wiki. 
 - From my experience, it is never read, let alone read in detail, and would only pollute the graph and references.
-- If [[hermetic]] is a preferred way for users to read the AI-generated content, then it should live separate from the human-written parts.
+- If [[hermetic]] is a preferred way for users to read the AI-generated content, then it should live separately from the human-written parts.

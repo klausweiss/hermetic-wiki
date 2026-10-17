@@ -1,0 +1,3 @@
+- I mostly write in Journal, creating pages on demand.
+- I often mention 2 pages in the same block, which forms a connection between them.
+- The relationship can then be seen on both pages' sites, along with all the references made to them.

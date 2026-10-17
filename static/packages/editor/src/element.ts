@@ -9,6 +9,7 @@ import { Conflict, Refused, SaveQueue, type SaveState, SourceApi } from "./api";
 import { type Doc, type Node, type Payload, flatten, fromPayload, newNode } from "./model";
 import { type Edit, MARKERS, applied, linkSelection, toggle } from "./format";
 import { highlighted } from "./highlight";
+import { type Entry, History, type Typing, type Where, historyKey } from "./history";
 import * as ops from "./ops";
 import { pageProps, setPageProps } from "./props";
 import { editProperties } from "./propsdialog";
@@ -35,6 +36,12 @@ interface Active {
   area: HTMLTextAreaElement;
   /** The area with its syntax-coloured mirror, as placed in the page. */
   wrap: HTMLElement;
+}
+
+/** A state of the page for undo: its outline and the blocks' renderings at the time. */
+interface State {
+  doc: Doc;
+  rendered: (Rendered | undefined)[];
 }
 
 /** Images of one paste or drop, inserted one by one as their uploads finish. */
@@ -84,6 +91,14 @@ export class HermeticEditor extends HTMLElement {
   private ready = false;
   /** Pastes and drops whose images are still being uploaded. */
   private uploads = new Set<Upload>();
+  private history = new History<State>();
+  /** A copy of the page as of the last change (what the next change is made from). */
+  private base: State | null = null;
+  private baseText = "";
+  /** The cursor before the key, input, or click that may change the outline next. */
+  private pre: Where | null = null;
+  /** The kind of the input under way, from its `beforeinput`. */
+  private inputKind: Typing["kind"] | null = null;
 
   connectedCallback(): void {
     whenParsed(() => void this.setup());
@@ -157,6 +172,15 @@ export class HermeticEditor extends HTMLElement {
       }
     });
     addEventListener("online", () => this.queue?.retryNow());
+    // Undo and redo when no block is being edited (the text field handles its own keys).
+    addEventListener("keydown", (e) => {
+      if (e.defaultPrevented || e.isComposing || this.active || !this.doc || isControl(e.target)) return;
+      if (document.querySelector("dialog[open]")) return;
+      const which = historyKey(e);
+      if (!which) return;
+      e.preventDefault();
+      this.step(which);
+    });
     // Return starts editing at the end of the page, when nothing else takes the key.
     addEventListener("keydown", (e) => {
       if (e.key !== "Enter" || e.defaultPrevented || e.isComposing || this.active || !this.doc) return;
@@ -288,6 +312,10 @@ export class HermeticEditor extends HTMLElement {
     // A journal day emptied while being written in has no file and no blocks: keep the
     // empty block being edited.
     if (this.doc.roots.length === 0 && this.active) this.doc.roots.push(newNode());
+    // Undo goes back through this tab's own changes, not over changes made elsewhere.
+    if (!sameText(payload.text, this.baseText)) this.history.clear();
+    this.base = this.snapshot();
+    this.baseText = serialize(this.doc);
     this.stored = payload.text;
     if (this.queue) this.queue.version = payload.version;
     const after = flatten(this.doc).map((e) => e.node);
@@ -554,6 +582,7 @@ export class HermeticEditor extends HTMLElement {
   private advanceOwn(node: Node): boolean {
     const body = ops.advanceTask(node.body);
     if (body === null) return false;
+    this.pre = this.where();
     const r = this.rendered.get(node);
     const fresh = r !== undefined && r.body === node.body;
     node.body = body;
@@ -665,6 +694,7 @@ export class HermeticEditor extends HTMLElement {
       area.rows = 1;
       area.spellcheck = true;
       area.setAttribute("aria-label", "Block text");
+      area.addEventListener("beforeinput", (e) => this.onBeforeInput(e, area));
       area.addEventListener("input", () => this.onInput(area));
       area.addEventListener("keydown", (e) => this.onKey(e, area));
       area.addEventListener("paste", (e) => this.onPaste(e, area));
@@ -706,16 +736,37 @@ export class HermeticEditor extends HTMLElement {
     return this.active;
   }
 
+  private onBeforeInput(e: InputEvent, area: HTMLTextAreaElement): void {
+    if (e.inputType === "historyUndo" || e.inputType === "historyRedo") {
+      e.preventDefault();
+      this.step(e.inputType === "historyUndo" ? "undo" : "redo");
+      return;
+    }
+    this.pre = this.where(area);
+    this.inputKind =
+      e.inputType === "insertText" ? "insert" : e.inputType.startsWith("delete") ? "delete" : null;
+  }
+
   private onInput(area: HTMLTextAreaElement): void {
     if (!this.active) return;
     this.active.node.body = area.value;
     autosize(area);
+    const kind = this.inputKind;
+    this.inputKind = null;
+    const index = kind && this.doc ? flatten(this.doc).findIndex((e) => e.node === this.active!.node) : -1;
+    this.commit(kind && index >= 0 ? { kind, index, caret: area.selectionStart } : null);
     for (const p of plugins) p.input?.(this, area);
-    this.changed();
+    this.scheduleSave();
   }
 
-  /** Something in the outline changed: save once typing pauses. */
+  /** Something in the outline changed: save soon. */
   changed(): void {
+    this.commit(null);
+    this.scheduleSave();
+  }
+
+  /** Saves once typing pauses. */
+  private scheduleSave(): void {
     this.showState("unsaved");
     clearTimeout(this.idle);
     this.idle = window.setTimeout(() => this.saveNow(), IDLE_SAVE_MS);
@@ -723,6 +774,7 @@ export class HermeticEditor extends HTMLElement {
 
   saveNow(): void {
     clearTimeout(this.idle);
+    this.commit(null);
     if (!this.queue || !this.doc) return;
     if (sameText(serialize(this.doc), this.stored) && !this.queue.dirty) {
       this.showState("saved");
@@ -741,6 +793,13 @@ export class HermeticEditor extends HTMLElement {
 
   private onKey(e: KeyboardEvent, area: HTMLTextAreaElement): void {
     if (e.isComposing || !this.active || !this.doc) return;
+    const which = historyKey(e);
+    if (which) {
+      e.preventDefault();
+      this.step(which);
+      return;
+    }
+    this.pre = this.where(area);
     for (const p of plugins) {
       if (p.key?.(this, e, area)) return;
     }
@@ -797,12 +856,82 @@ export class HermeticEditor extends HTMLElement {
     }
   }
 
+  // --- Undo ---------------------------------------------------------------------------
+
+  /** The cursor in the block being edited, if any. */
+  private where(area = this.active?.area): Where | null {
+    if (!this.doc || !this.active || !area) return null;
+    const index = flatten(this.doc).findIndex((e) => e.node === this.active!.node);
+    return index < 0 ? null : { index, start: area.selectionStart, end: area.selectionEnd };
+  }
+
+  /** A copy of the page's outline, with the blocks' current renderings. */
+  private snapshot(): State {
+    const doc = this.doc!;
+    return { doc: structuredClone(doc), rendered: flatten(doc).map((e) => this.rendered.get(e.node)) };
+  }
+
+  /**
+   * Records a change to the outline, if there was one since the last: the outline before
+   * it (with the cursor before it) becomes an undo entry. Without a change, a run of
+   * typing ends.
+   */
+  private commit(typing: Typing | null): void {
+    if (!this.doc || !this.base) return;
+    const text = serialize(this.doc);
+    if (text === this.baseText) {
+      if (!typing) this.history.close();
+      return;
+    }
+    const before = { state: this.base, where: this.pre ?? this.where() };
+    this.history.record(() => before, typing, Date.now());
+    this.base = this.snapshot();
+    this.baseText = text;
+    this.pre = null;
+  }
+
+  private step(which: "undo" | "redo"): void {
+    if (!this.doc) return;
+    if (this.active) this.active.node.body = this.active.area.value;
+    this.commit(null);
+    const current = (): Entry<State> => ({ state: this.snapshot(), where: this.where() });
+    const entry = which === "undo" ? this.history.undo(current) : this.history.redo(current);
+    if (entry) this.restore(entry);
+  }
+
+  /** Makes `entry` the page's state, editing where its cursor was. */
+  private restore(entry: Entry<State>): void {
+    const { doc, rendered } = entry.state;
+    const nodes = flatten(doc).map((e) => e.node);
+    nodes.forEach((node, i) => {
+      const r = rendered[i];
+      if (r && r.body === node.body) this.rendered.set(node, r);
+    });
+    this.doc = doc;
+    this.base = this.snapshot();
+    this.baseText = serialize(doc);
+    for (const p of plugins) p.end?.(this);
+    const w = entry.where;
+    const node = w ? nodes[w.index] : undefined;
+    if (w && node) {
+      // The block edited before belongs to the replaced outline: leave it without ending.
+      if (this.active) this.active.node = node;
+      this.edit(node, w.end);
+      this.active!.area.setSelectionRange(Math.min(w.start, node.body.length), Math.min(w.end, node.body.length));
+    } else {
+      this.active = null;
+      this.render();
+    }
+    this.saveNow();
+  }
+
   // --- Images -------------------------------------------------------------------------
 
   /** Pasting images (and no text) into the block being edited adds them at the cursor. */
   private onPaste(e: ClipboardEvent, area: HTMLTextAreaElement): void {
     const data = e.clipboardData;
     if (!this.active || !data) return;
+    this.pre = this.where(area);
     const link = linkSelection(area.value, area.selectionStart, area.selectionEnd, data.getData("text/plain"));
     if (link) {
       e.preventDefault();
@@ -882,6 +1011,7 @@ export class HermeticEditor extends HTMLElement {
     const area = active?.area;
     const [selStart, selEnd] = area ? [area.selectionStart, area.selectionEnd] : [0, 0];
     if (active && area) active.node.body = area.value;
+    this.pre = this.where();
     const r = ops.insertImage(this.doc, upload.at, markdown, upload.more);
     upload.at = { node: r.node, offset: r.end };
     upload.more = true;

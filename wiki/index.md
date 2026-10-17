@@ -5,6 +5,15 @@
 - ## Intended use-case
   - Documenting project implementation, as well as decisions made along the way.
   - Should help to get the overview of what's the current state of the project.
+- ## Supported features at a glance
+  - basic markdown rich text
+  - text search
+  - images (viewing and pasting)
+  - page mentions (aka linked references, see the bottom of this page)
+  - journal
+  - page relationships (through mutual parent, e.g. [[sample page 1]] is related to [[see this page to understand how relationships are formed]]
+  - TODOs
+    - (e.g. ((ib91416u)))
 - ## Usage
   - ### Writing wiki
     - 1. Create a folder for storing project wiki, then run `hermetic serve WIKI_PATH`

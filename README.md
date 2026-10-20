@@ -2,7 +2,7 @@
 
 hermetic turns a folder of Markdown notes into a project wiki: you edit it in the browser, then publish it as a static site.
 
-**Demo:** https://klausweiss.github.io/hermetic-wiki (built from [`wiki/`](wiki/))
+**Demo (read-only):** https://klausweiss.github.io/hermetic-wiki (built from [`wiki/`](wiki/))
 
 > [!WARNING]
 > This project has been vibe-coded to quickly serve my personal needs.

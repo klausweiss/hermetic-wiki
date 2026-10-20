@@ -4,6 +4,9 @@ hermetic turns a folder of Markdown notes into a project wiki: you edit it in th
 
 **Demo:** https://klausweiss.github.io/hermetic-wiki (built from [`wiki/`](wiki/))
 
+> [!WARNING]
+> This project has been vibe-coded to quickly serve my personal needs.
+
 ## Install and run
 
 Install with **either** uv (builds from source, needs `cargo`):

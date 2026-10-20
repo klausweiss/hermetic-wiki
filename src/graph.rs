@@ -41,6 +41,10 @@ pub struct Page {
     pub ns_parent: Option<PageId>,
     /// Direct namespace children, ordered by key.
     pub ns_children: Vec<PageId>,
+    /// Pages listed under this one through a namespaced alias (`alias:: <this>/x`), as
+    /// `(alias name, declaring page)`, ordered by key. The declaring page keeps its own
+    /// namespace parent.
+    pub ns_alias_children: Vec<(String, PageId)>,
     /// Accepted names from the page's `alias` property, normalized, in written order.
     pub aliases: Vec<String>,
 }
@@ -251,6 +255,12 @@ impl Graph {
             }
         }
 
+        for i in 0..g.pages.len() {
+            for alias in g.pages[i].aliases.clone() {
+                g.ensure_namespace_prefixes(&alias);
+            }
+        }
+
         g.link_namespaces();
         g.build_backlinks();
         g.build_tasks();
@@ -434,6 +444,22 @@ impl Graph {
         &self.page(page).ns_children
     }
 
+    /// What a page lists under it: its namespace children and the pages with a namespaced
+    /// alias under it, as `(leaf name, page)` ordered by key.
+    pub fn namespace_listing(&self, page: PageId) -> Vec<(&str, PageId)> {
+        let p = self.page(page);
+        let pages = p.ns_children.iter().map(|&c| {
+            let c_page = self.page(c);
+            (c_page.key.clone(), c_page.leaf_name(), c)
+        });
+        let aliases = p.ns_alias_children.iter().map(|(name, c)| {
+            (NameKey::new(name), name.rsplit('/').next().unwrap_or(name), *c)
+        });
+        let mut out: Vec<_> = pages.chain(aliases).collect();
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        out.into_iter().map(|(_, leaf, c)| (leaf, c)).collect()
+    }
+
     /// Pages co-mentioned with `page`, ordered by weight (desc), recency (newest first),
     /// then case-insensitive name.
     pub fn related(&self, page: PageId) -> Vec<Related<'_>> {
@@ -551,6 +577,7 @@ impl Graph {
             roots: Vec::new(),
             ns_parent: None,
             ns_children: Vec::new(),
+            ns_alias_children: Vec::new(),
             aliases: Vec::new(),
         });
         id
@@ -759,10 +786,27 @@ impl Graph {
                     .push(PageId(i as u32));
             }
         }
+        for i in 0..self.pages.len() {
+            for alias in self.pages[i].aliases.clone() {
+                // An implicit page with the alias's name (a prefix of another name) is
+                // already listed.
+                if self.by_key.contains_key(&NameKey::new(&alias)) {
+                    continue;
+                }
+                if let Some((prefix, _)) = alias.rsplit_once('/') {
+                    let parent = self.by_key[&NameKey::new(prefix)];
+                    self.pages[parent.0 as usize]
+                        .ns_alias_children
+                        .push((alias, PageId(i as u32)));
+                }
+            }
+        }
         let keys: Vec<NameKey> = self.pages.iter().map(|p| p.key.clone()).collect();
         for page in &mut self.pages {
             page.ns_children
                 .sort_by(|a, b| keys[a.0 as usize].cmp(&keys[b.0 as usize]));
+            page.ns_alias_children
+                .sort_by_cached_key(|(name, _)| NameKey::new(name));
         }
     }
 

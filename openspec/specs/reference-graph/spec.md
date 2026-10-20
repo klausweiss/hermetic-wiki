@@ -90,7 +90,7 @@ A page that is referenced (or is a namespace prefix of such a page) but has no f
 
 #### Scenario: Namespaced alias
 - **WHEN** `auth` declares `alias:: Project X/Login` and a block contains `[[Project X/Login]]`
-- **THEN** the block references `auth`, and neither `Project X/Login` nor `Project X` exists as a page
+- **THEN** the block references `auth`, `Project X/Login` does not exist as a page, and `Project X` exists as an implicit page
 
 ### Requirement: Direct and inherited references
 Each block SHALL have direct references (those written in its own content and properties) and inherited references (its direct references plus the inherited references of its parent).
@@ -156,11 +156,15 @@ Two distinct pages SHALL be co-mentioned when a single block directly references
 - **THEN** the related pages of `claude` are listed as `hermetic` (3) before `rust` (1)
 
 ### Requirement: Namespace children
-The graph SHALL expose, for each page, the pages that are its direct namespace children.
+The graph SHALL expose, for each page, the pages that are its direct namespace children. It SHALL also list under a page each page that declares an alias directly in its namespace (`alias:: <page>/x`), named by the alias's last segment, together with the children and ordered by key; that page's own namespace parent SHALL be unchanged. The namespace prefixes of an alias SHALL exist as pages, implicit if they have no file. When an implicit page has the alias's name, only that page SHALL be listed.
 
 #### Scenario: Listing children
 - **WHEN** pages `Project X/Auth Flow` and `Project X/Billing` exist
 - **THEN** the namespace children of `Project X` are `Auth Flow` and `Billing`
+
+#### Scenario: Listing a namespaced alias
+- **WHEN** `pages/emanote.md` declares `alias:: alternatives/emanote`
+- **THEN** `alternatives` lists `emanote` linking to the page `emanote`, and `emanote` has no namespace parent
 
 ### Requirement: Page aliases
 The page property `alias` SHALL give the page additional names. Its value SHALL be split on commas; each part, with surrounding whitespace removed, SHALL be an alias, written either as a bare name or as a single page link `[[name]]`. Empty parts SHALL be ignored. Alias names SHALL be normalized and validated like page names and matched case-insensitively. A page link or tag whose name matches an alias SHALL reference the page that declares it, and SHALL count as a reference to that page everywhere (linked references, tasks, co-mentions). A reference through an alias SHALL NOT create a page. An implicit page with an alias's name SHALL exist only as the namespace prefix of another referenced name (`[[login/x]]`); page links and tags naming it still resolve to the page that declares the alias. Aliases SHALL NOT apply to markdown links, which name files. Page links and tags in the `alias` property value SHALL NOT be references of the block.

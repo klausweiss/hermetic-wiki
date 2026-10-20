@@ -255,16 +255,16 @@ fn page_body(site: &Site, from: &Path, page: PageId) -> String {
 }
 
 fn namespace_children(site: &Site, from: &Path, page: PageId) -> String {
-    let children = site.g.namespace_children(page);
+    let children = site.g.namespace_listing(page);
     if children.is_empty() {
         return String::new();
     }
     let mut out = String::from("<section class=\"children\">\n<h2>Pages under this one</h2>\n<ul>");
-    for &c in children {
+    for (leaf, c) in children {
         out.push_str(&format!(
             "<li><a href=\"{}\">{}</a></li>",
             esc(&site.page_href(from, c)),
-            esc(site.g.page(c).leaf_name())
+            esc(leaf)
         ));
     }
     out.push_str("</ul>\n</section>\n");

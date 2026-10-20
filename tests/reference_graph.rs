@@ -737,5 +737,43 @@ fn namespaced_alias() {
     let b = block(&g, "[[Project X/Login]]");
     assert_eq!(g.block(b).refs[0].target, RefTarget::Page(page(&g, "auth")));
     assert!(g.find_page("Project X/Login").is_none());
-    assert!(g.find_page("Project X").is_none());
+    let px = page(&g, "Project X");
+    assert!(g.page(px).is_implicit());
+    assert_eq!(g.namespace_listing(px), [("Login", page(&g, "auth"))]);
+    assert!(g.namespace_children(px).is_empty());
+    assert_eq!(g.page(page(&g, "auth")).ns_parent, None);
+}
+
+#[test]
+fn namespaced_aliases_are_listed_with_children() {
+    let notes = Notes::new(&[
+        ("pages/alternatives.md", "- tools"),
+        ("pages/alternatives/obsidian.md", "- o"),
+        ("pages/emanote.md", "- alias:: alternatives/Emanote"),
+        ("pages/quartz.md", "- alias:: alternatives/quartz"),
+    ]);
+    let (g, diags) = notes.load();
+    assert!(diags.is_empty(), "{diags:?}");
+    let alt = page(&g, "alternatives");
+    assert_eq!(
+        g.namespace_listing(alt),
+        [
+            ("Emanote", page(&g, "emanote")),
+            ("obsidian", page(&g, "alternatives/obsidian")),
+            ("quartz", page(&g, "quartz")),
+        ]
+    );
+    assert_eq!(g.page(page(&g, "emanote")).ns_parent, None);
+}
+
+#[test]
+fn namespaced_alias_that_is_also_a_prefix() {
+    let notes = Notes::new(&[
+        ("pages/auth.md", "- alias:: x/login"),
+        ("pages/notes.md", "- [[x/login/sso]]"),
+    ]);
+    let (g, _) = notes.load();
+    let login = page(&g, "x/login");
+    assert!(g.page(login).is_implicit());
+    assert_eq!(g.namespace_listing(page(&g, "x")), [("login", login)]);
 }

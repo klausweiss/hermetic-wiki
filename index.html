@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="hermetic-root" content=".">
+<title>index · hermetic.wiki</title>
+<meta name="description" content="hermetic is a static site generator for project-specific wiki.">
+<meta property="og:description" content="hermetic is a static site generator for project-specific wiki.">
+<meta property="og:title" content="index">
+<meta property="og:site_name" content="hermetic.wiki">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="_hermetic/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="_hermetic/apple-touch-icon.png">
+<link rel="stylesheet" href="_hermetic/style.css">
+<script src="_hermetic/app.js"></script>
+</head>
+<body>
+<header class="site-header">
+<a class="site-title" href="index.html">hermetic.wiki</a>
+<nav class="site-nav"><a href="journals.html">Journals</a><a href="tasks.html">Open tasks<hermetic-task-count></hermetic-task-count></a><a href="graph.html">Graph</a><hermetic-search></hermetic-search><hermetic-theme-toggle></hermetic-theme-toggle></nav>
+</header>
+<main>
+<article class="page">
+<header class="page-header">
+<h1>index</h1>
+</header>
+<section class="content">
+<ul class="blocks"><li class="block" id="b1"><div class="block-body"><div class="block-content"><a class="page-ref" href="pages/hermetic.html">hermetic</a> is a static site generator for project-specific wiki.</div></div></li><li class="block" id="b2"><div class="block-body"><div class="block-content"><h2>Design goals</h2></div></div><ul class="blocks"><li class="block" id="b3"><div class="block-body"><div class="block-content">no config required, single binary that just works</div></div></li><li class="block" id="b4"><div class="block-body"><div class="block-content">opinionated, not many knobs to turn, intended to work for <a class="page-ref" href="pages/my%20use-case.html">my use-case</a></div></div></li></ul></li><li class="block" id="b5"><div class="block-body"><div class="block-content"><h2>Intended use-case</h2></div></div><ul class="blocks"><li class="block" id="b6"><div class="block-body"><div class="block-content">Documenting project implementation, as well as decisions made along the way.</div></div></li><li class="block" id="b7"><div class="block-body"><div class="block-content">Should help to get the overview of what's the current state of the project.</div></div></li></ul></li><li class="block" id="b8"><div class="block-body"><div class="block-content"><h2>Supported features at a glance</h2></div></div><ul class="blocks"><li class="block" id="b9"><div class="block-body"><div class="block-content">basic markdown rich text</div></div></li><li class="block" id="b10"><div class="block-body"><div class="block-content">text search</div></div></li><li class="block" id="b11"><div class="block-body"><div class="block-content">images (viewing and pasting)</div></div></li><li class="block" id="b12"><div class="block-body"><div class="block-content">page mentions (aka linked references, see the bottom of this page)</div></div></li><li class="block" id="b13"><div class="block-body"><div class="block-content">journal</div></div></li><li class="block" id="b14"><div class="block-body"><div class="block-content">page relationships (through mutual parent, e.g. <a class="page-ref" href="pages/sample%20page%201.html">sample page 1</a> is related to <a class="page-ref" href="pages/see%20this%20page%20to%20understand%20how%20relationships%20are%20formed.html">see this page to understand how relationships are formed</a></div></div></li><li class="block" id="b15"><div class="block-body"><div class="block-content">TODOs</div></div><ul class="blocks"><li class="block" id="b16"><div class="block-body"><div class="block-content">(e.g. <span class="block-ref"><span class="task-marker task-todo">TODO</span>explore how best to house <a class="page-ref" href="pages/AI-generated%20content.html">AI-generated content</a><a class="block-ref-link" href="journals/2026-10-13.html#id-ib91416u" title="Go to block">↗</a></span>)</div></div></li></ul></li></ul></li><li class="block" id="b17"><div class="block-body"><div class="block-content"><h2>Usage</h2></div></div><ul class="blocks"><li class="block" id="b18"><div class="block-body"><div class="block-content"><h3>Writing wiki</h3></div></div><ul class="blocks"><li class="block" id="b19"><div class="block-body"><div class="block-content"><ol>
+<li>Create a folder for storing project wiki, then run <code>hermetic serve WIKI_PATH</code></li>
+</ol></div></div><ul class="blocks"><li class="block" id="b20"><div class="block-body"><div class="block-content">you just ran the <a class="page-ref" href="pages/commands/serve.html">serve</a> command</div></div></li></ul></li><li class="block" id="b21"><div class="block-body"><div class="block-content"><ol start="2">
+<li>Open the reported URL in the wiki.</li>
+</ol></div></div><ul class="blocks"><li class="block" id="b22"><div class="block-body"><div class="block-content">The wiki is open in <a class="page-ref" href="pages/commands/serve.html">edit mode</a>. You can now interact with and change it. Press <code>?</code> to show <a class="page-ref" href="pages/keyboard%20shortcuts.html">keyboard shortcuts</a>.</div></div></li><li class="block" id="b23"><div class="block-body"><div class="block-content">The files are saved as you change the contents.</div></div></li></ul></li></ul></li><li class="block" id="b24"><div class="block-body"><div class="block-content"><h3>Reading wiki</h3></div></div><ul class="blocks"><li class="block" id="b25"><div class="block-body"><div class="block-content">You can either use the <a class="page-ref" href="pages/commands/serve.html">edit mode</a> for reading,</div></div></li><li class="block" id="b26"><div class="block-body"><div class="block-content">or render a read-only HTML version of the wiki using the <a class="page-ref" href="pages/commands/build.html">build</a> command with <code>hermetic build WIKI_PATH</code>.</div></div></li><li class="block" id="b27"><div class="block-body"><div class="block-content">The HTML version is a static website that can be hosted using most HTTP serves or hosting providers (e.g. <a class="page-ref" href="pages/GitHub%20Pages.html">GitHub Pages</a>).</div></div></li></ul></li></ul></li></ul>
+</section>
+<section class="linked-refs">
+<h2>Linked references <span class="count">2</span></h2>
+<div class="ref-group">
+<h3><a href="journals/2026-10-12.html">2026-10-12 Monday</a></h3>
+<div class="linked-ref"><ul class="blocks"><li class="block"><div class="block-body"><div class="block-content">Going to write a short <a class="page-ref" href="index.html">index</a></div></div></li></ul></div>
+</div>
+<div class="ref-group">
+<h3><a href="pages/see%20this%20page%20to%20understand%20how%20relationships%20are%20formed.html">see this page to understand how relationships are formed</a></h3>
+<div class="linked-ref"><ul class="blocks"><li class="block"><div class="block-body"><div class="block-content">They rather are both mentioned in the same block on the <a class="page-ref" href="index.html">index</a> page.</div></div></li></ul></div>
+</div>
+</section>
+</article>
+</main>
+<hermetic-sidebar><footer class="site-footer"><a href="pages.html">All pages</a><span>Generated with <a href="https://github.com/klausweiss/hermetic-wiki">hermetic</a> <code>4394210</code></span></footer></hermetic-sidebar>
+<hermetic-shortcuts></hermetic-shortcuts>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="hermetic-root" content=".">
+<title>Search · hermetic.wiki</title>
+<meta property="og:title" content="Search">
+<meta property="og:site_name" content="hermetic.wiki">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="_hermetic/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="_hermetic/apple-touch-icon.png">
+<link rel="stylesheet" href="_hermetic/style.css">
+<script src="_hermetic/app.js"></script>
+</head>
+<body>
+<header class="site-header">
+<a class="site-title" href="index.html">hermetic.wiki</a>
+<nav class="site-nav"><a href="journals.html">Journals</a><a href="tasks.html">Open tasks<hermetic-task-count></hermetic-task-count></a><a href="graph.html">Graph</a><hermetic-search></hermetic-search><hermetic-theme-toggle></hermetic-theme-toggle></nav>
+</header>
+<main>
+<article class="page index" data-view="search">
+<header class="page-header"><h1>Search</h1></header>
+<hermetic-search-results></hermetic-search-results>
+<p class="search-unavailable">Search needs JavaScript and the site served over <code>http://</code>. Run <code>hermetic serve</code> in the notes folder, or host the site on a web server.</p>
+</article>
+</main>
+<hermetic-sidebar><footer class="site-footer"><a href="pages.html">All pages</a><span>Generated with <a href="https://github.com/klausweiss/hermetic-wiki">hermetic</a> <code>4394210</code></span></footer></hermetic-sidebar>
+<hermetic-shortcuts></hermetic-shortcuts>
+</body>
+</html>

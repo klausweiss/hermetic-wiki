@@ -1,0 +1,788 @@
+/* hermetic baseline stylesheet. Fonts are bundled; no system fonts are preferred. */
+
+@font-face {
+  font-family: "Inter";
+  src: url("fonts/InterVariable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("fonts/InterVariable-Italic.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+/* The block editor's font: Inter without its italic face, so italic text is slanted by the
+   browser from the upright letters and keeps their widths (see .block-editor-mirror). */
+@font-face {
+  font-family: "Inter Upright";
+  src: url("fonts/InterVariable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("fonts/JetBrainsMono-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("fonts/JetBrainsMono-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --bg: #fbfbfa;
+  --surface: #f2f2ef;
+  /* Surfaces raised above the page: dialogs. */
+  --elevated: #ffffff;
+  --text: #1f2328;
+  --muted: #6a6f76;
+  --border: #e1e1dc;
+  --link: #1f5fbf;
+  --tag: #6b4fbb;
+  --todo: #b35900;
+  --doing: #1f5fbf;
+  --done: #2e7d32;
+  --broken: #c62828;
+  /* About 75 characters of body text per line. */
+  --measure: 40rem;
+  --sidebar-width: min(34rem, 42vw);
+  --sidebar-width-empty: 15rem;
+  color-scheme: light;
+}
+
+/* Dark palette: follows the system unless the reader picked a theme (data-theme,
+   set by the script). The variables are repeated because CSS cannot share them. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17181a;
+    --surface: #202124;
+    --elevated: #26282b;
+    --text: #e6e6e3;
+    --muted: #9a9ea5;
+    --border: #2f3134;
+    --link: #79a8ff;
+    --tag: #b49cff;
+    --todo: #ffb366;
+    --doing: #79a8ff;
+    --done: #7bc47f;
+    --broken: #ff6b6b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17181a;
+  --surface: #202124;
+  --elevated: #26282b;
+  --text: #e6e6e3;
+  --muted: #9a9ea5;
+  --border: #2f3134;
+  --link: #79a8ff;
+  --tag: #b49cff;
+  --todo: #ffb366;
+  --doing: #79a8ff;
+  --done: #7bc47f;
+  --broken: #ff6b6b;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html { font-size: 17px; -webkit-text-size-adjust: 100%; }
+html, body { overflow-x: hidden; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", sans-serif;
+  font-feature-settings: "cv11", "ss01";
+  line-height: 1.6;
+}
+
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+code, pre, kbd { font-family: "JetBrains Mono", monospace; font-size: 0.88em; }
+code { background: var(--surface); padding: 0.1em 0.3em; border-radius: 4px; }
+pre { background: var(--surface); padding: 0.75rem 1rem; border-radius: 6px; overflow-x: auto; line-height: 1.45; }
+pre code { background: none; padding: 0; }
+
+img { max-width: 100%; height: auto; }
+table { border-collapse: collapse; margin: 0.5rem 0; display: block; overflow-x: auto; }
+th, td { border: 1px solid var(--border); padding: 0.3rem 0.6rem; text-align: left; }
+blockquote { margin: 0.5rem 0; padding-left: 1rem; border-left: 3px solid var(--border); color: var(--muted); }
+
+/* Site chrome */
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1.5rem;
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 1rem 16px;
+  border-bottom: 1px solid var(--border);
+}
+.site-title { font-weight: 650; color: var(--text); }
+.site-nav { display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.9rem; flex: 1; }
+.site-nav a { color: var(--muted); }
+
+main { max-width: var(--measure); margin: 0 auto; padding: 1.5rem 16px 4rem; }
+
+/* Pages */
+
+.page-header { margin-bottom: 1.25rem; }
+.page-header h1 { font-size: 1.9rem; line-height: 1.25; margin: 0; font-weight: 700; letter-spacing: -0.01em; }
+.namespace { font-size: 0.9rem; color: var(--muted); margin-bottom: 0.25rem; }
+.weekday, .muted { color: var(--muted); font-weight: 400; }
+.day-nav, .pager { display: flex; gap: 1rem; margin-top: 0.5rem; font-size: 0.9rem; }
+.pager { margin-top: 1.5rem; align-items: baseline; }
+.pager span { color: var(--muted); }
+
+h2 { font-size: 1.1rem; margin: 2.25rem 0 0.5rem; font-weight: 650; }
+h3 { font-size: 1rem; margin: 1.25rem 0 0.25rem; font-weight: 600; }
+.count {
+  font-size: 0.75rem; font-weight: 500; color: var(--muted);
+  background: var(--surface); border-radius: 999px; padding: 0.05rem 0.5rem; vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+/* A badge whose number is not confirmed yet (see <hermetic-task-count>). */
+.count-pending { opacity: 0.5; }
+.empty { color: var(--muted); font-style: italic; }
+
+/* Blocks */
+
+ul.blocks { list-style: none; margin: 0; padding-left: 1.25rem; }
+.content > ul.blocks { padding-left: 0.25rem; }
+li.block { position: relative; margin: 0.15rem 0; }
+li.block::before {
+  content: ""; position: absolute; left: -0.9rem; top: 0.68em;
+  width: 0.36rem; height: 0.36rem; border-radius: 50%; background: var(--muted); opacity: 0.6;
+}
+li.block > ul.blocks { border-left: 1px solid var(--border); margin-left: -0.72rem; padding-left: 1.97rem; }
+li.block:target > .block-body { background: var(--surface); border-radius: 4px; }
+.block-body { padding: 0.05rem 0; }
+.block-content > :first-child { margin-top: 0; }
+.block-content > :last-child { margin-bottom: 0; }
+/* Indented like child blocks, so a block's children line up with its list items' text. */
+.block-content :is(ol, ul) { padding-left: 1.25rem; }
+li.task-done > .block-body .block-content { color: var(--muted); text-decoration: line-through; }
+
+.props { display: grid; gap: 0.1rem; margin: 0.2rem 0 0.3rem; font-size: 0.85rem; }
+.props > div { display: flex; gap: 0.5rem; }
+.props dt { color: var(--muted); }
+.props dt::after { content: ":"; }
+.props dd { margin: 0; }
+
+.task-marker {
+  display: inline-block; font-size: 0.7rem; font-weight: 650; letter-spacing: 0.03em;
+  border: 1px solid currentColor; border-radius: 4px; padding: 0 0.3rem; margin-right: 0.4rem;
+  vertical-align: 0.1em;
+}
+.block-body > .task-marker { float: left; margin-top: 0.3em; }
+.task-todo { color: var(--todo); }
+.task-doing { color: var(--doing); }
+.task-done { color: var(--done); }
+
+/* References */
+
+.page-ref::before { content: "[["; color: var(--muted); opacity: 0.5; }
+.page-ref::after { content: "]]"; color: var(--muted); opacity: 0.5; }
+.tag { color: var(--tag); }
+.block-ref { border-bottom: 1px dashed var(--muted); }
+.block-ref > .task-marker { margin-right: 0.3rem; }
+.block-ref-link { margin-left: 0.2rem; font-size: 0.85em; }
+.broken { color: var(--broken); text-decoration: underline wavy; }
+/* Links leaving the wiki; page links are always relative. Icon: Lucide "external-link". */
+:is(.block-content, .props dd) a:is([href^="http://"], [href^="https://"])::after {
+  content: "";
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-left: 0.15em;
+  vertical-align: -0.05em;
+  background: currentColor;
+  opacity: 0.7;
+  -webkit-mask: var(--external-icon) no-repeat center / contain;
+  mask: var(--external-icon) no-repeat center / contain;
+  /* Inline, since masks are fetched with CORS and would not load over file://. */
+  --external-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 3h6v6'/%3E%3Cpath d='M10 14 21 3'/%3E%3Cpath d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/%3E%3C/svg%3E");
+}
+
+.linked-ref { margin: 0.4rem 0 0.8rem; padding: 0.4rem 0.75rem; background: var(--surface); border-radius: 6px; }
+.linked-ref > ul.blocks { padding-left: 1rem; }
+.breadcrumb { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.15rem; }
+.breadcrumb a { color: var(--muted); }
+
+.related details { margin: 0.25rem 0; }
+.related summary { cursor: pointer; }
+.related ul.shared { list-style: none; padding-left: 1rem; margin: 0.25rem 0 0.75rem; }
+.related ul.shared > li { margin: 0.4rem 0; padding: 0.4rem 0.75rem; background: var(--surface); border-radius: 6px; }
+.related .source { font-size: 0.8rem; color: var(--muted); }
+
+ul.tasks { list-style: none; padding-left: 0; }
+ul.tasks > li { margin: 0.3rem 0; }
+.task-source { font-size: 0.8rem; color: var(--muted); margin-left: 0.4rem; }
+
+.children ul, ul.days, ul.all-pages { padding-left: 1.25rem; }
+.implicit { font-size: 0.75rem; color: var(--muted); margin-left: 0.4rem; }
+
+/* Graph view: drawn at its natural size, shrunk to fit; the script makes it a full canvas. */
+
+main:has(> article.graph-view) { max-width: none; }
+.graph-view > .page-header { max-width: calc(var(--measure) - 32px); margin-left: auto; margin-right: auto; }
+hermetic-graph { display: block; position: relative; }
+.graph {
+  display: block; margin: 0 auto; max-width: 100%; max-height: 80vh;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+}
+.graph a:hover { text-decoration: none; }
+.graph-edges path {
+  fill: none; stroke: var(--muted); stroke-opacity: 0.4; stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.graph-edges .w1 { stroke-width: 1; }
+.graph-edges .w2 { stroke-width: 2; }
+.graph-edges .w3 { stroke-width: 3; }
+.graph-nodes circle { fill: var(--link); stroke: var(--surface); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.graph-nodes .implicit circle { fill: var(--surface); stroke: var(--muted); stroke-dasharray: 3 2; }
+.graph-nodes a:hover circle, .graph-nodes a:focus-visible circle { fill: var(--text); }
+.graph-nodes a:focus-visible { outline: none; }
+.graph-nodes a:focus-visible circle { stroke: var(--link); stroke-width: 3; }
+/* --u is one screen pixel in graph units: the script keeps labels the same size on screen
+   at every zoom level. */
+.graph-nodes text {
+  font-size: calc(11px * var(--u, 1)); fill: var(--text); text-anchor: middle; dominant-baseline: hanging;
+  paint-order: stroke; stroke: var(--surface); stroke-width: calc(3px * var(--u, 1)); stroke-linejoin: round;
+}
+.graph-nodes .implicit text { fill: var(--muted); }
+/* Only the biggest nodes are labelled until the reader zooms in. */
+.graph-nodes a:not(.t0) text { display: none; }
+.graph-nodes a:hover text, .graph-nodes a:focus-visible text { display: inline; }
+.graph-empty { color: var(--muted); }
+
+/* With the script: a canvas to pan and zoom in, labels by zoom level (data-zoom), and the
+   hovered or focused node's neighbourhood emphasized (data-focus). */
+hermetic-graph[data-ready] .graph {
+  width: 100%; height: min(80vh, 60rem); max-height: none;
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
+}
+hermetic-graph[data-moving] .graph { cursor: grabbing; }
+hermetic-graph[data-zoom="1"] .graph-nodes .t1 text,
+hermetic-graph[data-zoom="2"] .graph-nodes :is(.t1, .t2) text,
+hermetic-graph[data-zoom="3"] .graph-nodes a text { display: inline; }
+/* While moving, only the biggest labels are drawn, to keep panning smooth. */
+hermetic-graph[data-moving] .graph-nodes a:not(.t0) text { display: none; }
+.graph[data-focus] .graph-edges path { stroke-opacity: 0.12; }
+.graph[data-focus] .graph-nodes a:not(.hl) { opacity: 0.25; }
+.graph[data-focus] .graph-nodes a.hl text { display: inline; }
+.graph-highlight { fill: none; stroke: var(--link); stroke-width: 2; stroke-opacity: 0.8; vector-effect: non-scaling-stroke; }
+.graph-controls {
+  position: absolute; top: 0.5rem; right: 0.5rem;
+  display: flex; flex-direction: column; gap: 0.25rem;
+}
+.graph-controls button {
+  display: grid; place-items: center; width: 2rem; height: 2rem; padding: 0; background: var(--bg);
+}
+.graph-controls button:hover { background: var(--surface); }
+.graph-controls .icon { width: 16px; height: 16px; }
+
+/* Search in the graph (data-search while there is a query): matches stand out with their
+   labels, the current one is ringed, everything else fades. */
+.graph[data-search] .graph-edges path { stroke-opacity: 0.12; }
+.graph[data-search] .graph-nodes a:not(.match, .hl) { opacity: 0.2; }
+.graph[data-search][data-focus] .graph-nodes a.match { opacity: 1; }
+.graph[data-search] .graph-nodes a.match text { display: inline; }
+.graph-nodes a.match circle { stroke: var(--text); stroke-width: 2; }
+.graph-nodes a.current circle { fill: var(--text); stroke: var(--link); stroke-width: 3; }
+.graph-search {
+  position: absolute; top: 0.5rem; left: 0.5rem; max-width: calc(100% - 4rem);
+  display: flex; align-items: center; gap: 0.4rem; padding: 0.2rem 0.5rem;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.08);
+}
+.graph-search[hidden] { display: none; }
+.graph-search .icon { width: 15px; height: 15px; color: var(--muted); flex: none; }
+.graph-search input {
+  font: inherit; font-size: 0.9rem; color: var(--text); background: none; border: none; outline: none;
+  width: 15rem; min-width: 0; flex: 1;
+}
+.graph-search output { font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+
+@media (max-width: 600px) {
+  html { font-size: 16px; }
+  .page-header h1 { font-size: 1.5rem; }
+}
+
+/* Default home page hint */
+
+.hint { margin-top: 2.5rem; font-size: 0.85rem; color: var(--muted); }
+
+/* Controls added by the script (never present without it) */
+
+button {
+  font: inherit; font-size: 0.85rem; color: var(--muted); background: none;
+  border: 1px solid var(--border); border-radius: 6px; padding: 0.1rem 0.55rem; cursor: pointer;
+}
+button:hover { color: var(--text); background: var(--surface); }
+/* The corner controls: the sidebar's show/hide button in the top-right corner and the
+   theme button just left of it (in the corner itself where there is no sidebar button).
+   Both are fixed, so they stay in place whether the sidebar is shown or hidden; the
+   header and the sidebar's top bar keep that corner free. */
+:root { --corner-size: 2rem; --corner-gap: 0.35rem; --corner-inset: 0.75rem; }
+.corner-button {
+  position: fixed; top: 0.5rem; z-index: 11; width: var(--corner-size); height: var(--corner-size);
+  padding: 0; display: inline-grid; place-items: center; background: var(--bg);
+}
+.corner-button .icon { display: block; }
+.sidebar-toggle { right: var(--corner-inset); }
+.theme-button { right: calc(var(--corner-inset) + var(--corner-size) + var(--corner-gap)); }
+:root:not(:has(.sidebar-toggle)) .theme-button { right: var(--corner-inset); }
+.corner-count {
+  position: absolute; top: -0.4rem; right: -0.4rem; min-width: 1rem; height: 1rem; padding: 0 0.2rem;
+  border-radius: 0.5rem; background: var(--link); color: var(--bg); font-size: 0.65rem; font-weight: 700; line-height: 1rem;
+}
+
+.view-toggle { display: inline-flex; gap: 0.25rem; margin-bottom: 1rem; }
+.view-toggle button[aria-pressed="true"] { color: var(--text); background: var(--surface); }
+.page-header:has(> .view-toggle) { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
+.page-header > .view-toggle { margin-bottom: 0; }
+
+/* Journal timeline */
+
+hermetic-timeline { display: block; }
+hermetic-timeline > .timeline { display: none; }
+hermetic-timeline.show-timeline > .timeline { display: block; }
+hermetic-timeline.show-timeline > h2, hermetic-timeline.show-timeline > ul.days { display: none; }
+.timeline-day { padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+.timeline-day > h2 { font-size: 1.3rem; margin-top: 1.75rem; }
+.timeline-sentinel { height: 1px; }
+.timeline-end { color: var(--muted); font-style: italic; text-align: center; margin: 2rem 0; }
+
+/* Journal calendar: one row of month grids at the top of the timeline, scrolling sideways
+   however long the journal gets. Months off screen skip rendering. */
+.calendar {
+  --cell: 1.05rem;
+  display: flex; align-items: stretch; gap: 0.75rem;
+  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin;
+  padding: 0.25rem 0 0.5rem; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+}
+.calendar-month {
+  flex: none; content-visibility: auto;
+  contain-intrinsic-size: calc(7 * var(--cell) + 6px) calc(7 * var(--cell) + 6px);
+}
+.calendar-title { font-size: 0.7rem; font-weight: 600; color: var(--muted); line-height: var(--cell); white-space: nowrap; }
+.calendar-grid {
+  display: grid; gap: 1px;
+  grid-template-columns: repeat(7, var(--cell)); grid-auto-rows: var(--cell);
+  font-size: 0.6rem; line-height: var(--cell); text-align: center; font-variant-numeric: tabular-nums;
+}
+.calendar-grid > * { border-radius: 3px; color: var(--muted); opacity: 0.55; }
+.calendar-grid > a.has-entry {
+  opacity: 1; color: var(--link); font-weight: 650;
+  background: color-mix(in srgb, var(--link) 16%, transparent);
+}
+.calendar-grid > a.has-entry:hover, .calendar-grid > a.has-entry:focus-visible {
+  text-decoration: none; color: var(--bg); background: var(--link); outline: none;
+}
+.calendar-grid > .today { opacity: 1; box-shadow: inset 0 0 0 1px var(--text); }
+.calendar-gap {
+  flex: none; align-self: stretch; display: grid; place-items: center;
+  padding: 0 0.15rem; border-left: 1px dashed var(--border); border-right: 1px dashed var(--border);
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font-size: 0.65rem; color: var(--muted); white-space: nowrap; cursor: default;
+}
+
+/* Sidebar */
+
+.sidebar { display: none; }
+.sidebar-open .sidebar {
+  display: flex; flex-direction: column;
+  position: fixed; top: 0; right: 0; bottom: 0; width: var(--sidebar-width);
+  background: var(--bg); border-left: 1px solid var(--border); z-index: 10;
+}
+/* The layout classes are on <html>, set before first paint. Transitions are enabled
+   (sidebar-animate) only once the page has settled, so loading a page never slides. */
+.sidebar-open body { padding-right: var(--sidebar-width); }
+.sidebar-open.sidebar-empty body { padding-right: var(--sidebar-width-empty); }
+.sidebar-open.sidebar-empty .sidebar { width: var(--sidebar-width-empty); }
+.sidebar-animate body, .sidebar-animate .sidebar { transition: padding-right 0.15s ease, width 0.15s ease; }
+
+/* The hide/show control (a corner button, above) sits over the sidebar's top bar when it
+   is open, and in the same spot when it is hidden. */
+/* The centered header reaches the corner only on narrower screens (about measure + 2 ×
+   the corner's width); there it keeps the corner free while the sidebar is hidden. */
+@media (max-width: 54rem) {
+  .sidebar-hidden .site-header, :root:not(:has(.sidebar-toggle)):has(.theme-button) .site-header {
+    padding-right: calc(16px + 2 * var(--corner-size) + var(--corner-gap) + var(--corner-inset));
+  }
+}
+.sidebar-bar {
+  display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem calc(2 * var(--corner-size) + var(--corner-gap) + var(--corner-inset) + 0.5rem) 0.6rem 1rem;
+  border-bottom: 1px solid var(--border); font-size: 0.85rem; color: var(--muted);
+}
+/* "Close all" only turns invisible while no pane is open, so the bar keeps its height (and
+   its border its distance from the corner buttons). */
+.sidebar-bar button { margin-left: auto; }
+.sidebar-bar button[hidden] { display: block; visibility: hidden; }
+.panes { overflow-y: auto; flex: 1; padding: 0 1rem 2rem; }
+
+/* The site footer: after the page's content without the script (its parent,
+   <hermetic-sidebar>, is then an ordinary inline element), at the sidebar's bottom with it. */
+.site-footer {
+  display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; align-items: baseline;
+  max-width: var(--measure); margin: 0 auto; padding: 1rem 16px 2rem;
+  border-top: 1px solid var(--border); font-size: 0.72rem; color: var(--muted);
+}
+.site-footer a { color: var(--link); }
+.site-footer code { font-size: 1em; background: none; padding: 0; }
+.sidebar .site-footer { max-width: none; width: 100%; margin: 0; padding: 0.6rem 1rem; flex: none; }
+.sidebar-placeholder { margin: 1.5rem 1rem; color: var(--muted); font-size: 0.85rem; }
+.sidebar-placeholder[hidden] { display: none; }
+.pane {
+  border-bottom: 1px solid var(--border); padding: 0.5rem 0 1rem;
+  /* Off-screen panes are neither laid out nor painted. */
+  content-visibility: auto; contain-intrinsic-size: auto 30rem;
+}
+.pane.collapsed { contain-intrinsic-size: auto 2.5rem; }
+.pane.collapsed > .pane-body { display: none; }
+/* z-index keeps the sticky header above the positioned blocks scrolling under it. */
+.pane-header { display: flex; align-items: center; gap: 0.4rem; position: sticky; top: 0; z-index: 1; background: var(--bg); padding: 0.25rem 0; }
+.pane-title { font-weight: 650; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pane-collapse, .pane-close { border: none; padding: 0 0.3rem; font-size: 1rem; line-height: 1.4; }
+.pane-body { font-size: 0.92rem; }
+.pane-body .page-header h1 { font-size: 1.35rem; }
+.pane-body .page-header { display: none; }
+.pane-body [data-hermetic-target] > .block-body { background: var(--surface); border-radius: 4px; }
+
+@media (max-width: 899.98px) { /* the same breakpoint as the sidebar script */
+  .sidebar-open body { padding-right: 0; }
+  .sidebar-open .sidebar, .sidebar-open.sidebar-empty .sidebar { width: 100%; left: 0; border-left: none; }
+}
+
+/* Keyboard shortcut help */
+
+/* The dialog itself has no padding, so a click on it (not its content) is a backdrop click. */
+dialog.shortcuts {
+  border: 1px solid var(--border); border-radius: 10px; background: var(--elevated); color: var(--text);
+  padding: 0; width: min(46rem, calc(100vw - 2rem)); max-height: calc(100vh - 4rem);
+  font-size: 0.85rem; line-height: 1.4; box-shadow: 0 12px 40px rgb(0 0 0 / 0.18);
+}
+dialog.shortcuts::backdrop { background: rgb(0 0 0 / 0.35); }
+dialog.shortcuts:focus { outline: none; }
+dialog.shortcuts header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.9rem 1rem 0.6rem 1.5rem; border-bottom: 1px solid var(--border);
+}
+dialog.shortcuts h2 { margin: 0; font-size: 1rem; font-weight: 600; }
+.shortcuts-close {
+  display: grid; place-items: center; width: 1.9rem; height: 1.9rem; padding: 0;
+  border: none; border-radius: 6px; background: none; color: var(--muted); cursor: pointer;
+}
+.shortcuts-close:hover, .shortcuts-close:focus-visible { background: var(--surface); color: var(--text); }
+.shortcuts-close .icon { width: 16px; height: 16px; }
+/* Groups flow into two balanced columns where there is room. */
+.shortcut-groups { columns: 2 18rem; column-gap: 2.5rem; padding: 0.25rem 1.5rem 1rem; }
+.shortcut-groups section { break-inside: avoid; padding-top: 0.75rem; }
+.shortcut-groups h3 {
+  margin: 0 0 0.3rem; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted);
+}
+.shortcut-groups dl { margin: 0; }
+.shortcut-groups dl > div {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.22rem 0; border-bottom: 1px solid var(--border);
+}
+.shortcut-groups dl > div:last-child { border-bottom: none; }
+.shortcut-groups dt { min-width: 0; }
+.shortcut-groups dd { margin: 0; flex-shrink: 0; }
+/* Key menus, set apart above the other shortcuts: a card each, side by side. */
+.shortcut-menus {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.75rem 1rem;
+  padding: 0.9rem 1.5rem; border-bottom: 1px solid var(--border);
+}
+.shortcut-menu { padding: 0.6rem 0.8rem 0.5rem; border: 1px solid var(--border); border-radius: 8px; }
+.shortcut-menu h3 { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.4rem; font-size: 0.85rem; font-weight: 600; }
+.shortcut-menu dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.15rem 1rem; margin: 0; }
+.shortcut-menu dl > div { display: flex; align-items: center; gap: 0.5rem; padding: 0.15rem 0; }
+.shortcut-menu dt, .shortcut-menu dd { margin: 0; }
+/* The menu's own key: the size of the others, in the link colour. */
+.keys.menu-key kbd {
+  color: var(--link); background: color-mix(in srgb, var(--link) 8%, var(--elevated));
+  border-color: color-mix(in srgb, var(--link) 40%, var(--elevated));
+  box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--link) 25%, var(--elevated));
+}
+.keys { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 0.3rem; }
+.keys .chord { display: inline-flex; align-items: center; gap: 0.15rem; }
+.keys-sep, .keys-text { color: var(--muted); font-size: 0.75rem; }
+/* A keycap: raised above the dialog in both themes (mixed from the text colour), with a
+   deeper bottom edge, and the label sitting above that edge. */
+.keys kbd {
+  display: inline-block; min-width: 1.6em; padding: 0 0.35rem 3px; box-sizing: border-box;
+  font-family: "JetBrains Mono", monospace; font-size: 0.72rem; line-height: 1.45; text-align: center;
+  color: var(--text); background: color-mix(in srgb, var(--text) 6%, var(--elevated));
+  border: 1px solid color-mix(in srgb, var(--text) 18%, var(--elevated)); border-radius: 5px;
+  box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--text) 14%, var(--elevated));
+}
+
+/* Key menus (`g`, `,`): like the search dialog, a panel in the upper part of the window. */
+dialog.leader-dialog {
+  width: min(24rem, calc(100vw - 16px)); max-width: none; margin: 12vh auto auto; padding: 0;
+  color: var(--text); background: var(--elevated); border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--muted) 45%, transparent);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.32), 0 2px 8px rgb(0 0 0 / 0.12);
+  font-size: 0.9rem;
+}
+dialog.leader-dialog:focus { outline: none; }
+dialog.leader-dialog::backdrop { background: rgb(0 0 0 / 0.35); }
+.leader-head {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--border); color: var(--muted); font-size: 0.85rem;
+}
+.leader-title { color: var(--text); font-weight: 600; }
+.leader-panel ul { list-style: none; margin: 0; padding: 0.3rem; }
+.leader-action {
+  display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.45rem 0.6rem;
+  font: inherit; text-align: left; color: var(--text); background: none; border: none; border-radius: 6px; cursor: pointer;
+}
+.leader-action:hover, .leader-action:focus-visible { background: var(--surface); outline: none; }
+.leader-what { flex: 1; }
+.leader-detail { color: var(--muted); font-size: 0.8rem; }
+
+/* Search (shown only when the script runs over http): a header button opening a dialog
+   in the upper part of the window, with the field and the results as you type. */
+
+hermetic-search { display: inline-flex; align-self: center; margin-left: auto; }
+/* The theme toggle's button is fixed in the corner; its element takes no room in the nav. */
+.site-nav hermetic-theme-toggle { display: contents; }
+.search-button {
+  display: inline-grid; place-items: center; width: 1.9rem; height: 1.9rem; padding: 0;
+  border-color: transparent; color: var(--muted);
+}
+.search-button:hover, .search-button:focus-visible { border-color: var(--border); color: var(--text); }
+.search-button .icon { width: 16px; height: 16px; }
+dialog.search-dialog {
+  width: min(40rem, calc(100vw - 16px)); max-width: none; max-height: 76vh;
+  margin: 12vh auto auto; padding: 0; overflow: hidden;
+  color: var(--text); background: var(--elevated); border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--muted) 45%, transparent);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.32), 0 2px 8px rgb(0 0 0 / 0.12);
+}
+dialog.search-dialog::backdrop { background: rgb(0 0 0 / 0.5); }
+.search-panel, .search-panel form { display: flex; flex-direction: column; max-height: calc(76vh - 2px); }
+.search-field {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+.search-field .icon { width: 18px; height: 18px; color: var(--muted); flex: none; }
+.search-field input {
+  flex: 1; min-width: 0; font: inherit; font-size: 1.05rem; color: var(--text);
+  background: none; border: none; outline: none; padding: 0;
+}
+.search-dropdown { overflow-y: auto; padding: 0.3rem; }
+.search-dropdown[hidden] { display: none; }
+.search-result {
+  display: block; padding: 0.45rem 0.6rem; border-radius: 6px; color: var(--text);
+}
+.search-result:hover { background: var(--surface); text-decoration: none; }
+.search-result-head { display: flex; flex-wrap: wrap; gap: 0 0.5rem; align-items: baseline; }
+.search-result-title { font-weight: 600; font-size: 0.9rem; }
+.search-result-crumbs { font-size: 0.78rem; color: var(--muted); }
+.search-result-preview { display: block; font-size: 0.85rem; color: var(--muted); overflow-wrap: anywhere; }
+.search-result mark { background: none; color: var(--text); font-weight: 650; text-decoration: underline; text-decoration-color: var(--link); text-underline-offset: 2px; }
+.search-note, .search-summary { color: var(--muted); font-size: 0.85rem; margin: 0.3rem 0.6rem; }
+.search-all { display: block; padding: 0.35rem 0.6rem; font-size: 0.85rem; border-radius: 6px; }
+.search-all:hover { background: var(--surface); text-decoration: none; }
+/* The keyboard selection looks different from hover and wins when both apply. */
+.search-result[aria-selected="true"], .search-all[aria-selected="true"] {
+  background: color-mix(in srgb, var(--link) 12%, transparent); box-shadow: inset 2px 0 0 var(--link); text-decoration: none;
+}
+.search-list .search-result { padding: 0.6rem 0.75rem; margin: 0.2rem 0; }
+.search-unavailable[hidden] { display: none; }
+
+@media (max-width: 600px) {
+  dialog.search-dialog { margin-top: 0.5rem; max-height: 85vh; }
+  .search-panel, .search-panel form { max-height: calc(85vh - 2px); }
+}
+
+/* Editing (hermetic serve, same machine only): every control below is added by the script. */
+.site-nav .today { color: var(--text); font-weight: 600; }
+/* The save status: a small label in the window's bottom-left corner, out of the header. */
+.edit-status {
+  position: fixed; left: 0.6rem; bottom: 0.5rem; z-index: 5; pointer-events: none;
+  padding: 0.05rem 0.4rem; border-radius: 4px; background: var(--bg);
+  color: var(--muted); font-size: 0.7rem;
+}
+.edit-status[data-state="unsaved"] { color: var(--todo); }
+.edit-status:empty { display: none; }
+.edit-status.faded { opacity: 0; transition: opacity 0.4s ease; }
+html[data-hermetic-editing] section.content li.block > .block-body { cursor: text; }
+.block-editor-wrap { position: relative; margin: 0 -0.25rem; border-radius: 4px; background: var(--surface); }
+/* The textarea's text is transparent: the mirror behind it shows the same text coloured.
+   Both must lay text out identically, so styles in the mirror never change glyph widths. */
+.block-editor, .block-editor-mirror {
+  display: block; width: 100%; box-sizing: border-box; margin: 0; border: none; padding: 0.05rem 0.25rem;
+  font: inherit; font-family: "Inter Upright", sans-serif; font-synthesis: style;
+  line-height: inherit; letter-spacing: inherit; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; tab-size: 4;
+}
+.block-editor {
+  position: relative; resize: none; overflow: hidden; background: transparent;
+  color: transparent; caret-color: var(--text);
+}
+.block-editor:focus { outline: none; }
+.block-editor::selection { color: transparent; background: color-mix(in srgb, var(--link) 25%, transparent); }
+.block-editor-mirror { position: absolute; inset: 0; color: var(--text); pointer-events: none; overflow: hidden; }
+.block-editor-mirror .hl-mark, .block-editor-mirror .hl-prop { color: var(--muted); }
+.block-editor-mirror .hl-ref, .block-editor-mirror .hl-link { color: var(--link); }
+.block-editor-mirror .hl-code { color: var(--muted); background: var(--bg); border-radius: 3px; }
+.block-editor-mirror .hl-strong { -webkit-text-stroke: 0.04em currentColor; }
+.block-editor-mirror .hl-em { font-style: italic; }
+.block-editor-mirror .hl-strike { text-decoration: line-through; color: var(--muted); }
+.block-editor-mirror .hl-todo { color: var(--todo); }
+.block-editor-mirror .hl-doing { color: var(--doing); }
+.block-editor-mirror .hl-done { color: var(--done); }
+.block-body.pending { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
+.editor-start { cursor: text; }
+.edit-notice {
+  border: 1px solid var(--border); border-left: 3px solid var(--link); border-radius: 6px;
+  padding: 0.5rem 0.75rem; margin: 0.5rem 0 1rem; background: var(--surface);
+}
+.edit-notice p { margin: 0 0 0.4rem; }
+.edit-notice textarea {
+  display: block; width: 100%; box-sizing: border-box; font-family: "JetBrains Mono", monospace;
+  font-size: 0.85rem; margin-bottom: 0.4rem; color: var(--text); background: var(--bg);
+  border: 1px solid var(--border); border-radius: 4px;
+}
+.edit-notice button { font: inherit; font-size: 0.85rem; margin-right: 0.4rem; }
+.block-handle {
+  position: absolute; left: -1.2rem; top: 0.3em; width: 1rem; height: 1rem; padding: 0;
+  border: none; border-radius: 50%; background: transparent; cursor: pointer; z-index: 1;
+}
+.block-handle:hover, .block-handle:focus-visible { background: var(--surface); outline: 1px solid var(--border); }
+.complete-list, .block-menu {
+  position: fixed; z-index: 30; min-width: 14rem; max-width: min(28rem, calc(100vw - 16px));
+  max-height: 50vh; overflow-y: auto; padding: 0.25rem; background: var(--bg);
+  border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+}
+.complete-item { display: block; padding: 0.3rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+.complete-item[aria-selected="true"], .complete-item:hover { background: var(--surface); }
+.complete-detail { display: block; font-size: 0.78rem; color: var(--muted); }
+.block-menu button { display: block; width: 100%; text-align: left; font: inherit; font-size: 0.9rem; padding: 0.3rem 0.5rem; border: none; border-radius: 6px; background: none; color: var(--text); cursor: pointer; }
+.block-menu button:hover, .block-menu button:focus-visible { background: var(--surface); }
+.task-marker[role="button"] { cursor: pointer; user-select: none; }
+.task-marker[role="button"]:hover { background: var(--surface); }
+.task-marker[role="button"]:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+/* Every block row can be clicked to edit it, also an empty block. */
+html[data-hermetic-editing] section.content li.block > .block-body { min-height: 1.6em; }
+.write-home { font: inherit; font-weight: 600; margin-right: 0.4rem; cursor: pointer; }
+p.warning { border-left: 3px solid var(--todo); padding: 0.4rem 0.75rem; background: var(--surface); border-radius: 4px; }
+.page-header { position: relative; }
+.page-menu { position: absolute; top: 0.3rem; right: 0; }
+.page-menu-button {
+  display: inline-grid; place-items: center; width: 1.9rem; height: 1.9rem; padding: 0;
+  border-color: transparent; opacity: 0.6;
+}
+.page-menu-button:hover, .page-menu-button:focus-visible, .page-menu-button[aria-expanded="true"] {
+  opacity: 1; border-color: var(--border);
+}
+.page-menu-items {
+  position: absolute; top: calc(100% + 0.3rem); right: 0; z-index: 20; min-width: 11rem; width: max-content; padding: 0.25rem;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+}
+.page-menu-items[hidden] { display: none; }
+.page-menu-items button {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%; text-align: left; white-space: nowrap; border: none;
+  border-radius: 6px; padding: 0.35rem 0.5rem; color: var(--text); font-size: 0.9rem;
+}
+.page-menu-items button:hover, .page-menu-items button:focus-visible { background: var(--surface); }
+.page-menu-items .icon { width: 15px; height: 15px; }
+.page-menu-items button[hidden] { display: none; }
+.page-menu-items kbd {
+  margin-left: auto; padding-left: 1rem; font-family: "JetBrains Mono", monospace; font-size: 0.75rem; color: var(--muted);
+}
+.page-header:has(.page-menu) h1 { padding-right: 2.5rem; }
+dialog.confirm-delete {
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text);
+  padding: 1rem 1.5rem; max-width: min(30rem, 90vw);
+}
+dialog.confirm-delete::backdrop { background: rgb(0 0 0 / 0.35); }
+dialog.confirm-delete h2 { margin-top: 0; font-size: 1.15rem; }
+dialog.confirm-delete .error { color: var(--todo); }
+dialog.page-props {
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text);
+  padding: 1rem 1.5rem; width: min(32rem, calc(100vw - 2rem)); box-sizing: border-box;
+}
+dialog.page-props::backdrop { background: rgb(0 0 0 / 0.35); }
+dialog.page-props h2 { margin-top: 0; font-size: 1.15rem; }
+dialog.page-props .error { color: var(--todo); font-size: 0.85rem; }
+.prop-rows { display: grid; gap: 0.3rem; }
+.prop-row { display: flex; align-items: center; gap: 0.35rem; }
+.prop-row input {
+  font: inherit; font-size: 0.9rem; color: var(--text); background: var(--surface);
+  border: 1px solid transparent; border-radius: 4px; padding: 0.2rem 0.4rem; min-width: 0;
+}
+.prop-row input:focus { outline: 2px solid var(--link); outline-offset: 0; }
+.prop-row input[aria-invalid="true"] { border-color: var(--todo); }
+.prop-key { flex: 0 1 9rem; width: 0; font-family: "JetBrains Mono", monospace; }
+/* Inputs have an intrinsic width; a zero basis lets the row fit the dialog. */
+.prop-value { flex: 1 1 0; width: 0; }
+.prop-sep { color: var(--muted); font-family: "JetBrains Mono", monospace; font-size: 0.85rem; }
+.prop-delete { display: flex; align-items: center; gap: 0.3rem; flex: none; padding: 0.2rem 0.35rem; border-color: transparent; }
+.prop-delete .icon { width: 15px; height: 15px; }
+.prop-delete:focus-visible { outline: 2px solid var(--link); outline-offset: 0; }
+.prop-delete[data-armed] { color: var(--bg); background: var(--todo); border-color: var(--todo); }
+.prop-confirm { font-size: 0.8rem; white-space: nowrap; }
+.prop-hint { font-size: 0.8rem; color: var(--muted); margin-bottom: 0; }
+.dialog-buttons { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
+button.danger { color: var(--bg); background: var(--todo); border-color: var(--todo); }
+button.danger:hover { color: var(--bg); background: var(--todo); filter: brightness(1.1); }
+button.danger:disabled { opacity: 0.5; filter: none; cursor: default; }
+
+/* Maintenance (hermetic serve, same machine only): the actions, and the unused assets. */
+ul.maintenance-actions { list-style: none; padding-left: 0; }
+ul.maintenance-actions > li { margin: 0.5rem 0; padding: 0.6rem 0.9rem; background: var(--surface); border-radius: 6px; }
+ul.maintenance-actions > li > a { font-weight: 600; }
+ul.maintenance-actions > li > p { margin: 0.2rem 0 0; font-size: 0.9rem; color: var(--muted); }
+.maintenance-unavailable[hidden] { display: none; }
+.unused-assets { display: block; }
+.unused-summary { color: var(--muted); }
+.unused-result:empty { display: none; }
+.unused-result { padding: 0.5rem 0.9rem; border-radius: 6px; background: var(--surface); font-size: 0.9rem; }
+.unused-result p, .unused-result ul { margin: 0.2rem 0; }
+.unused-toolbar {
+  position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 0.5rem; padding: 0.5rem 0; background: var(--bg); border-bottom: 1px solid var(--border);
+}
+.unused-toolbar[hidden], .unused-list[hidden] { display: none; }
+.unused-select-all { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer; }
+.unused-list { list-style: none; padding-left: 0; margin: 0; }
+.unused-list > li {
+  display: grid; grid-template-columns: auto 3rem minmax(0, 1fr) auto; align-items: center; gap: 0.75rem;
+  padding: 0.35rem 0; border-bottom: 1px solid var(--border);
+}
+.unused-preview { width: 3rem; height: 3rem; border-radius: 4px; background: var(--surface); overflow: hidden; }
+.unused-preview img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.unused-path { font-family: "JetBrains Mono", monospace; font-size: 0.85rem; overflow-wrap: anywhere; }
+.unused-size { font-size: 0.85rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+dialog.confirm-trash .confirm-files {
+  max-height: 12rem; overflow-y: auto; margin: 0; padding: 0.4rem 0.6rem; list-style: none;
+  background: var(--surface); border-radius: 6px; font-size: 0.85rem;
+}
+dialog.confirm-trash .confirm-files code { background: none; padding: 0; overflow-wrap: anywhere; }

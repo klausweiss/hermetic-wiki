@@ -138,6 +138,25 @@ fn inherited_references_and_self_links_make_no_edges() {
 }
 
 #[test]
+fn namespace_children_and_aliases_are_connected() {
+    let notes = Notes::new(&[
+        ("pages/alternatives/obsidian.md", "- o"),
+        ("pages/emanote.md", "- alias:: alternatives/emanote"),
+        ("pages/quartz.md", "- alias:: alternatives/quartz\n- see [[alternatives]]"),
+    ]);
+    let (g, _) = notes.load();
+    let o = g.overview();
+    assert_eq!(
+        edges(&g, &o),
+        [
+            edge("alternatives", "alternatives/obsidian", 1),
+            edge("alternatives", "emanote", 1),
+            edge("alternatives", "quartz", 2),
+        ]
+    );
+}
+
+#[test]
 fn block_refs_connect_to_the_target_page() {
     let notes = Notes::new(&[
         ("pages/redis.md", "- the bug\n  id:: ttl-bug"),

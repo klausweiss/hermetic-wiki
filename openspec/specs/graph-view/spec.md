@@ -29,7 +29,7 @@ The graph SHALL have one node for every page that is not a journal page, includi
 - **THEN** `graph.html` has a node for `scratch` with no edges
 
 ### Requirement: Edges
-Two distinct nodes P and Q SHALL be connected by one undirected edge when at least one block connects them: a block located on P that directly references Q or a block of Q (or the reverse), or a block anywhere, including on journal pages, in which P and Q are co-mentioned (see `reference-graph`). The edge's weight SHALL be the number of distinct such blocks. Edges SHALL be drawn thicker for higher weights, up to a maximum thickness. Inherited references SHALL NOT create edges, and a page SHALL NOT be connected to itself.
+Two distinct nodes P and Q SHALL be connected by one undirected edge when at least one block connects them: a block located on P that directly references Q or a block of Q (or the reverse), or a block anywhere, including on journal pages, in which P and Q are co-mentioned (see `reference-graph`), or one of P and Q is listed under the other as a namespace child or through a namespaced alias (see `reference-graph`, Namespace children). The edge's weight SHALL be the number of distinct such blocks, plus one when one page is listed under the other. Edges SHALL be drawn thicker for higher weights, up to a maximum thickness. Inherited references SHALL NOT create edges, and a page SHALL NOT be connected to itself.
 
 #### Scenario: Link between pages
 - **WHEN** `pages/auth.md` contains `- uses [[redis]]`
@@ -42,6 +42,10 @@ Two distinct nodes P and Q SHALL be connected by one undirected edge when at lea
 #### Scenario: Co-mention in a journal
 - **WHEN** a journal block contains `[[claude]] helped design [[hermetic]]` and no page links one to the other
 - **THEN** `claude` and `hermetic` are connected by an edge of weight 1
+
+#### Scenario: Namespace child
+- **WHEN** `pages/Project X/Billing.md` exists and `pages/emanote.md` declares `alias:: alternatives/emanote`, with no links between these pages
+- **THEN** `Project X` and `Project X/Billing` are connected by an edge of weight 1, and so are `alternatives` and `emanote`
 
 #### Scenario: Journal reference alone
 - **WHEN** a journal block contains only `[[kafka]]`

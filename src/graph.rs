@@ -171,7 +171,8 @@ impl Related<'_> {
 
 /// The whole-wiki graph of the graph view: every non-journal page, and an edge between
 /// two of them for each block connecting them (a link from one to the other, or a
-/// co-mention).
+/// co-mention) and for one being listed under the other (see
+/// [`Graph::namespace_listing`]).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Overview {
     /// Nodes in page order.
@@ -534,6 +535,15 @@ impl Graph {
                 *weights.entry(pair).or_default() += 1;
             }
         }
+        for (i, &p) in nodes.iter().enumerate() {
+            let here = i as u32;
+            for (_, c) in self.namespace_listing(p) {
+                let c = index[c.0 as usize];
+                if c != u32::MAX && c != here {
+                    *weights.entry((here.min(c), here.max(c))).or_default() += 1;
+                }
+            }
+        }
         Overview {
             nodes,
             mentions,
@@ -795,6 +805,9 @@ impl Graph {
                 }
                 if let Some((prefix, _)) = alias.rsplit_once('/') {
                     let parent = self.by_key[&NameKey::new(prefix)];
+                    if parent.0 as usize == i {
+                        continue;
+                    }
                     self.pages[parent.0 as usize]
                         .ns_alias_children
                         .push((alias, PageId(i as u32)));

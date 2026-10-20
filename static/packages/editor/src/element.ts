@@ -386,6 +386,8 @@ export class HermeticEditor extends HTMLElement {
       next = next.nextSibling;
       section.parentElement!.append(document.adoptNode(node));
     }
+    // Live reload re-arms task lists before this fetched copy lands, so arm its labels too.
+    armLabels(section.parentElement!, TASK_LIST_LABELS);
   }
 
   render(): void {
@@ -624,8 +626,7 @@ export class HermeticEditor extends HTMLElement {
   private watchTaskLists(): void {
     const main = document.querySelector("main");
     if (!main) return;
-    const lists = ":scope ul.tasks > li > .task-marker";
-    armLabels(main, lists);
+    armLabels(main, TASK_LIST_LABELS);
     const act = (label: HTMLElement) => void this.advanceListed(label);
     main.addEventListener("click", (e) => {
       const label = (e.target as Element).closest<HTMLElement>("ul.tasks > li > .task-marker[role=button]");
@@ -638,7 +639,7 @@ export class HermeticEditor extends HTMLElement {
         act(target as HTMLElement);
       }
     });
-    document.addEventListener(PAGES_CHANGED, () => armLabels(main, lists));
+    document.addEventListener(PAGES_CHANGED, () => armLabels(main, TASK_LIST_LABELS));
   }
 
   private async advanceListed(label: HTMLElement): Promise<void> {
@@ -1182,6 +1183,9 @@ function showState(label: HTMLElement, state: TaskState): void {
   label.classList.add(`task-${state}`);
   label.title = `${state.toUpperCase()}: click for ${NEXT[state].toUpperCase()}`;
 }
+
+/** Labels of the tasks in task lists (the open-tasks pages and "Open tasks" sections). */
+const TASK_LIST_LABELS = ":scope ul.tasks > li > .task-marker";
 
 /** Makes task labels matching `selector` under `root` controls. */
 function armLabels(root: Element, selector: string): void {

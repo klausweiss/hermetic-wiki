@@ -1,0 +1,1 @@
+- alias:: read-only mode

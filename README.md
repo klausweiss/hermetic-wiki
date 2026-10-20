@@ -1,37 +1,39 @@
 # <img src="static/favicon.svg" width="32" height="32" alt=""> hermetic
 
-The files for installing hermetic with uv and Nix are in [`packaging/`](packaging/).
+hermetic turns a folder of Markdown notes into a project wiki: you edit it in the browser, then publish it as a static site.
 
-Run without installing:
+**Demo:** https://klausweiss.github.io/hermetic-wiki (built from [`wiki/`](wiki/))
 
-```sh
-uvx --from "git+ssh://git@github.com/klausweiss/hermetic-wiki.git#subdirectory=packaging/python" hermetic --help
-```
+## Install and run
 
-Install:
+Install with **either** uv (builds from source, needs `cargo`):
 
 ```sh
 uv tool install "git+ssh://git@github.com/klausweiss/hermetic-wiki.git#subdirectory=packaging/python"
 ```
 
-Both build hermetic from source, so they need a Rust toolchain (`cargo`) on the machine.
-
-## With Nix
-
-Nix builds hermetic with its own toolchain, so nothing else needs to be installed.
-These need flakes enabled (`experimental-features = nix-command flakes`).
-
-Run without installing:
-
-```sh
-nix run "git+ssh://git@github.com/klausweiss/hermetic-wiki.git?dir=packaging/nix" -- --help
-```
-
-Install into your profile:
+**or** Nix (needs flakes, nothing else):
 
 ```sh
 nix profile install "git+ssh://git@github.com/klausweiss/hermetic-wiki.git?dir=packaging/nix"
 ```
 
-From a checkout, `nix build ./packaging/nix` puts the binary in `./result/bin/hermetic`, and
-`nix develop ./packaging/nix` opens a shell with the tools for working on hermetic.
+Then:
+
+```sh
+hermetic serve my-wiki/         # edit in the browser
+hermetic build my-wiki/ site/   # render a static site
+```
+
+<details>
+<summary>Try it without installing</summary>
+
+```sh
+uvx --from "git+ssh://git@github.com/klausweiss/hermetic-wiki.git#subdirectory=packaging/python" hermetic serve my-wiki/
+```
+
+```sh
+nix run "git+ssh://git@github.com/klausweiss/hermetic-wiki.git?dir=packaging/nix" -- serve my-wiki/
+```
+
+</details>
